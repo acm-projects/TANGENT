@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://media.tenor.com/B1KlQs7e3R4AAAAd/see-you-again-paul-walker.gif" alt="See You Again" width="600"/>
+  <img src="https://media.tenor.com/B1KlQs7e3R4AAAAM/see-you-again-paul-walker.gif" alt="See You Again" width="480"/>
 </p>
 
 <!-- Drop the Tangent logo at ./assets/tangent-logo.png, then uncomment this block:
