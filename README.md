@@ -50,25 +50,24 @@ Most AI chat tools are built like a straight line: you ask, you get an answer, y
 
 ## How It Works 🧠
 
-The whole project rests on one idea: **a branching conversation is a prefix tree, and LLM providers discount shared prefixes.** The simplest architecture and the cheapest architecture turn out to be the same architecture.
+Tangent is a chat app where the conversation is a tree instead of one long list.
 
-**Storage.** Every node is one row in Postgres with a `parent_id` column pointing at its parent. That single column is the entire tree structure, and one `WITH RECURSIVE` query walks it from any node back up to the root. The messages belonging to a node live on that same row as JSONB, each carrying role, content, model, token counts, and a timestamp. Rebuilding a branch's history costs one recursive query whether the branch sits two levels deep or twenty.
+* **Every branch is a row in the database** that remembers which branch it came from.
+* **Each branch also records how far along the conversation was when it split off,** and that number never changes afterwards.
+* **Rebuilding a branch's history** means following the chain of parents back and taking only the messages that existed when each split happened.
+* **Branches stay apart on their own:** two made from the same point never see each other's messages.
+* **Running costs stay low** because providers charge far less for history they have already read, and every branch shares most of its history with its parent.
 
-**The fork index.** When a branch is created it records how many messages its parent had at that exact instant, and that number is then frozen forever. To rebuild any branch's context, walk up the parent chain and take only the messages up to each ancestor's stored index. Because the number never updates afterwards, two useful properties come free: sibling branches never see each other, and messages added to a parent after a fork never leak backwards into it.
+### ⚠️ If this part is wrong, nothing crashes
 
-**Why the ordering rule exists.** Providers reuse an already-processed prefix at roughly a 90% discount, but only when that prefix is byte-identical every single time. So every request is assembled in the same order: static system prompt first, then ancestor messages serialized identically, then the newest message last. Nothing that changes per request (a timestamp, a token count, a random ID) may sit anywhere inside the cached region.
+* **The app keeps working,** which is exactly what makes it dangerous.
+* **Answers look completely normal,** except the AI was handed a history that never happened on that branch.
+* **Nobody catches it by looking,** so it surfaces weeks later once the mind map and Battle mode are sitting on top of it.
+* **So this gets built and tested first,** before any of the visual work starts.
 
-### ⚠️ The one failure mode everyone on this team needs to understand
+### What gets built on top
 
-**If the context layer is wrong, nothing crashes.**
-
-That is what makes it dangerous. A normal bug announces itself with a stack trace or a 500, and you go fix it. This one announces nothing at all. The server stays up, the request succeeds, the map renders, tokens stream back into the chat exactly as they should.
-
-What actually happened is that the model was handed a history that is quietly not the one the user is looking at. A sibling branch's messages bled in, or a parent's later messages leaked backwards into a branch that forked before those messages existed. The reply that comes back is fluent and confident and shaped like every other reply in the app. It is a plausible answer built on the wrong history, and plausible is precisely the problem: there is no visible seam between a correct answer and a corrupted one.
-
-The only way anyone catches it is by knowing a conversation well enough to notice the model responding to something that was never said on that branch. Nobody reads that carefully during a demo. Nobody reads that carefully in Week 6 either, which means a bug introduced in Week 4 can sit there silently poisoning every branch in the app until someone finally looks closely, and by then it has been feeding wrong material into the features built on top of it. The mind map will happily draw a tree that misrepresents what each node actually knows, and Battle mode will adjudicate between two cases assembled from material neither side was supposed to see, producing a verdict that is wrong for reasons invisible in the output.
-
-**So the build order is not up for debate.** The storage model and context reconstruction get written and tested *before* a single node is drawn on screen. Tests must assert the exact reconstructed message list for deep and re-entrant trees, not that the output merely looks reasonable, because looking reasonable is the failure mode. This is Week 4 work, and Week 4 is the week to slow down rather than speed up.
+The tree and the history rebuilding are the foundation. Agentic features are layered on top of it, where the model works the tree itself rather than one message at a time, proposing tangents worth taking and developing several branches in parallel. The same structure suits research, where separate angles stay in separate branches until Battle mode settles the ones that genuinely conflict.
 
 ---
 
@@ -262,66 +261,53 @@ API access and billing are separate from any consumer chat subscription. A Pro p
   </tr>
   <tr>
     <td align="center"><b>1</b></td>
-    <td colspan="2">Shared: project planning, architecture walkthrough, stack setup on every machine, tutorial ramp-up. The whole team agrees the node/edge schema on paper before any code is written. Deliverable is a written schema spec and a repo skeleton, not features.</td>
+    <td colspan="2">Everyone: plan the project, walk through how it works, get the tools installed on every machine, and work through the tutorials. Agree on paper how a conversation tree will be stored before anyone writes code. The goal this week is a written plan and an empty project, not features.</td>
   </tr>
   <tr>
     <td align="center"><b>2</b></td>
-    <td>Scaffold React + TypeScript + Tailwind. Build the static chat UI: message list, composer, streaming placeholder. Wire the Zustand store shape to match the agreed schema.</td>
-    <td>Scaffold FastAPI. Postgres schema + migrations for sessions and nodes. Auth endpoints. A single non-branching chat endpoint that proxies to the model API.</td>
+    <td>Set up the React project. Build the chat screen: a list of messages and a box to type in. No real answers yet.</td>
+    <td>Set up the server and the database. Create tables for users, sessions, and branches. Build a basic chat endpoint that can talk to the AI.</td>
   </tr>
   <tr>
     <td align="center"><b>3</b></td>
-    <td>Connect UI to backend. Stream tokens into the message list over WebSocket. Session list, create and load a session.</td>
-    <td>WebSocket streaming from provider to client. Node creation, message persistence to JSONB. Begin the ancestor-path walk (recursive query).</td>
+    <td>Connect the chat screen to the server so answers appear word by word as they arrive. Add a list of saved conversations.</td>
+    <td>Send the AI's answers to the browser as they come in. Save every message to the database as it is written, not just at the end.</td>
   </tr>
   <tr>
     <td align="center"><b>4</b></td>
-    <td>Build the "Start a Tangent" affordance and the breadcrumb trail. Local branch switching in the store.</td>
-    <td>Finish fork logic: parent pointer + fork index stamping. Context reconstruction endpoint. Unit-test against deep and re-entrant trees. <b>This is the highest-risk correctness work in the project.</b></td>
+    <td>Add a "Start a Tangent" button to each message, and a trail across the top showing where you currently are in the tree.</td>
+    <td>Build the branching. When a branch is made, record which branch it came from and how far along the conversation was. Then build the part that rebuilds a branch's history, and test it properly. <b>This is the riskiest work in the whole project.</b></td>
   </tr>
   <tr>
     <td align="center"><b>5</b></td>
-    <td>React Flow mind map: render the live tree, color-coded branches, click-to-jump navigation, auto-layout.</td>
-    <td>Restructure prompt assembly so the cached prefix is byte-identical every call. Wire per-message token, cost, and model recording.</td>
+    <td>Draw the mind map next to the chat. Colour the branches, and make clicking a node jump you into that branch.</td>
+    <td>Make sure the conversation history is sent to the AI the same way every time, so the cost stays low. Record how many tokens each message used.</td>
   </tr>
   <tr>
     <td align="center"><b>6</b></td>
-    <td>Map polish: active-node highlighting, pan and zoom, keeping map and chat in sync. Usage readout in the UI.</td>
-    <td>Verify and log the cache-hit rate from provider response metadata. Confirm the discount is actually landing before building on top of it.</td>
+    <td>Polish the map: highlight the branch you are on, add zoom and drag, and keep the map and the chat in step with each other. Show token usage on screen.</td>
+    <td>Check the cost savings are actually happening by logging them, before anything else gets built on top.</td>
   </tr>
   <tr>
     <td align="center"><b>7</b></td>
-    <td>Prompt Coach UI: collapsed by default, expands on click, renders 2-3 suggestions. Refine Prompt pre-send flow.</td>
-    <td>Coach endpoint: cheap model, prompt-only input, capped JSON output. Side-aware system prompt variants for Battle branches.</td>
+    <td>Build the Prompt Coach panel. Closed by default, and when opened it shows two or three ways to improve the question.</td>
+    <td>Build the Coach behind it. Use the cheapest model, send it only the user's question rather than the whole conversation, and keep the reply short.</td>
   </tr>
   <tr>
     <td align="center"><b>8</b></td>
-    <td>Battle mode UI: two-branch fork, side-by-side case building, the Battle button, verdict display.</td>
-    <td>Battle backend: position-document assembly, adjudicator call, Battle-node storage with source references and an input snapshot.</td>
+    <td>Build Battle mode: the two-sided split, the two cases shown side by side, the Battle button, and the verdict screen.</td>
+    <td>Collect each side's argument, send both to the AI to judge between them, and save the verdict as a new branch.</td>
   </tr>
   <tr>
     <td align="center"><b>9</b></td>
-    <td>Export (PNG + shareable link). Empty states, error states, loading states. Responsive polish.</td>
-    <td>Share-link endpoints and read-only access. Hardening, rate limiting, spend cap verification.</td>
+    <td>Export the map as an image and a shareable link. Handle the empty, loading, and error screens. Make it work in smaller windows.</td>
+    <td>Build the share links and view-only access. Add limits so nobody can accidentally run up a bill.</td>
   </tr>
   <tr>
     <td align="center"><b>10</b></td>
-    <td colspan="2" align="center">✨ Feature freeze. Demo rehearsal, bug triage on the demo path only, presentation prep. No new scope. ✨</td>
+    <td colspan="2" align="center">✨ Everyone: stop adding features. Practise the demo, fix only what breaks the demo, and prepare the presentation. ✨</td>
   </tr>
 </table>
-
----
-
-## What to Cut if the Timeline Slips ✂️
-
-In this order, without agonizing over it:
-
-1. **TipTap** → fall back to a plain textarea
-2. **PNG export** → the shareable link alone is sufficient
-3. **Frozen-summary optimization** → only needed if usage logs show deep trees are actually common
-4. **Multi-model support of any kind** → already a stretch goal, cut without hesitation
-
-**Protect the core loop, the mind map, and Battle mode. Those three are the demo.**
 
 ---
 
