@@ -18,7 +18,7 @@ server-side, not just in the UI).
 from dataclasses import dataclass
 from typing import Sequence
 
-from schemas import ChatMessage, PathNode
+from app.context.schemas import ChatMessage, PathNode
 
 
 @dataclass(frozen=True)

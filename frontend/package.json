@@ -3,12 +3,11 @@
     "@types/node": "^26.6.3",
     "oxlint": "^1.86.0",
     "react": "^18.3.1",
-    "typescript": "^7.0.2",
+    "typescript": "7.0.2",
     "vitest": "^2.1.9"
   },
   "dependencies": {
     "axios": "^1.20.0",
-    "typecheck": "^0.1.2",
     "zustand": "^5.0.15"
   },
   "scripts": {
