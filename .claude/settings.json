@@ -1,0 +1,11 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:20128",
+    "ANTHROPIC_AUTH_TOKEN": "sk-df3a3a2ed0e3c549-a298d6-f829ca94",
+    "ANTHROPIC_MODEL": "auto/best-free",
+    "ANTHROPIC_SMALL_FAST_MODEL": "auto/best-free",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "auto/best-free",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "auto/best-free",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "auto/best-free"
+  }
+}
