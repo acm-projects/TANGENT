@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from TANGENT.backend.app.context.flatten import flatten, to_provider_messages
-from TANGENT.backend.app.context.schemas import ChatMessage, PathNode
+from app.context.flatten import flatten, to_provider_messages
+from app.context.schemas import ChatMessage, PathNode
 
 NOW = datetime(2026, 9, 29, tzinfo=timezone.utc)
 
