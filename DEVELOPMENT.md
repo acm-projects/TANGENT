@@ -52,6 +52,7 @@ backend/app/
 backend/tests/       pytest, mirrors app/
 
 frontend/src/
+    app/             Next.js App Router: pages, layouts (npm run dev)
     api/             foundation: client.ts, stream.ts, services.ts, types.ts
     store/           foundation: treeStore.ts
     features/<f>/    one folder per feature
