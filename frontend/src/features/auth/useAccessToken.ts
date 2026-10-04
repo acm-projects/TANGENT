@@ -16,8 +16,9 @@ export function useAccessToken(): "loading" | "authed" | "anon" {
       url.searchParams.delete("access_token");
       window.history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
-    if (getAccessToken()) return setState("authed");
-    apiClient.refresh().then(
+    // setState only inside the promise callbacks, never synchronously in the effect body.
+    const ready = getAccessToken() ? Promise.resolve() : apiClient.refresh();
+    ready.then(
       () => setState("authed"),
       () => setState("anon"),
     );
