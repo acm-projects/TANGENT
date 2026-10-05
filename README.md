@@ -20,6 +20,19 @@ Most AI chat tools are built like a straight line: you ask, you get an answer, y
 
 ---
 
+## Docs 📚
+
+Four docs, four jobs. Start with whichever question you have.
+
+| Doc | Answers |
+|---|---|
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | How do I run it, test it, and open a PR? **Start here.** |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How does the system work, and why is it built this way? |
+| [docs/FILE_STRUCTURE.md](docs/FILE_STRUCTURE.md) | Where does my new file go, and what do I call it? |
+| [docs/DESIGN.md](docs/DESIGN.md) | How is the UI layered and styled? (Authority inside `src/ui/`.) |
+
+---
+
 ## MVP ✅
 * **Standard Chat Interface** → Model selection and streamed responses
 * **Start a Tangent** → Branch from any message to fork a child thread from that exact point
@@ -72,7 +85,14 @@ The tree and the history rebuilding are the foundation. Agentic features are lay
 ---
 
 ## Tech Stack & Resources
-#### React + TypeScript • Tailwind • React Flow • Zustand • FastAPI • PostgreSQL • Gemini API
+#### Next.js + React + TypeScript • React Flow • Zustand • FastAPI • PostgreSQL
+
+> **The resource list below is learning material from week 1, not the current
+> stack.** Two things changed: we build on **Next.js** (App Router), not Vite, and
+> we use **plain CSS with design tokens**, not Tailwind — see
+> [docs/DESIGN.md](docs/DESIGN.md). Ignore the Vite and Tailwind links; the rest
+> still applies. For what is actually built, read
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 <details>
 <summary>Frontend</summary>

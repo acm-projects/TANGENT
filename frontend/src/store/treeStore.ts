@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, NodeMeta } from "../api/types";
+import type { ChatMessage, NodeMeta } from "@/api/types";
 
 /**
  * Two slices, on purpose:
