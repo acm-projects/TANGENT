@@ -54,15 +54,23 @@ backend/app/
 backend/tests/       pytest, mirrors app/
 
 frontend/src/
-    app/             Next.js App Router: thin route files that re-export a feature page (npm run dev)
+    app/             Next.js App Router: routes only, no UI (npm run dev)
+    ui/
+      components/    foundation: design library (tokens, primitives, composites)
+      pages/<p>/     one folder per screen of the site
+        features/    features used only by that page
     api/             foundation: client.ts, stream.ts, services.ts, types.ts
     store/           foundation: treeStore.ts
-    features/<f>/    one folder per feature
+    features/<f>/    features shared by two or more pages
 ```
 
 Folders split by **runtime** (server vs browser), not concept. There is no "middle end" folder; the seam is the API contract (section 5).
 
-**Foundation** (`core/`, `context/`, `api/`, `store/`) changes rarely and via review (enforced by `CODEOWNERS`). **Features** are owned by one person each, end to end: DB change, endpoint, client wrapper, state, UI, tests.
+**Foundation** (`core/`, `context/`, `api/`, `store/`, `ui/components/`) changes rarely and via review (**[planned]** — `CODEOWNERS` does not exist yet). **Features** are owned by one person each, end to end: DB change, endpoint, client wrapper, state, UI, tests.
+
+On the frontend, **pages** are screens (they arrange features and own layout); **features** are the pieces a page uses (they own behaviour, state and data calls). A feature starts inside the page that needs it and moves to `src/features/` once a second page uses it. Layering, import direction, and styling rules are in **DESIGN.md**.
+
+The `src/ui/` tree is scaffolded with `.gitkeep` files so the empty folders survive a clone (see section 9).
 
 ---
 
@@ -105,7 +113,7 @@ git commit -m "..." && git push -u origin <branch>
 - `summary` is display-only (mind-map hover), never used for context.
 - **Merge nodes** are ordinary nodes whose `parent_id` is the LCA of the two source leaves. Each branch's LCA-to-leaf messages are **copied** into the merge node's `chats`, tagged `a`/`b`. A merge is a snapshot. `node_merge_sources` exists only so the mind map can draw merge edges.
 - Deleting a node cascades to its subtree.
-- The DB also has workspaces, projects, shares, and invitations..
+- The DB also has workspaces, projects, shares, and invitations.
 
 ### 5.2 Context reconstruction (`backend/app/context/`) [built]
 
@@ -189,8 +197,12 @@ Frontend routes **[built, not yet tested against a real backend]**: `/` redirect
 
 ```
 backend/app/features/<f>/   router.py (thin), service.py (logic + DB), schemas.py
-frontend/src/features/<f>/  api.ts, store.ts (if needed), components/
+frontend/<feature dir>/     api.ts, store.ts (if needed), components/
 ```
+
+The frontend feature dir is `src/ui/pages/<p>/features/<f>/` while only one page
+uses it, and `src/features/<f>/` once a second page does. Build its UI from
+`@/ui/components`; never hand-roll styling (DESIGN.md).
 
 ### Recipe
 1. Branch off `dev`.
@@ -216,8 +228,8 @@ async def list_polls(node_id: str): ...
 ```
 
 ```ts
-// frontend/src/features/polls/api.ts
-import type { ApiClient } from "../../api/client";
+// frontend/src/ui/pages/workspace/features/polls/api.ts
+import type { ApiClient } from "@/api/client";   // @/* -> src/*, so nesting depth never matters
 
 export interface Poll { id: string; question: string }
 
@@ -244,6 +256,8 @@ export function createPollsApi({ http }: ApiClient) {
 CI runs all of this on every PR; red CI blocks merging into `dev`.
 
 **Where tests go:** backend in `backend/tests/` (mirrors `app/`; features under `tests/features/<f>/`); frontend next to the code (`foo.test.ts`). Backend imports use `from app.context.flatten import ...`; run pytest from `backend/`.
+
+**Component explorer [planned].** `src/ui/components/` has no isolated preview harness yet. Storybook 10.6 was tried and backed out: `@storybook/nextjs` aliases bare `react`/`react-dom` into Next's private `next/dist/compiled/react`, and on Next 16.3.8 the preview iframe dies at runtime with `class heritage ....Component is not an object or null` — the production build compiles fine, so `build-storybook` does not catch it. If retried: either pin the React aliases back to the real deduped `react` in `.storybook/main.ts`, or use `@storybook/react-webpack5`, which does no Next-specific aliasing. Avoid `@storybook/nextjs-vite` — it wants Vite 7 as a peer and would collide with the Vite 5 that `vitest` bundles. We are not using Vite.
 
 **Patterns**
 1. **Pure logic in, plain data out.** No DB or network inside the function under test.
