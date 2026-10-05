@@ -1,3 +1,3 @@
-import OnboardingPage from "../../features/auth/OnboardingPage";
+import { Onboarding } from "@/ui/pages/onboarding";
 
-export default OnboardingPage;
+export default Onboarding;

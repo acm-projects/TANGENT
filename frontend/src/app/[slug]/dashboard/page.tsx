@@ -1,3 +1,3 @@
-import DashboardPage from "../../../features/auth/DashboardPage";
+import { Dashboard } from "@/ui/pages/dashboard";
 
-export default DashboardPage;
+export default Dashboard;

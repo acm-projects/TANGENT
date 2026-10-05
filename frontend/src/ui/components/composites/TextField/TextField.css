@@ -1,0 +1,18 @@
+/* TextField — see DESIGN.md §4.
+ *
+ * Styles only its own wrapper and parts. The Input inside keeps its own CSS;
+ * this file must never reach into [data-ui="input"]. */
+
+@layer ui {
+  :where([data-ui="textfield"]) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  :where([data-ui="textfield"] [data-part="error"]) {
+    color: var(--color-text-danger);
+    font-size: var(--font-size-sm);
+  }
+}

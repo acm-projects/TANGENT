@@ -1,0 +1,25 @@
+/* Page CSS: layout only, unlayered, tokens only. See DESIGN.md §2 and Rule 8. */
+
+.onboarding {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.onboarding-panel {
+  width: 100%;
+  max-width: var(--measure-card);
+}
+
+.onboarding-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.onboarding-subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}

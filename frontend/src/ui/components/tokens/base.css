@@ -4,26 +4,27 @@
  * a name here describes what the value IS, not what it's FOR.
  * Components use semantic.css instead. See DESIGN.md Rule 1.
  *
- * Starting-point palette — swap these for the real Tangent values. */
+ * Palette lifted from the original auth screens, which were the only place real
+ * Tangent colours existed. The app is dark-first, so semantic.css defaults dark. */
 
 :root {
-  /* brand ramp */
-  --purple-400: #a78bfa;
-  --purple-500: #7c3aed;
-  --purple-600: #6d28d9;
+  /* accent */
+  --blue-400: #74a5ff;
+  --blue-500: #4f8cff;
+  --blue-600: #3f77e0;
 
   /* status */
+  --red-400: #ff6b6b;
   --red-500: #ef4444;
   --red-600: #dc2626;
 
-  /* neutrals */
-  --gray-0: #ffffff;
-  --gray-50: #f9fafb;
-  --gray-200: #e5e7eb;
-  --gray-400: #9ca3af;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  /* neutrals, darkest to lightest */
+  --ink-900: #0f1115;
+  --ink-800: #171a21;
+  --ink-700: #262b36;
+  --ink-400: #8b93a1;
+  --ink-100: #e6e6e6;
+  --ink-0: #ffffff;
 
   /* spacing — 4px base unit, multiply from there */
   --space-1: 0.25rem;
@@ -31,16 +32,23 @@
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-6: 1.5rem;
+  --space-8: 2rem;
 
   /* radii */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
   --radius-full: 999px;
 
   /* type */
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
-  --font-size-lg: 1.125rem;
+  --font-size-lg: 1.25rem;
   --font-weight-medium: 500;
+  --font-weight-semibold: 600;
   --line-height-tight: 1.2;
+  --line-height-base: 1.4;
+
+  /* layout */
+  --measure-card: 380px;
 }

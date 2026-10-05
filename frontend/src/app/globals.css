@@ -1,18 +1,34 @@
 /* The one CSS entry point (imported by layout.tsx).
  *
- * `@layer ui;` pins the layer order before anything declares into it. Component
- * CSS lives in that layer; page and feature CSS stays UNLAYERED, because
- * unlayered CSS always beats layered CSS — that's what lets a page override a
- * component without specificity fights. See DESIGN.md §2 and §4. */
+ * Cascade order, weakest to strongest:
+ *
+ *   @layer reset    ← the * reset below
+ *   @layer ui       ← component CSS (ui/components/ **)
+ *   unlayered       ← page and feature CSS
+ *
+ * The reset MUST be inside a layer. Unlayered CSS beats EVERY layer regardless
+ * of specificity, so an unlayered `* { padding: 0 }` silently outranks a
+ * component's own padding — and no specificity change can fix that, only layer
+ * order can.
+ *
+ * Page and feature CSS stays unlayered on purpose, so it still wins over
+ * component CSS without specificity fights. See DESIGN.md §2 and §4. */
 
-@layer ui;
+@layer reset, ui;
 
 @import "../ui/components/tokens/index.css";
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
 }
 
 body {

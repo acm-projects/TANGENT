@@ -1,5 +1,5 @@
-import type { ApiClient } from "../../api/client";
-import type { OnboardingResponse } from "../../api/types";
+import type { ApiClient } from "@/api/client";
+import type { OnboardingResponse } from "@/api/types";
 
 export function createAuthApi({ http }: ApiClient) {
   return {

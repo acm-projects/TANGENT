@@ -1,0 +1,30 @@
+/* Page CSS: layout only, and deliberately UNLAYERED so it beats @layer ui
+ * without specificity tricks (DESIGN.md §2). Every value is a token — a hex
+ * code here would fail the §7 modularity test.
+ *
+ * The page sets the Panel's width because width is placement, which belongs to
+ * the page, not to the Panel (Rule 8). */
+
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.login-panel {
+  width: 100%;
+  max-width: var(--measure-card);
+}
+
+.login-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.login-subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}

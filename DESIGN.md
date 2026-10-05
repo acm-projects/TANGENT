@@ -114,13 +114,28 @@ consumer. We rely on global, unhashed selectors on purpose.
 `src/app/globals.css` is the only CSS entry point (`layout.tsx` imports it):
 
 ```css
-@layer ui;                                       /* pin the layer order first */
+@layer reset, ui;                                /* pin the layer order first */
 @import "../ui/components/tokens/index.css";
+
+@layer reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; padding: 0; }
+}
 ```
 
-Component CSS lives inside `@layer ui`. Page and feature CSS stays **unlayered**,
-because unlayered CSS always beats layered CSS — that's what lets a page override a
-component without specificity fights. See §4.
+Cascade order, weakest to strongest:
+
+| Tier | Holds | Why it's there |
+|------|-------|----------------|
+| `@layer reset` | the `*` reset | must lose to components |
+| `@layer ui` | `ui/components/**` CSS | beats the reset, loses to app code |
+| unlayered | page and feature CSS | beats components without specificity fights |
+
+**The reset must be inside a layer.** Unlayered CSS beats *every* layer regardless of
+specificity, so an unlayered `* { padding: 0 }` silently outranks a component's own
+`padding` — including a zero-specificity `:where()` rule. No specificity change fixes
+that; only layer order does. This is the one ordering mistake that makes components
+look broken for no visible reason.
 
 ### Component anatomy
 
@@ -330,6 +345,12 @@ downward**: everything a client component imports ships to the browser too.
 - Features are usually the client boundary; pages stay server components where they
   can. This matches Rule 8 — pages arrange (server), features behave (client).
 - Never pass a function as a prop from a server component into a client one.
+  Passing `children` is fine — an element tree is serialisable.
+- **Mark hook files too, not just components.** A module calling `useState`/`useEffect`
+  needs its own `"use client"` if a feature barrel re-exports it: a server component
+  importing *anything* from that barrel pulls every re-exported module into the
+  server graph, and the build fails on the hook. This is the barrel hazard in Rule 4
+  showing up as an RSC error rather than a circular import.
 
 ---
 

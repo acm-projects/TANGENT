@@ -1,5 +1,11 @@
+"use client";
+
+/* Needed even though only client components call this hook: features/auth/index.ts
+ * re-exports it next to SessionGate, and a server component importing SessionGate
+ * from that barrel pulls this module into the server graph too (DESIGN.md Rule 9). */
+
 import { useEffect, useState } from "react";
-import { apiClient, getAccessToken, setAccessToken } from "../../api/session";
+import { apiClient, getAccessToken, setAccessToken } from "@/api/session";
 
 /**
  * The backend callback redirects with `?access_token=...`. Take it once, keep it in memory,

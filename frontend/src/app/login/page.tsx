@@ -1,3 +1,3 @@
-import LoginPage from "../../features/auth/LoginPage";
+import { Login } from "@/ui/pages/login";
 
-export default LoginPage;
+export default Login;
