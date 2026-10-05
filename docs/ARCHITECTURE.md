@@ -63,6 +63,7 @@ Three consequences shape the whole architecture:
   src/ui/pages/<page>/              arranges features, owns layout
     │
     │  src/ui/pages/<page>/features/<f>/   behaviour, state, data calls
+    │  src/ui/features/<f>/                (or shared by several pages)
     ▼
   src/api/                          the seam: transport + typed endpoints
     │         src/store/treeStore.ts   client state (structure | content)
@@ -90,7 +91,7 @@ Both halves use the same split, and it is the most important structural idea in
 the repo:
 
 - **Foundation** — `app/context/`, `app/models.py`, `src/api/`, `src/store/`,
-  `src/ui/components/`. Every feature converges on it. Changes are small,
+  `src/ui/library/`. Every feature converges on it. Changes are small,
   additive, and reviewed. **[planned]** `CODEOWNERS` does not exist yet.
 - **Features** — one router per capability on the backend, plus the frontend
   feature folders. Owned by one person end to end: DB change, endpoint, client
@@ -108,7 +109,7 @@ way:
 1. **A feature never imports another feature.** If two need the same thing,
    promote it to the foundation in its own small PR.
 2. **The foundation never imports a feature.** `flatten.py` knows nothing about
-   polls; `ui/components/` knows nothing about chat.
+   polls; `ui/library/` knows nothing about chat.
 
 The only shared file a feature normally edits is one line in `main.py`:
 `app.include_router(...)`.
@@ -295,7 +296,7 @@ real tree. Keep custom node components memoised — ReactFlow already virtualise
 
 ### 7.4 UI layering
 
-Tokens → primitives → composites → features → pages, with one-way imports.
+Tokens → primitives → components → features → pages, with one-way imports.
 That is **[DESIGN.md](DESIGN.md)**'s territory and it is the authority; this file
 does not restate it.
 

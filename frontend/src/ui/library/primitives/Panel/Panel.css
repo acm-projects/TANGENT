@@ -1,0 +1,50 @@
+/* Panel — see DESIGN.md §4. Hierarchy picks the surface colour, elevation
+ * picks flat or frosted glass. Text and Icon inside inherit the colour set
+ * here.
+ *
+ * Floating mixes the hierarchy's own colour into glass, so each
+ * hierarchy × floating pair has its own rule. Those are (0,3,0) and beat both
+ * the hierarchy rules and the floating rule (0,2,0) by specificity. The
+ * floating rule itself never sets background, so it never ties with a
+ * hierarchy rule. */
+
+@layer ui {
+  [data-ui="panel"] {
+    padding: var(--space-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  /* hierarchy */
+  [data-ui="panel"][data-hierarchy="primary"] {
+    background: var(--color-brand);
+    color: var(--color-text-on-brand);
+  }
+
+  [data-ui="panel"][data-hierarchy="secondary"] {
+    border-color: var(--color-border);
+  }
+
+  [data-ui="panel"][data-hierarchy="tertiary"] {
+    background: transparent;
+  }
+
+  /* elevation */
+  [data-ui="panel"][data-elevation="floating"] {
+    box-shadow: var(--shadow-floating);
+    -webkit-backdrop-filter: blur(var(--blur-floating));
+    backdrop-filter: blur(var(--blur-floating));
+  }
+
+  /* hierarchy × floating: glass tinted by the hierarchy's colour.
+   * Tertiary stays transparent, so floating only adds blur and shadow. */
+  [data-ui="panel"][data-hierarchy="primary"][data-elevation="floating"] {
+    background: color-mix(in srgb, var(--color-brand) var(--glass-mix), transparent);
+  }
+
+  [data-ui="panel"][data-hierarchy="secondary"][data-elevation="floating"] {
+    background: color-mix(in srgb, var(--color-surface) var(--glass-mix), transparent);
+  }
+}

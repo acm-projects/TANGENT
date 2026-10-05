@@ -109,7 +109,7 @@ break are in [ARCHITECTURE.md](ARCHITECTURE.md) §2 and §8. The order of work:
 4. **Backend tests**, mirroring `app/`.
 5. **Client wrapper**: a file in `src/api/endpoints/`, wired in `src/api/index.ts`,
    plus any new types in `src/api/types.ts`.
-6. **State and UI.** Build the UI from `@/ui/components`; never hand-roll styling
+6. **State and UI.** Build the UI from `@/ui/library`; never hand-roll styling
    (DESIGN.md).
 7. **Frontend tests** for hooks and logic, not pixels.
 8. **Run everything locally**, then PR into `dev`.
@@ -181,7 +181,7 @@ next to the code, `<subject>.test.ts`.
 **What to test, and why these particular tests exist:** ARCHITECTURE.md §9. The
 short version — test the invariants in §8, because none of them fail loudly.
 
-**Component explorer [planned].** `src/ui/components/` has no isolated preview
+**Component explorer [planned].** `src/ui/library/` has no isolated preview
 harness. Storybook 10.6 was tried and backed out: `@storybook/nextjs` aliases
 bare `react`/`react-dom` into Next's private `next/dist/compiled/react`, and on
 Next 16.3.8 the preview iframe dies at runtime with

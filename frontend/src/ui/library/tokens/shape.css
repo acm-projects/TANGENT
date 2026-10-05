@@ -1,0 +1,31 @@
+/* shape.css — spacing, radii, elevation. See DESIGN.md Rule 1.
+ *
+ * Spacing and radii are scales, used by components directly
+ * (`padding: var(--space-4)`). Elevation follows the colour rule: raw values
+ * first, then the meanings a component may name. */
+
+:root {
+  /* spacing — 4px base unit, multiply from there */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+
+  /* radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-full: 999px;
+
+  /* elevation — tier 1: raw values, never named by a component */
+  --shadow-md: 0 0 8px rgb(0 0 0 / 0.25);
+  --blur-md: 5px;
+
+  /* elevation — tier 2: meaning */
+  --shadow-floating: var(--shadow-md);
+  --blur-floating: var(--blur-md);
+
+  /* how much of a floating surface's colour shows through the glass */
+  --glass-mix: 25%;
+  --glass-mix-hover: 50%;
+}

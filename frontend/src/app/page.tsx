@@ -5,5 +5,5 @@
  * replaces this body with `<Workspace />` from `@/ui/pages/workspace`.
  */
 export default function Home() {
-  return <main />;
+  return null;
 }
