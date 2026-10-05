@@ -59,7 +59,7 @@ frontend/src/
       components/    foundation: design library (tokens, primitives, composites)
       pages/<p>/     one folder per screen of the site
         features/    features used only by that page
-    api/             foundation: client.ts, stream.ts, services.ts, types.ts
+    api/             foundation (transport only): client.ts, session.ts, stream.ts, types.ts
     store/           foundation: treeStore.ts
     features/<f>/    features shared by two or more pages
 ```
@@ -130,9 +130,10 @@ The **server** builds LLM context; the client sends only `{content}`.
 
 - **`client.ts`**: axios factory `createApiClient({baseURL, auth, adapter?})`. Attaches the JWT; on 401 does a **single-flight refresh** (N concurrent 401s -> 1 refresh call). Refresh rotates tokens and detects reuse, so concurrent refreshes could revoke the session.
 - **`stream.ts`**: SSE over `fetch` (XHR streams badly). Retries **only on 401**, never on stream errors, since retrying a POST re-sends the user's message. A stream ending without a terminal event surfaces an error.
-- **`services.ts`**: typed wrappers (`trees.get`, `nodes.get/fork/merge`).
+- **`session.ts`**: the app's single client instance (`baseURL: "/api"`, proxied by `next.config.ts`) plus the in-memory access token.
 - **`types.ts`**: hand-written, names match backend Pydantic models. Generating it from `openapi.json` is a later option.
 - **Never call `axios` directly in features**; use the shared client.
+- **`api/` is transport only.** Endpoint wrappers live in the feature that calls them (`<feature>/api.ts`, taking the shared client by injection — see section 7). A `services.ts` holding `trees`/`nodes` wrappers used to sit here; it was unreferenced and modelled a second, competing convention, so it was deleted. Recreate those as `features/tree/api.ts` when that feature is built.
 
 ### 5.4 State (`store/treeStore.ts`) [built]
 

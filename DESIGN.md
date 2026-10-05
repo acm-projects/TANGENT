@@ -85,9 +85,9 @@ frontend/src/
           chat/
           toolbar/
   features/                    ← features shared by two or more pages
-  api/                         ← client, typed endpoints, streaming
+  api/                         ← transport only: no per-feature endpoints
     client.ts
-    services.ts
+    session.ts
     stream.ts
     types.ts
   store/                       ← cross-page state
@@ -98,7 +98,11 @@ DESIGN.md                      ← this file
 ```
 
 Imports use the `@/*` alias from `tsconfig.json`: `@/ui/components`,
-`@/features/...`, `@/api/services`.
+`@/features/...`, `@/api/session`.
+
+`api/` holds **transport** (the axios instance, token refresh, SSE parsing, shared
+types). The endpoints a feature calls belong to that feature, in its own `api.ts` —
+so adding an endpoint never means editing a file every other feature depends on.
 
 **File extensions:** `.tsx` for any file containing JSX, `.ts` for files with none.
 So `Button.tsx`, `Chat.tsx`, but `useChat.ts`, `api.ts`, `index.ts`. `tsconfig.json`
