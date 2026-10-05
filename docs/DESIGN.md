@@ -11,27 +11,6 @@ There is no separate "designer" role on this project — whoever owns a componen
 its look. That means **a component's styling lives in the component's own folder**,
 never in a global file reaching in from outside.
 
-### Two principles that outrank every rule below
-
-**1. As little code as possible per unique component.** Every layer of indirection
-is something a person types by hand, for every component, forever. A rule earns its
-place by preventing a real bug, not by being more general. **When two mechanisms do
-the same job, keep one.**
-
-**2. No fallbacks.** Never write `var(--a, var(--b))`, and never give a value a
-second place to come from. A fallback converts a mistake into a plausible-looking
-result: misspell `--a` and CSS silently uses `--b`, the component renders fine, and
-what you actually wrote is ignored. Nothing errors and nothing logs, so you find out
-when someone eventually notices the colour is wrong.
-
-Drop the fallback and an undefined custom property makes the declaration invalid, so
-the style **visibly breaks** — which is the outcome you want. A loud failure costs a
-minute; a silent one costs a day.
-
-The corollary is what removes most of the code: **if a value always has a definition,
-the fallback is dead code that can only ever hide a typo.** A component always defines
-its own look, so it never needs one.
-
 ---
 
 ## 1. The layers
@@ -139,38 +118,13 @@ consumer. We rely on global, unhashed selectors on purpose.
 `src/app/globals.css` is the only CSS entry point (`layout.tsx` imports it):
 
 ```css
-@layer reset, ui;                     /* pin the order first: reset < ui < unlayered */
-
+@layer ui;                                       /* pin the layer order first */
 @import "../ui/components/tokens/index.css";
-
-@layer reset {
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: system-ui, sans-serif;
-    background: var(--color-surface);
-    color: var(--color-text);
-  }
-}
-```
-
-The priority order, lowest to highest:
-
-```
-@layer reset   →   @layer ui   →   unlayered
-(the * reset)      (components)    (pages, features)
 ```
 
 Component CSS lives inside `@layer ui`. Page and feature CSS stays **unlayered**,
 because unlayered CSS always beats layered CSS — that's what lets a page override a
 component without specificity fights. See §4.
-
-**The reset must be inside a layer, and it must come first.** This is the one piece
-of the layer model that bites. Cascade layers outrank specificity, and *unlayered
-declarations outrank every layer* — so an unlayered `* { padding: 0 }` silently beats
-`@layer ui { [data-ui="button"] { padding: ... } }` even though the component selector
-is far more specific. Every component would lose its padding and margin, and the
-cascade would give you no warning. Putting the reset in `@layer reset` restores the
-order you actually want.
 
 ### Component anatomy
 
@@ -178,15 +132,7 @@ order you actually want.
 Button/
   Button.tsx           ← structure + UI behaviour (no app logic)
   Button.css           ← look and motion, built only from tokens
-```
-
-**Two files, not three.** There is no per-component `index.ts`. A one-line
-re-export file per component is pure overhead: the only barrel is
-`ui/components/index.ts`, and it imports the file directly:
-
-```ts
-// ui/components/index.ts
-export { Button } from "./primitives/Button/Button";
+  index.ts             ← export { Button } from "./Button";
 ```
 
 A component should be viewable in isolation — if it needs a page, a route, or a
@@ -203,6 +149,7 @@ chat/
   useChat.ts           ← its state and behaviour
   api.ts               ← its calls, wrapping @/api (optional)
   components/          ← pieces only this feature uses (optional)
+  index.ts             ← export { Chat } from "./Chat";
 ```
 
 ### Page anatomy
@@ -212,10 +159,8 @@ workspace/
   Workspace.tsx        ← layout: arranges features, wires them together
   Workspace.css        ← page-level layout only (grid/areas), unlayered
   features/            ← features used only by this page
+  index.ts             ← export { Workspace } from "./Workspace";
 ```
-
-Features and pages have no `index.ts` either — import the file:
-`import { Chat } from "./features/chat/Chat"`.
 
 A component, feature, or page folder is self-contained: deleting or replacing it
 must not break anything except the things that import it.
@@ -230,34 +175,26 @@ the two imports. Don't pre-promote features on a guess that they'll be reused.
 
 ## 3. Modularity rules
 
-### Rule 1: Two token tiers, and a component uses the second one directly
+### Rule 1: Three token tiers
 
 ```css
-/* base.css — tier 1: raw values. Never referenced by a component. */
+/* base.css: raw values, never used directly by components */
 --purple-500: #7c3aed;
 
-/* semantic.css — tier 2: meaning. The only tier a component may name. */
+/* semantic.css: meaning */
 --color-brand: var(--purple-500);
 
-/* Button.css — the component just uses it. No third name, no fallback. */
-background: var(--color-brand);
+/* Button.css: component-level hook, falls back to semantic */
+background: var(--button-bg, var(--color-brand));
 ```
 
-- Components reference **semantic** tokens only — never base tokens, never a raw
-  value.
+- Components only reference **semantic** tokens, never base tokens or raw values.
 - The test for tier 2: **can you name it without saying a colour?** `--color-danger`
   passes; `--color-red` is tier 1 in disguise.
-- A rebrand = edit `semantic.css`. One component's look = edit that component's CSS.
+- A rebrand = edit `semantic.css`. A one-component tweak = set `--button-bg`.
 
-**There is no third tier.** A component does not publish `--button-bg` alongside the
-semantic token it already reads. That pattern costs three names per visual property
-(`--_bg` private, `--button-bg` public, `--color-brand` semantic) joined by a
-fallback, and the fallback is exactly the silent failure Principle 2 is about: a
-consumer who writes `--buton-bg` gets no error, no warning, and no effect. Overrides
-have a simpler mechanism — see Rule 6 and §4.
-
-The payoff is still theming. Because no component ever names a colour, a whole theme
-is a few lines, and **no component file changes**:
+The payoff is theming. Because no component ever names a colour, a whole theme is a
+few lines, and **no component file changes**:
 
 ```css
 :root                   { --color-surface: var(--gray-50);  --color-text: var(--gray-900); }
@@ -298,9 +235,9 @@ app/  →  ui/pages/  →  features  →  ui/components/  →  tokens
 - Composites may import primitives; primitives must not import composites.
 
 **Barrel discipline:** consumers import from `@/ui/components`. Files *inside*
-`ui/components/` always import the file directly
-(`../primitives/Button/Button`), never through the barrel — importing your own
-barrel creates circular dependencies and makes every edit invalidate everything.
+`ui/components/` always import by direct relative path (`../primitives/Button`),
+never through the barrel — importing your own barrel creates circular dependencies
+and makes every edit invalidate everything.
 
 > Not yet enforced by tooling **[planned]**. Lint zones (`import/no-restricted-paths`)
 > or `dependency-cruiser` can encode this graph in CI. Worth doing while there are
@@ -343,21 +280,13 @@ Four destinations, and picking the right one is most of what keeps this modular:
 <Button variant="primary" className="chat-send">Send</Button>
 ```
 ```css
-/* Chat.css — one-off styling lives with the thing that needs it.
-   Unlayered, so it beats Button.css without a fight. */
-.chat-send { background: var(--color-accent); }
+/* Chat.css — one-off styling lives with the thing that needs it */
+.chat-send { --button-bg: var(--color-accent); }
 ```
 
-Delete the feature and the styling goes with it.
-
-The consumer sets **the real property**, not a custom property the component had to
-publish first. That works because `Chat.css` is unlayered and `Button.css` is in
-`@layer ui`, and unlayered CSS always wins (§4) — so there is nothing to opt into and
-nothing to spell correctly. If the selector is wrong you see no change and go look at
-it; if a hook name were wrong you'd see no change and have no idea why.
-
-**Still off-limits:** reaching into a component's internals (`.chat-send [data-part]`).
-Override what the component renders at its root, not how it is built inside.
+Delete the feature and the styling goes with it. Note it goes through a **published
+custom-property hook**, not a selector reaching into Button's internals — so Button
+keeps control of what is themeable.
 
 ### Rule 7: Motion is its own module
 
@@ -371,7 +300,7 @@ Override what the component renders at its root, not how it is built inside.
 ```
 ```css
 /* Message.css — component: how */
-[data-ui="message"][data-streaming] {
+:where([data-ui="message"][data-streaming]) {
   animation: shimmer var(--motion-slow) var(--ease-out) infinite;
 }
 ```
@@ -386,9 +315,8 @@ Override what the component renders at its root, not how it is built inside.
 
 ### Rule 8: Pages lay out, features behave
 
-- A page's CSS may set grid, areas, and spacing. It may not reach into a component's
-  internals (`data-part`) — use a variant, or override at the component's root from
-  the page's own unlayered CSS.
+- A page's CSS may set grid, areas, and spacing. It may not restyle a component's
+  internals — use a variant, or a published custom-property hook.
 - A page holds no data fetching of its own. If a screen needs data, that belongs
   to one of its features.
 
@@ -451,93 +379,29 @@ independent of class names.
 
 `data-part` is an **internal** naming convention. Consumers must not target it: the
 moment outside CSS depends on a component's internal structure, that structure is
-public API and the DOM can't be refactored. If an internal piece genuinely needs to be
-stylable from outside, that is a signal it should be a slot the consumer passes in, or
-its own component — not a custom property threaded through.
+public API and the DOM can't be refactored. Expose a custom property instead.
 
-### Writing the CSS
+### Themeable hooks
 
-A component's CSS sets **real properties from semantic tokens**. No private
-`--_vars`, no published hooks, no `var(a, b)`. Variants and sizes set the same
-properties again:
+Each component publishes the custom properties it honours, as deliberately as it
+publishes props:
 
 ```css
 /* Button.css */
 @layer ui {
-  [data-ui="button"] {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-md);
-    background: var(--color-brand);
-    color: var(--color-text-on-brand);
-    cursor: pointer;
-    transition: background var(--motion-fast) var(--ease-out);
-  }
-
-  [data-ui="button"]:hover:not(:disabled) {
-    background: var(--color-brand-hover);
-  }
-
-  [data-ui="button"][data-variant="ghost"] {
-    background: transparent;
-    border-color: var(--color-border);
-    color: var(--color-text);
-  }
-
-  /* Required. Without it, a hovered ghost button turns brand-coloured,
-     because the base :hover rule is more specific than the variant rule. */
-  [data-ui="button"][data-variant="ghost"]:hover:not(:disabled) {
-    background: var(--color-surface-raised);
-  }
-
-  [data-ui="button"][data-size="sm"] {
-    padding: var(--space-1) var(--space-3);
-    font-size: var(--font-size-sm);
-  }
-
-  [data-ui="button"]:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 2px;
+  :where([data-ui="button"]) {
+    background: var(--button-bg, var(--color-brand));
+    padding: var(--button-padding, var(--space-2) var(--space-4));
   }
 }
 ```
 
-**Two things make this work, and both are mechanical:**
+Two mechanisms make consumer overrides safe and `!important`-free:
 
-1. **Always qualify with `data-ui`.** Write `[data-ui="button"][data-variant="ghost"]`,
-   never a bare `[data-variant="ghost"]`. Qualified, the variant is specificity
-   `(0,2,0)` and beats the base rule's `(0,1,0)` outright. Bare, it ties with the base
-   rule and the winner depends on source order — which breaks the moment someone
-   reorders the file.
-2. **Every variant that differs on hover (or focus, or `:disabled`) needs its own
-   state rule.** The base `:hover:not(:disabled)` is `(0,3,0)`, so it outranks any
-   plain variant rule. This is the one real cost of dropping custom properties: a few
-   extra rules instead of an indirection layer you maintain in every component. Forget
-   one and the button visibly flashes the wrong colour on hover — a bug you see
-   immediately rather than one that hides.
-
-**No `:where()`.** It contributed zero specificity so that a consumer's single class
-could win — but `@layer ui` already guarantees that, since unlayered CSS beats layered
-CSS regardless of specificity. Two mechanisms for one job, so we keep the one that
-also lets normal specificity do the work above. Component selectors are plain.
-
-### How a consumer overrides
-
-One mechanism: **`@layer ui`.**
-
-- Component CSS is inside `@layer ui`.
-- Page and feature CSS is **unlayered**.
-- Unlayered beats layered, always, regardless of specificity. So a single class in
-  `Chat.css` overrides anything in `Button.css`, with no `!important` and nothing the
-  component had to publish in advance.
-
-That is the whole contract. A consumer needs no permission and no hook name; it just
-needs its CSS to be unlayered, which it is by default.
+- **`@layer ui`** — unlayered CSS (pages, features) always beats layered CSS,
+  regardless of specificity.
+- **`:where(...)`** — contributes zero specificity, so even a single class in a
+  feature's CSS wins.
 
 ---
 
@@ -569,18 +433,15 @@ outlines without replacing them.
 ### Adding a component
 
 1. Can it be built by composing existing primitives? If yes, it's a composite.
-2. Create the folder — two files, `Thing.tsx` and `Thing.css`. No `index.ts`.
+2. Create the folder with the anatomy from §2.
 3. Use the correct native element; add `"use client"` only if it holds state (Rule 9).
 4. Extend `ComponentProps<...>` and spread `...rest`; map variants to `data-*`.
-5. Style with semantic tokens inside `@layer ui`. Set real properties — **no
-   `var(a, b)` fallback, no `--_private` vars, no published hooks** (Rule 1, §4).
-6. Qualify every selector with `data-ui`, and give each variant its own `:hover` /
-   `:focus-visible` / `:disabled` rule where it differs (§4).
-7. Use motion tokens for any transition or animation.
-8. Add a `:focus-visible` style if it's interactive.
-9. Check it in both themes (flip `data-theme="dark"` on `:root` in devtools) — if
+5. Style only with semantic tokens, inside `@layer ui` and `:where()`.
+6. Use motion tokens for any transition or animation.
+7. Add a `:focus-visible` style if it's interactive.
+8. Check it in both themes (flip `data-theme="dark"` on `:root` in devtools) — if
    it doesn't re-theme, it hardcoded a colour.
-10. Export it from `ui/components/index.ts`, importing the file directly.
+9. Export it from `ui/components/index.ts`.
 
 ### Adding a page
 
@@ -601,9 +462,6 @@ The structure is working if all of these are true:
 
 - [ ] Changing `--color-brand` recolours the whole app.
 - [ ] No component hardcodes a hex colour or a duration.
-- [ ] `grep -r "var(--[a-z-]*," src/ui` finds nothing — no fallbacks anywhere.
-- [ ] No component defines a custom property; it only reads semantic tokens.
-- [ ] Every component is two files.
 - [ ] Button can be fully redesigned without opening any file in `pages/` or `features/`.
 - [ ] No file in `ui/components/` imports from `pages/`, `features/`, `api/` or `store/`.
 - [ ] No CSS outside a component targets that component's `data-part` internals.

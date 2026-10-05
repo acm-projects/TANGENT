@@ -233,7 +233,7 @@ A feature is named after what it *does*, not the route it happens to serve.
 |---|---|---|
 | Python module | `snake_case.py` | `flatten.py` |
 | Python test | `test_<subject>.py` | `test_flatten.py` |
-| Component | `PascalCase.tsx` + `PascalCase.css` — two files, no `index.ts` | `Button.tsx` |
+| Component | `PascalCase.tsx` + `PascalCase.css` + `index.ts` | `Button.tsx` |
 | Hook | `useThing.ts` | `useChat.ts` |
 | TS test | `<subject>.test.ts`, beside the subject | `client.test.ts` |
 | Everything else TS | `camelCase.ts` | `treeStore.ts` |
@@ -344,6 +344,7 @@ frontend/src/ui/pages/workspace/features/polls/
   Polls.tsx         the UI, built from @/ui/components
   Polls.css         its layout and one-off styling (unlayered — DESIGN.md §2)
   usePolls.ts       its state and behaviour
+  index.ts          export { Polls } from "./Polls";
   usePolls.test.ts  test the hook, not the pixels
 ```
 
