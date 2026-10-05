@@ -37,6 +37,8 @@ npm run typecheck && npm test
 
 Run the API: `uvicorn app.main:app --reload` from `backend/` **[assumed: `main.py` exposes `app`]**.
 
+Run the frontend: `cp .env.example .env.local` then `npm run dev` from `frontend/` (serves on http://localhost:5173).
+
 **Keep the repo outside OneDrive/Dropbox** (e.g. `C:\dev\Tangent`). Sync conflicts can corrupt `.git`.
 
 ---
@@ -144,6 +146,8 @@ Graph and breadcrumb selectors read only the structure slice, so a streamed toke
 ### 5.5 API contract v0
 
 ```
+GET  /auth/login/google                   -> OAuth redirect               # [assumed] full-page navigation, not axios; signup and login are the same flow
+POST /auth/onboarding { workspace_name }  -> { redirect }                 # [assumed] redirect is "/{slug}/dashboard"; 400 if already completed
 POST /auth/refresh                        -> { access_token }
 GET  /trees/:id                           -> { tree, nodes: NodeMeta[] }   # flat, no chats
 GET  /nodes/:id                           -> Node                          # includes chats
@@ -153,7 +157,11 @@ POST /nodes/:id/messages { content }      -> SSE stream
 ```
 
 SSE events **[assumed]**: `token {text}`, then `done`, or `error {message}`. The server persists the assistant message when the stream ends.
-Auth **[assumed]**: refresh token is an httpOnly cookie.
+Auth **[assumed]**: refresh token is an httpOnly cookie. After the Google callback the backend redirects to `{FRONTEND_URL}/onboarding?access_token=...` (new user) or `/{slug}/dashboard?access_token=...`. `features/auth/useAccessToken.ts` stores it in memory (`api/session.ts`), strips it from the URL, and falls back to `POST /auth/refresh` on reload. The backend also has `GET/PATCH/DELETE /auth/me` and `POST /auth/logout` (not used yet).
+
+Frontend/backend wiring **[assumed until `prakrit` merges]**: the frontend adapts to the backend, not the reverse. Backend dev `FRONTEND_URL` is `http://localhost:5173`, so `npm run dev` serves Next on **5173**. The backend has no CORS, so axios uses `baseURL: "/api"`, which `next.config.ts` rewrites to `BACKEND_URL` (default `http://localhost:8000`). Login is a full-page navigation to `NEXT_PUBLIC_API_BASE_URL`. See `frontend/.env.example`.
+
+Frontend routes **[built, not yet tested against a real backend]**: `/` redirects to `/login`; `/login` (Google button); `/onboarding` (workspace name form, `POST /auth/onboarding`); `/[slug]/dashboard` (placeholder). Pages live in `features/auth/`.
 
 `NodeMeta` (no chats) vs `Node` (with chats) is intentional: the whole tree loads cheaply, chat bodies load on demand.
 

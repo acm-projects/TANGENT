@@ -50,3 +50,10 @@ export type StreamEvent =
   | { type: "token"; text: string }
   | { type: "done" }
   | { type: "error"; message: string };
+
+/** POST /auth/onboarding */
+export interface OnboardingResponse {
+  message: string;
+  /** e.g. "/{slug}/dashboard" */
+  redirect: string;
+}
