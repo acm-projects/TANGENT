@@ -1,80 +1,69 @@
-# Tangent: Development Guide
+# DEVELOPMENT.md
 
-One doc for the repo: what it is, how to run it, how it's designed, how to add a feature.
+How to run Tangent, how to work on it, and what to do when it breaks.
 
-Markers: **[built]** exists and is tested. **[assumed]** code relies on it, not verified against a real backend. **[planned]** agreed, not built.
-
----
-
-## 1. What Tangent is
-
-An AI research workspace. Every node in a tree (mind map) is a conversation. Only **leaf** nodes can be prompted. Branching ("start a tangent") creates a child node. Two branches can be merged into a new node.
-
-**Stack:** Supabase/Postgres, FastAPI, React + ReactFlow, Zustand + axios, OpenRouter, OAuth (GitHub/Google) with JWT (6h expiry).
+| You want to know | Read |
+|---|---|
+| How to run, test and ship it | **this file** |
+| Why the system is shaped like this | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Where a new file goes | [FILE_STRUCTURE.md](FILE_STRUCTURE.md) |
+| How the UI is layered and styled | [DESIGN.md](DESIGN.md) |
 
 ---
 
-## 2. Quick start
+## 1. Quick start
 
-Prerequisites: Git, Python 3.11, Node 22.
+Prerequisites: Git, Python 3.11+, Node 22.
+
+**Keep the repo outside OneDrive/Dropbox** (e.g. `C:\dev\Tangent`). Sync
+conflicts can corrupt `.git`.
 
 ```bash
 git clone https://github.com/acm-projects/TANGENT.git
 cd TANGENT && git switch dev
+```
 
-# backend
+**Backend**
+
+```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install pydantic pytest        # [planned] pip install -e ".[dev]"
-python -m pytest -q
+pip install fastapi uvicorn pydantic httpx python-dotenv pytest
+python -m pytest -q                # 5 passing
+uvicorn app.main:app --reload      # serves on http://localhost:8000
+```
 
-# frontend (new terminal)
+Dependencies are installed by hand because **neither `pyproject.toml` nor
+`requirements.txt` declares anything yet** — both files are empty. CI gets away
+with `pip install pydantic pytest` because the only tests cover `app/context/`,
+which imports nothing else. Declaring them is an open item (§6); until then, if
+an import fails, install it and add it to the list above.
+
+Run `pytest` and `uvicorn` **from `backend/`**. That is what puts `app` on the
+import path — there is no packaging config doing it for you.
+
+**Frontend** (new terminal)
+
+```bash
 cd frontend
 npm install
-npm run typecheck && npm test
+npm run typecheck && npm test && npx oxlint src
+npm run dev                        # serves on http://localhost:5173
 ```
 
-Run the API: `uvicorn app.main:app --reload` from `backend/` **[assumed: `main.py` exposes `app`]**.
+Port 5173 is not arbitrary — the backend's dev `FRONTEND_URL` points there, and
+`next.config.ts` proxies `/api/*` to the backend so the browser never makes a
+cross-origin request. See ARCHITECTURE.md §6.
 
-Run the frontend: `cp .env.example .env.local` then `npm run dev` from `frontend/` (serves on http://localhost:5173).
-
-**Keep the repo outside OneDrive/Dropbox** (e.g. `C:\dev\Tangent`). Sync conflicts can corrupt `.git`.
+Environment: copy `.env.example` to `.env.local` in `frontend/` once it exists
+(**[planned]**). `OPENROUTER_API_KEY` is the only backend variable currently
+read — `app/routers/chats_router.py` loads it via `python-dotenv`. Put it in a
+gitignored `backend/.env`.
 
 ---
 
-## 3. Repo map
-
-```
-backend/app/
-    main.py          FastAPI app; features register routers here
-    core/            foundation: auth, db, config
-    context/         foundation: tree -> LLM context (schemas.py, flatten.py)
-    features/<f>/    one folder per feature
-backend/tests/       pytest, mirrors app/
-
-frontend/src/
-    app/             Next.js App Router: routes only, no UI (npm run dev)
-    ui/
-      components/    foundation: design library (tokens, primitives, composites)
-      pages/<p>/     one folder per screen of the site
-        features/    features used only by that page
-    api/             foundation: client.ts, stream.ts, services.ts, types.ts
-    store/           foundation: treeStore.ts
-    features/<f>/    features shared by two or more pages
-```
-
-Folders split by **runtime** (server vs browser), not concept. There is no "middle end" folder; the seam is the API contract (section 5).
-
-**Foundation** (`core/`, `context/`, `api/`, `store/`, `ui/components/`) changes rarely and via review (**[planned]** — `CODEOWNERS` does not exist yet). **Features** are owned by one person each, end to end: DB change, endpoint, client wrapper, state, UI, tests.
-
-On the frontend, **pages** are screens (they arrange features and own layout); **features** are the pieces a page uses (they own behaviour, state and data calls). A feature starts inside the page that needs it and moves to `src/features/` once a second page uses it. Layering, import direction, and styling rules are in **DESIGN.md**.
-
-The `src/ui/` tree is scaffolded with `.gitkeep` files so the empty folders survive a clone (see section 9).
-
----
-
-## 4. Workflow
+## 2. Workflow
 
 ```bash
 git switch dev && git pull
@@ -82,154 +71,78 @@ git switch -c <yourname>/<tag>/<short-name>      # e.g. ryan/feature/polls
 # ...work...
 python -m pytest -q                              # from backend/
 npm run typecheck && npm test && npx oxlint src  # from frontend/
-git add -A && git status --short                 # read before committing
+git add -A && git status --short                 # read this before committing
 git commit -m "..." && git push -u origin <branch>
 # open a PR into dev; CI must be green
 ```
 
-- `main` is always working. `dev` is the integration branch (merged to `main` weekly).
-- **Never name a branch just `<yourname>`**: it blocks `<yourname>/...` pushes.
-- If `node_modules` appears in `git status`, stop (see section 9).
+- `main` is always working. `dev` is the integration branch, merged to `main`
+  weekly.
+- **Never name a branch just `<yourname>`** — it blocks all your `<yourname>/...`
+  pushes afterwards.
+- If `node_modules` shows up in `git status`, stop and read §5.
 
-**PR checklist**
-- [ ] Backend tests pass; frontend typecheck, tests, lint pass
-- [ ] No imports from other features
+### PR checklist
+
+- [ ] Backend tests pass; frontend typecheck, tests and lint pass
+- [ ] No feature imports another feature
 - [ ] Foundation edits, if any, are small and additive
-- [ ] New request/response types are in `api/types.ts`
-- [ ] New assumptions are written into this doc
+- [ ] New request/response types are in `src/api/types.ts`
+- [ ] New files follow [FILE_STRUCTURE.md](FILE_STRUCTURE.md) §8
+- [ ] Any assumption you relied on is written into ARCHITECTURE.md with an
+      **[assumed]** marker — or, if you verified one, the marker is updated
 
 ---
 
-## 5. Design
+## 3. Adding a feature
 
-### 5.1 Data model
+File layout is in [FILE_STRUCTURE.md](FILE_STRUCTURE.md) §7. Rules you can't
+break are in [ARCHITECTURE.md](ARCHITECTURE.md) §2 and §8. The order of work:
 
-> The real database is the source of truth. Verify column names against it.
+1. **Branch off `dev`.**
+2. **Define the contract first.** Pydantic schemas, a stubbed router, one
+   `include_router` line in `main.py`. Open an early PR if anyone else depends
+   on the shape — it unblocks them against mocks.
+3. **Implement the service.** Keep pure logic separate from DB calls so it tests
+   without a database. Coordinate schema changes with the DB owner and announce
+   them *before* merging.
+4. **Backend tests**, mirroring `app/`.
+5. **Client wrapper**: a file in `src/api/endpoints/`, wired in `src/api/index.ts`,
+   plus any new types in `src/api/types.ts`.
+6. **State and UI.** Build the UI from `@/ui/components`; never hand-roll styling
+   (DESIGN.md).
+7. **Frontend tests** for hooks and logic, not pixels.
+8. **Run everything locally**, then PR into `dev`.
 
-- `nodes.parent_id` is the **only** structural link. One parent per node; a tree, never a DAG. NULL only for the root.
-- `fork_index` is the sibling ordinal under a parent, assigned server-side as `max(sibling fork_index) + 1`. It is not a position inside the parent's conversation.
-- `nodes.chats` is a JSON array: `{ role, content, seq, branch_source, created_at }`. `branch_source` is `null`, `"a"`, or `"b"` and is only set on messages copied into a merge node. Array order is message order; `seq` is never read.
-- `node_type` (`chat | question | poll | document`, open-ended) is set by the user's first action in the node, so it is nullable. Display metadata only.
-- `summary` is display-only (mind-map hover), never used for context.
-- **Merge nodes** are ordinary nodes whose `parent_id` is the LCA of the two source leaves. Each branch's LCA-to-leaf messages are **copied** into the merge node's `chats`, tagged `a`/`b`. A merge is a snapshot. `node_merge_sources` exists only so the mind map can draw merge edges.
-- Deleting a node cascades to its subtree.
-- The DB also has workspaces, projects, shares, and invitations.
+Recommended, learned the hard way:
 
-### 5.2 Context reconstruction (`backend/app/context/`) [built]
+- Keep foundation edits small and additive. Don't reshape `treeStore`,
+  `client.ts` or `flatten.py` as a side effect of a feature.
+- Feature-specific state goes in the feature's own store. `treeStore` is for
+  tree structure and node content only.
 
-The **server** builds LLM context; the client sends only `{content}`.
-
-1. Fetch the root-to-leaf path with one recursive CTE (query is in the `flatten.py` docstring).
-2. `flatten(path)` returns one `Segment` per node. Node boundaries are the natural prompt-cache breakpoints.
-3. Merge nodes collapse both snapshots into **one user turn** with `<branch_a>` / `<branch_b>` blocks, keeping roles alternating.
-4. `to_provider_messages(segments, new_user_message)` builds the payload and coalesces adjacent same-role messages.
-
-`flatten` is pure (no DB, no network), which is what makes it testable. Changing LLM context is a foundation change: extend `flatten` with tests, don't fork the logic in a feature.
-
-### 5.3 Client [built]
-
-- **`client.ts`**: axios factory `createApiClient({baseURL, auth, adapter?})`. Attaches the JWT; on 401 does a **single-flight refresh** (N concurrent 401s -> 1 refresh call). Refresh rotates tokens and detects reuse, so concurrent refreshes could revoke the session.
-- **`stream.ts`**: SSE over `fetch` (XHR streams badly). Retries **only on 401**, never on stream errors, since retrying a POST re-sends the user's message. A stream ending without a terminal event surfaces an error.
-- **`services.ts`**: typed wrappers (`trees.get`, `nodes.get/fork/merge`).
-- **`types.ts`**: hand-written, names match backend Pydantic models. Generating it from `openapi.json` is a later option.
-- **Never call `axios` directly in features**; use the shared client.
-
-### 5.4 State (`store/treeStore.ts`) [built]
-
-| Slice | Holds | Written by |
-|---|---|---|
-| structure | `nodesById`, `childrenByParent` (sorted by `fork_index`), `activeNodeId` | hydrate, fork, merge |
-| content | `chatsByNode`, `streaming` | prompts, token appends |
-
-Graph and breadcrumb selectors read only the structure slice, so a streamed token never re-renders the mind map. A test asserts this.
-
-### 5.5 API contract v0
-
-```
-GET  /auth/login/google                   -> OAuth redirect               # [assumed] full-page navigation, not axios; signup and login are the same flow
-POST /auth/onboarding { workspace_name }  -> { redirect }                 # [assumed] redirect is "/{slug}/dashboard"; 400 if already completed
-POST /auth/refresh                        -> { access_token }
-GET  /trees/:id                           -> { tree, nodes: NodeMeta[] }   # flat, no chats
-GET  /nodes/:id                           -> Node                          # includes chats
-POST /nodes/:id/fork                      -> NodeMeta
-POST /nodes/merge  { source_leaf_ids }    -> NodeMeta                      # server derives LCA
-POST /nodes/:id/messages { content }      -> SSE stream
-```
-
-SSE events **[assumed]**: `token {text}`, then `done`, or `error {message}`. The server persists the assistant message when the stream ends.
-Auth **[assumed]**: refresh token is an httpOnly cookie. After the Google callback the backend redirects to `{FRONTEND_URL}/onboarding?access_token=...` (new user) or `/{slug}/dashboard?access_token=...`. `features/auth/useAccessToken.ts` stores it in memory (`api/session.ts`), strips it from the URL, and falls back to `POST /auth/refresh` on reload. The backend also has `GET/PATCH/DELETE /auth/me` and `POST /auth/logout` (not used yet).
-
-Frontend/backend wiring **[assumed until `prakrit` merges]**: the frontend adapts to the backend, not the reverse. Backend dev `FRONTEND_URL` is `http://localhost:5173`, so `npm run dev` serves Next on **5173**. The backend has no CORS, so axios uses `baseURL: "/api"`, which `next.config.ts` rewrites to `BACKEND_URL` (default `http://localhost:8000`). Login is a full-page navigation to `NEXT_PUBLIC_API_BASE_URL`. See `frontend/.env.example`.
-
-Frontend routes **[built, not yet tested against a real backend]**: `/` redirects to `/login`; `/login` (Google button); `/onboarding` (workspace name form, `POST /auth/onboarding`); `/[slug]/dashboard` (placeholder). Pages live in `features/auth/`.
-
-`NodeMeta` (no chats) vs `Node` (with chats) is intentional: the whole tree loads cheaply, chat bodies load on demand.
-
----
-
-## 6. Invariants: don't break these
-
-| Invariant | Why | Guarded by |
-|---|---|---|
-| Only leaf nodes are promptable, **enforced on the server** | UI-only checks are bypassable; a non-leaf write corrupts ancestor context | **[planned]** endpoint check + test |
-| One `parent_id` per node (tree, never a DAG) | Merge is a content copy, not a structural exception | design |
-| `flatten` stays pure and type-agnostic | Every feature converges on it | `test_flatten.py` |
-| `chats` array order is message order | `seq` is redundant | `flatten.py` |
-| Token appends don't touch tree structure in the store | No mind-map re-render per token | `client.test.ts` |
-| Token refresh is single-flight | Concurrent refreshes can revoke the session | `client.test.ts` |
-| Stream client retries only on 401 | Retrying re-sends the user's message | `stream.ts` |
-| The client never builds LLM context | Trust and stale-tree problems | design |
-
----
-
-## 7. Adding a feature
-
-### Hard rules
-1. **Features never import other features.** If two need the same thing, promote it to the foundation in its own small PR.
-2. **The foundation never imports features.**
-
-### Recommended
-- Keep foundation edits small and additive; don't reshape `treeStore`, `client.ts`, or `flatten.py` as a side effect.
-- Feature-specific state goes in the feature's own store; `treeStore` is for tree structure and node content only.
-- Schemas and endpoint stubs first, so UI can build against mocks.
-- The only shared edit a feature normally makes is one line in `main.py`: `app.include_router(...)`.
-- Start with one file per layer and split when it grows. Suggested shape:
-
-```
-backend/app/features/<f>/   router.py (thin), service.py (logic + DB), schemas.py
-frontend/<feature dir>/     api.ts, store.ts (if needed), components/
-```
-
-The frontend feature dir is `src/ui/pages/<p>/features/<f>/` while only one page
-uses it, and `src/features/<f>/` once a second page does. Build its UI from
-`@/ui/components`; never hand-roll styling (DESIGN.md).
-
-### Recipe
-1. Branch off `dev`.
-2. Define Pydantic schemas, stub the router, register it in `main.py`. Open an early PR if others depend on the contract.
-3. Implement the service. Keep pure logic separate from DB calls so it tests without a database. Coordinate schema changes with the DB owner and announce them before merging.
-4. Add backend tests.
-5. Add `api.ts` using the shared client, plus types.
-6. Add state and UI.
-7. Add frontend tests for hooks/logic, not pixels.
-8. Run everything locally, PR into `dev`.
-
-Minimal example (`polls`):
+### Minimal example
 
 ```python
-# backend/app/features/polls/router.py
+# backend/app/routers/polls_router.py
 from fastapi import APIRouter
-from app.features.polls.schemas import PollOut
+from pydantic import BaseModel
+
+
+class PollOut(BaseModel):
+    id: str
+    question: str
+
 
 router = APIRouter(prefix="/nodes/{node_id}/polls", tags=["polls"])
 
 @router.get("", response_model=list[PollOut])
-async def list_polls(node_id: str): ...
+async def list_polls(node_id: str) -> list[PollOut]: ...
 ```
 
 ```ts
-// frontend/src/ui/pages/workspace/features/polls/api.ts
-import type { ApiClient } from "@/api/client";   // @/* -> src/*, so nesting depth never matters
+// frontend/src/api/endpoints/polls.ts
+import type { ApiClient } from "../client";
 
 export interface Poll { id: string; question: string }
 
@@ -240,9 +153,14 @@ export function createPollsApi({ http }: ApiClient) {
 }
 ```
 
+```ts
+// frontend/src/api/index.ts — one line to wire it up
+polls: createPollsApi(apiClient),
+```
+
 ---
 
-## 8. Testing
+## 4. Testing
 
 | Where | Command | What |
 |---|---|---|
@@ -253,55 +171,83 @@ export function createPollsApi({ http }: ApiClient) {
 | `frontend/` | `npm run typecheck` | `tsc --noEmit`, strict |
 | `frontend/` | `npx oxlint src` | lint |
 
-CI runs all of this on every PR; red CI blocks merging into `dev`.
+CI runs all of this on every PR. Red CI blocks merging into `dev`.
 
-**Where tests go:** backend in `backend/tests/` (mirrors `app/`; features under `tests/features/<f>/`); frontend next to the code (`foo.test.ts`). Backend imports use `from app.context.flatten import ...`; run pytest from `backend/`.
+**Where tests go.** Backend: `backend/tests/`, mirroring `app/` — so
+`tests/test_flatten.py` covers `app/context/flatten.py`. Imports are absolute
+(`from app.context.flatten import ...`); run pytest from `backend/`. Frontend:
+next to the code, `<subject>.test.ts`.
 
-**Component explorer [planned].** `src/ui/components/` has no isolated preview harness yet. Storybook 10.6 was tried and backed out: `@storybook/nextjs` aliases bare `react`/`react-dom` into Next's private `next/dist/compiled/react`, and on Next 16.3.8 the preview iframe dies at runtime with `class heritage ....Component is not an object or null` — the production build compiles fine, so `build-storybook` does not catch it. If retried: either pin the React aliases back to the real deduped `react` in `.storybook/main.ts`, or use `@storybook/react-webpack5`, which does no Next-specific aliasing. Avoid `@storybook/nextjs-vite` — it wants Vite 7 as a peer and would collide with the Vite 5 that `vitest` bundles. We are not using Vite.
+**What to test, and why these particular tests exist:** ARCHITECTURE.md §9. The
+short version — test the invariants in §8, because none of them fail loudly.
 
-**Patterns**
-1. **Pure logic in, plain data out.** No DB or network inside the function under test.
-2. **Inject the transport.** `createApiClient` accepts an `adapter`, so tests fake the network instead of mocking modules.
-3. **Test invariants, not implementation.** If a design relies on a property, write a test for it.
-
-**Existing coverage [built]:** `flatten` (5 tests: ordering, empty nodes, merge alternation, single-branch merge, determinism), `client.ts` (2: single-flight refresh, auth failure once), `stream.ts` (1: SSE across chunk boundaries), `treeStore` (2: `fork_index` ordering, structure refs stable on `appendToken`).
-
-**Not covered yet (needs a real environment)**
-1. The recursive CTE against real Postgres data, and that real `chats` JSON validates as `ChatMessage`. Seed root -> child -> grandchild plus a merge node; this is where drift from the live schema shows first.
-2. The SSE client against a live endpoint. Tokens should arrive incrementally; if batched, a proxy or gzip middleware is buffering.
-3. Token refresh against the real auth endpoint, including two concurrent expired requests.
-
-If your feature touches one of these, add the integration check and document how to run it.
+**Component explorer [planned].** `src/ui/components/` has no isolated preview
+harness. Storybook 10.6 was tried and backed out: `@storybook/nextjs` aliases
+bare `react`/`react-dom` into Next's private `next/dist/compiled/react`, and on
+Next 16.3.8 the preview iframe dies at runtime with
+`class heritage ....Component is not an object or null`. The production build
+compiles fine, so `build-storybook` does **not** catch it. If retried: either pin
+the React aliases back to the real deduped `react` in `.storybook/main.ts`, or
+use `@storybook/react-webpack5`, which does no Next-specific aliasing. Avoid
+`@storybook/nextjs-vite` — it wants Vite 7 as a peer and would collide with the
+Vite 5 that `vitest` bundles. We are not using Vite directly.
 
 ---
 
-## 9. Troubleshooting
+## 5. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `No module named 'app'` (pytest) | Not in `backend/`, or `pythonpath` missing | `cd backend`; `pyproject.toml` needs `[tool.pytest.ini_options] pythonpath = ["."]` |
+| `No module named 'app'` (pytest) | Not in `backend/`, and `pyproject.toml` declares no `pythonpath` | `cd backend`, then `python -m pytest` (the `-m` is what adds the cwd) |
 | `No module named 'flatten'` / `'schemas'` | Old flat imports | `from app.context.flatten import ...` |
+| `ModuleNotFoundError` for `fastapi`/`httpx`/`dotenv` | Nothing declares the backend's deps | Install it and add it to §1's list |
 | `Missing script: "typecheck"` / `"test"` | Wrong folder | Run npm from `frontend/` |
 | `Cannot find module 'axios'` | `npm install` ran in the wrong folder | `cd frontend && npm install` |
+| `Cannot find module '@/...'` in a test | Alias missing at resolve time | `vitest.config.ts` declares it — check it wasn't deleted |
 | Many `tsc` errors inside `node_modules` | `skipLibCheck` off | Set `"skipLibCheck": true`; install `@types/node` |
-| `node_modules` in `git status` | `.gitignore` missing or incomplete | Add `node_modules/`; if staged: `git rm -r --cached frontend/node_modules` |
+| `node_modules` in `git status` | `.gitignore` missing or incomplete | Add `node_modules/`; if already staged: `git rm -r --cached frontend/node_modules` |
 | Push rejected: `cannot lock ref ... exists` | A bare `<name>` branch blocks `<name>/...` | Delete the bare remote branch, or use a non-colliding name |
-| CI `npm ci` fails, missing `@rollup/rollup-linux-x64-gnu` or `@esbuild/linux-x64` | Lockfile lacks Linux optional deps | Delete `frontend/node_modules` and `package-lock.json`, `npm install`, commit the lockfile |
+| CI `npm ci` fails on `@rollup/rollup-linux-x64-gnu` or `@esbuild/linux-x64` | Lockfile lacks Linux optional deps | Delete `frontend/node_modules` and `package-lock.json`, `npm install`, commit the lockfile |
 | CI errors on `ci.yml` | Workflow file empty or has no `jobs` | Restore the real workflow |
-| Empty folders missing after clone | Git ignores empty dirs | Add a `.gitkeep` |
+| Empty folder missing after clone | Git doesn't track empty directories | Add a `.gitkeep` |
 | `LF will be replaced by CRLF` | Windows line endings | `.gitattributes`: `* text=auto eol=lf` |
 
-Also: never commit `node_modules/`, `__pycache__/`, `.venv/`, or `.env`; pin TypeScript to an exact version.
+Never commit `node_modules/`, `__pycache__/`, `.venv/`, `.next/`, or `.env`. Pin
+TypeScript to an exact version.
 
-**PowerShell tip:** `Out-File` takes one path. For several files: `foreach ($d in "a","b") { New-Item -ItemType File -Force "$d\.gitkeep" | Out-Null }`.
+**PowerShell tip:** `Out-File` takes one path. For several files:
+`foreach ($d in "a","b") { New-Item -ItemType File -Force "$d\.gitkeep" | Out-Null }`
 
 ---
 
-## 10. Open items
+## 6. Open items
 
-Blocking teammates:
-- ReactFlow adapter (`nodesById`/`childrenByParent` -> nodes/edges + layout)
-- Server-side leaf enforcement on the prompt endpoint
-- MSW mock handlers and a dev-DB seed script (small tree including a merge node)
+**Blocking teammates**
 
-Not blocking (track as GitHub issues): OpenAPI -> generated TS types with a CI drift check; prompt-cache breakpoints in `to_provider_messages`; document-upload representation in `chats`; `pyproject.toml` dependency declarations; verifying the assumed SSE event names and refresh-cookie auth.
+- ReactFlow adapter: `nodesById` / `childrenByParent` → nodes/edges + layout
+- Server-side leaf enforcement on the prompt endpoint (ARCHITECTURE.md §8)
+- MSW mock handlers and a dev-DB seed script (a small tree including a merge node)
+- The real auth, branch, projects and workspace routers — `app/routers/` holds
+  empty placeholder files for all four
+
+**Not blocking** (track as GitHub issues)
+
+- **Backend layout.** `app/core/` and `app/features/` are scaffolded and empty
+  while the code sits in a flat `app/routers/`. Pick one and finish the move;
+  see [FILE_STRUCTURE.md](FILE_STRUCTURE.md) §2. Belongs to the backend owner.
+- **Backend dependencies are undeclared.** `pyproject.toml` and
+  `requirements.txt` are both empty, so setup is manual and CI installs a
+  hand-written subset. Consolidate on one manifest.
+- `/model_call` is a spike that predates the API contract. Fold it into
+  `POST /nodes/:id/messages` or delete it.
+- `app/database.py` and `app/models.py` are empty; no DB access exists yet.
+- `app/routers/chats_router.py` reads `os.getenv` and builds its HTTP call
+  inline. A `core/config.py` plus a service split would make it testable.
+- OpenAPI → generated TS types, with a CI drift check
+- Prompt-cache breakpoints in `to_provider_messages`
+- Document-upload representation in `chats`
+- `CODEOWNERS` for the foundation paths
+- Lint zones (`import/no-restricted-paths` or `dependency-cruiser`) to enforce
+  the import graph in CI — worth doing while there are zero violations to fix
+- Verify the **[assumed]** items in ARCHITECTURE.md §6 against the real backend
+- `frontend/.env.example` doesn't exist yet

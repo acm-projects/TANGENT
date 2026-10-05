@@ -1,10 +1,11 @@
 import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from "axios";
 import { describe, expect, it, vi } from "vitest";
-import { createApiClient } from "./api/client";
-import { sseFrames } from "./api/stream";
-import type { NodeMeta } from "./api/types";
-import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "./store/treeStore";
+import { createApiClient } from "./client";
 
+/**
+ * No module mocking: `createApiClient` takes an adapter, so the network is a
+ * parameter. See ARCHITECTURE.md -- "inject the transport".
+ */
 function makeAdapter(opts: { refreshOk: boolean }) {
   const calls = { refresh: 0, api: 0 };
   const respond = (config: InternalAxiosRequestConfig, status: number, data: unknown) => {
@@ -54,52 +55,5 @@ describe("single-flight refresh", () => {
     expect(calls.refresh).toBe(1);
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
     expect(token).toBeNull();
-  });
-});
-
-describe("sseFrames", () => {
-  it("parses frames split across chunk boundaries", async () => {
-    const enc = new TextEncoder();
-    const chunks = ['event: token\ndata: {"text":"he', 'llo"}\n\nevent: done\n', "data: {}\n\n"];
-    const body = new ReadableStream<Uint8Array>({
-      start(c) {
-        chunks.forEach((x) => c.enqueue(enc.encode(x)));
-        c.close();
-      },
-    });
-    const frames: { event: string; data: string }[] = [];
-    for await (const f of sseFrames(body)) frames.push(f);
-    expect(frames).toEqual([
-      { event: "token", data: '{"text":"hello"}' },
-      { event: "done", data: "{}" },
-    ]);
-  });
-});
-
-const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
-  id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
-  status: "active", title: null, summary: null, created_by_id: "u", created_at: "",
-});
-
-describe("tree store", () => {
-  it("orders children by fork_index, computes leaf + breadcrumb", () => {
-    useTreeStore.getState().hydrateTree("r", [node("c2", "r", 2), node("r", null, 0), node("c1", "r", 1), node("g", "c1", 1)]);
-    const s = useTreeStore.getState();
-    expect(s.childrenByParent["r"]).toEqual(["c1", "c2"]);
-    expect(selectIsLeaf(s, "c2")).toBe(true);
-    expect(selectIsLeaf(s, "c1")).toBe(false);
-    expect(selectBreadcrumb(s, "g").map((n) => n.id)).toEqual(["r", "c1", "g"]);
-  });
-
-  it("token appends leave structure references untouched", () => {
-    useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
-    const before = useTreeStore.getState();
-    before.beginStream("r", { role: "user", content: "q", seq: 0, branch_source: null, created_at: "" });
-    useTreeStore.getState().appendToken("a");
-    useTreeStore.getState().appendToken("b");
-    const after = useTreeStore.getState();
-    expect(after.streaming?.text).toBe("ab");
-    expect(after.nodesById).toBe(before.nodesById);
-    expect(after.childrenByParent).toBe(before.childrenByParent);
   });
 });
