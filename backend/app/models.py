@@ -52,10 +52,11 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     email = Column(Text, unique=True, nullable=False)
-    user_name = Column(Text, nullable=False)
+    name = Column("user_name", Text, nullable=False)
     auth_provider = Column(auth_provider_enum, nullable=False)
     provider_id = Column(Text, nullable=False)
-    profile_picture = Column(Text, nullable=True)
+    avatar_url = Column("profile_picture", Text, nullable=True)
+    onboarding_completed = Column(Boolean, nullable=False, server_default=text("FALSE"))
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
 
     __table_args__ = (
@@ -71,10 +72,12 @@ class User(Base):
     trees_created = relationship("Tree", back_populates="created_by", cascade="all, delete-orphan")
     nodes_created = relationship("Node", back_populates="created_by", cascade="all, delete-orphan")
     shares_created = relationship(
-        "Share", back_populates="shared_by", foreign_keys="Share.shared_by_id", cascade="all, delete-orphan"
+        "Share", back_populates="shared_by", foreign_keys="Share.shared_by_id", cascade="all, delete-orphan",
+        passive_deletes=True
     )
     shares_received = relationship(
-        "Share", back_populates="shared_with", foreign_keys="Share.shared_with_id", cascade="all, delete-orphan"
+        "Share", back_populates="shared_with", foreign_keys="Share.shared_with_id", cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
 
@@ -103,6 +106,7 @@ class Workspace(Base):
     slug = Column(String(100), unique=True, nullable=False)
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
+    last_used_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     owner = relationship("User", back_populates="owned_workspaces")
     projects = relationship("Project", back_populates="workspace", cascade="all, delete-orphan")
@@ -134,7 +138,8 @@ class Project(Base):
     trees = relationship("Tree", back_populates="project", cascade="all, delete-orphan")
     nodes = relationship("Node", back_populates="project", cascade="all, delete-orphan")
     shares = relationship(
-        "Share", back_populates="project", foreign_keys="Share.project_id", cascade="all, delete-orphan"
+        "Share", back_populates="project", foreign_keys="Share.project_id", cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
 class Invitation(Base):
@@ -235,13 +240,9 @@ class Share(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     shared_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    shared_with_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    shared_with_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     share_token = Column(Text, unique=True, nullable=True)
     permission = Column(share_permission_enum, nullable=False, server_default=text("'view'"))
-
-    forked_project_id = Column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
-    )
 
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
     revoked_at = Column(TIMESTAMP(timezone=True), nullable=True)
@@ -249,4 +250,3 @@ class Share(Base):
     project = relationship("Project", back_populates="shares", foreign_keys=[project_id])
     shared_by = relationship("User", back_populates="shares_created", foreign_keys=[shared_by_id])
     shared_with = relationship("User", back_populates="shares_received", foreign_keys=[shared_with_id])
-    forked_project = relationship("Project", foreign_keys=[forked_project_id])

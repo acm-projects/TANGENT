@@ -2,12 +2,15 @@
 Tangent — auth_router.py
 """
 
+import hashlib
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from jose import JWTError, jwt
@@ -17,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.database import get_db_session
-from app.models import User, Workspace, Session
+from app.models import User, Workspace, SessionModel as Session
 from app.auth import (
     create_access_token,
     create_refresh_token,
@@ -33,6 +36,7 @@ from app.core.oauth_utils import (
     generate_state_token,
     generate_pkce_pair,
     get_google_auth_url,
+    GOOGLE_REAUTH_REDIRECT_URI,
     exchange_google_code_for_tokens,
     verify_google_id_token,
 )
@@ -52,11 +56,27 @@ REFRESH_COOKIE_MAX_AGE = int(REFRESH_TOKEN_EXPIRE.total_seconds())
 
 class OnboardingRequest(BaseModel):
     workspace_name: str
+    next: str | None = None
 
 
 class UpdateAccountRequest(BaseModel):
     name: str | None = None
     avatar_url: str | None = None
+
+INVITE_PATH_RE = re.compile(r"/invite/[A-Za-z0-9_-]{16,128}")
+
+
+def _safe_invite_path(path: str | None) -> str | None:
+    """
+    Only same-site invite paths may be used as a post-login destination.
+    """
+    if path and INVITE_PATH_RE.fullmatch(path):
+        return path
+    return None
+
+
+def _hash_refresh_token(refresh_token: str) -> str:
+    return hashlib.sha256(refresh_token.encode()).hexdigest()
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
@@ -70,9 +90,15 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
+
 async def _get_owned_workspace_slug(db: AsyncSession, user_id) -> str | None:
     result = await db.execute(
-        select(Workspace.slug).where(Workspace.owner_id == user_id)
+        select(Workspace.slug)
+        .where(Workspace.owner_id == user_id)
+        .order_by(
+            Workspace.last_used_at.desc().nulls_last(),
+            Workspace.created_at.desc(),
+        )
     )
     return result.scalars().first()
 
@@ -93,7 +119,7 @@ async def _issue_session(db: AsyncSession, user: User) -> tuple[str, str]:
     new_session = Session(
         id=session_id,
         user_id=user.id,
-        refresh_token=refresh_token,
+        refresh_token_hash=_hash_refresh_token(refresh_token),
         expires_at=datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRE,
         consumed_at=None,
     )
@@ -133,7 +159,10 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
         raise credentials_exception
 
     session_result = await db.execute(
-        select(Session).where(Session.refresh_token == refresh_token, Session.user_id == user_id)
+        select(Session).where(
+            Session.refresh_token_hash == _hash_refresh_token(refresh_token),
+            Session.user_id == user_id,
+        )
     )
     active_session = session_result.scalar_one_or_none()
 
@@ -155,7 +184,6 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
 
     now = datetime.now(timezone.utc)
 
-    # APPSEC: Reuse Detection & Grace Period
     if active_session.consumed_at is not None:
         consumed_time = active_session.consumed_at
         if consumed_time.tzinfo is None:
@@ -167,7 +195,6 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
             new_access_token = create_access_token(data=token_payload)
             return {"access_token": new_access_token, "token_type": "bearer"}
         else:
-            # THREAT DETECTED: reuse outside the grace window -> replay attack.
             await db.execute(delete(Session).where(Session.user_id == user_id))
             await db.commit()
             response.delete_cookie("refresh_token")
@@ -175,8 +202,7 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Security alert: Compromised token detected. All sessions terminated.",
             )
-
-    # STANDARD PATH: token is fresh and unused
+            
     active_session.consumed_at = now
 
     new_access_token = create_access_token(data=token_payload)
@@ -187,7 +213,7 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
     new_session = Session(
         id=new_session_id,
         user_id=user.id,
-        refresh_token=new_refresh_token,
+        refresh_token_hash=_hash_refresh_token(new_refresh_token),
         expires_at=now + REFRESH_TOKEN_EXPIRE,
         consumed_at=None,
     )
@@ -203,7 +229,9 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(response: Response, refresh_token: str | None = Cookie(None), db: AsyncSession = Depends(get_db_session)):
     if refresh_token:
-        result = await db.execute(select(Session).where(Session.refresh_token == refresh_token))
+        result = await db.execute(
+            select(Session).where(Session.refresh_token_hash == _hash_refresh_token(refresh_token))
+        )
         active_session = result.scalar_one_or_none()
 
         if active_session:
@@ -240,6 +268,7 @@ async def onboarding(
         name=request.workspace_name,
         slug=workspace_slug,
         owner_id=current_user.id,
+        last_used_at=datetime.now(timezone.utc),
     )
     db.add(new_workspace)
 
@@ -247,9 +276,11 @@ async def onboarding(
     db.add(current_user)
     await db.commit()
 
+    next_path = _safe_invite_path(request.next)
+
     return {
         "message": "Workspace created successfully.",
-        "redirect": f"/{workspace_slug}/dashboard",
+        "redirect": next_path or f"/{workspace_slug}",
     }
 
 
@@ -321,7 +352,7 @@ async def delete_account(
 # ==========================================
 
 @router.get("/login/google", status_code=status.HTTP_302_FOUND)
-async def google_login():
+async def google_login(next_path: str | None = Query(None, alias="next")):
     """Departure Gate: Redirects user to Google Consent Screen"""
     state = generate_state_token()
     code_verifier, code_challenge = generate_pkce_pair()
@@ -337,6 +368,10 @@ async def google_login():
     }
     redirect_response.set_cookie("oauth_state", state, **cookie_kwargs)
     redirect_response.set_cookie("pkce_verifier", code_verifier, **cookie_kwargs)
+
+    safe_next = _safe_invite_path(next_path)
+    if safe_next:
+        redirect_response.set_cookie("post_login_next", safe_next, **cookie_kwargs)
 
     return redirect_response
 
@@ -374,21 +409,26 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db_se
         db.add(user)
         await db.flush()
 
-    redirect_url = f"{FRONTEND_URL}/onboarding"
+    access_token, refresh_token = await _issue_session(db, user)
+
+    next_path = _safe_invite_path(request.cookies.get("post_login_next"))
+    query = f"access_token={access_token}"
 
     if user.onboarding_completed:
         workspace_slug = await _get_owned_workspace_slug(db, user.id)
-        if workspace_slug:
-            redirect_url = f"{FRONTEND_URL}/{workspace_slug}/dashboard"
-        else:
+        if not workspace_slug:
             raise HTTPException(status_code=403, detail="User does not belong to any workspace.")
+        redirect_url = f"{FRONTEND_URL}{next_path}" if next_path else f"{FRONTEND_URL}/{workspace_slug}"
+    else:
+        redirect_url = f"{FRONTEND_URL}/onboarding"
+        if next_path:
+            query += f"&next={quote(next_path, safe='')}"
 
-    access_token, refresh_token = await _issue_session(db, user)
-
-    redirect_response = RedirectResponse(url=f"{redirect_url}?access_token={access_token}")
+    redirect_response = RedirectResponse(url=f"{redirect_url}?{query}")
     _set_refresh_cookie(redirect_response, refresh_token)
     redirect_response.delete_cookie("oauth_state")
     redirect_response.delete_cookie("pkce_verifier")
+    redirect_response.delete_cookie("post_login_next")
 
     return redirect_response
 
@@ -405,7 +445,7 @@ async def google_reauth(current_user: User = Depends(get_current_user)):
     state = generate_state_token()
     code_verifier, code_challenge = generate_pkce_pair()
 
-    auth_url = get_google_auth_url(state, code_challenge)
+    auth_url = get_google_auth_url(state, code_challenge, GOOGLE_REAUTH_REDIRECT_URI)
     redirect_response = RedirectResponse(url=auth_url)
 
     cookie_kwargs = {
@@ -441,7 +481,7 @@ async def google_reauth_callback(request: Request, db: AsyncSession = Depends(ge
     if not code_verifier or not reauth_user_id:
         raise HTTPException(status_code=400, detail="Missing verifier or user context. Session timed out.")
 
-    tokens = await exchange_google_code_for_tokens(code, code_verifier)
+    tokens = await exchange_google_code_for_tokens(code, code_verifier, GOOGLE_REAUTH_REDIRECT_URI)
     id_token = tokens.get("id_token")
     user_info = await verify_google_id_token(id_token)
     email = user_info.get("email")

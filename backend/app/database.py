@@ -1,11 +1,17 @@
 import os
+import uuid
+from typing import AsyncGenerator
+
+from fastapi import Request
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import text
+from sqlalchemy import event, text
 from dotenv import load_dotenv
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is missing!")
@@ -27,21 +33,39 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db_session(user_id: str = None) -> AsyncSession:
+def _user_id_from_request(request: Request) -> str | None:
+    header = request.headers.get("authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+        if payload.get("type") != "access":
+            return None
+        return str(uuid.UUID(payload.get("sub")))
+    except (JWTError, ValueError, TypeError):
+        return None
+
+
+async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency that yields a database session.
-    CRITICAL: If a user_id is provided, it injects it into the Postgres
-    transaction context so has_project_access() in every RLS policy can
-    resolve the current user and enforce project-membership/share-based
-    row isolation.
+    The user id comes only from a verified access token in the Authorization
+    header, never from request parameters. When a verified user is present,
+    app.current_user_id is set at the start of every transaction on the
+    session (including ones that begin after a commit), so has_project_access()
+    and the RLS policies resolve the current user for the whole request.
+    Requests without a valid token get a session with no identity.
     """
+    user_id = _user_id_from_request(request)
+
     async with AsyncSessionLocal() as session:
-        try:
-            if user_id:
-                await session.execute(
-                    text("SET LOCAL app.current_user_id = :user_id"),
-                    {"user_id": user_id}
+        if user_id:
+            @event.listens_for(session.sync_session, "after_begin")
+            def set_current_user(sync_session, transaction, connection):
+                connection.execute(
+                    text("SELECT set_config('app.current_user_id', :user_id, true)"),
+                    {"user_id": user_id},
                 )
-            yield session
-        finally:
-            await session.close()
+
+        yield session

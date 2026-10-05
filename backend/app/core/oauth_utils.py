@@ -11,11 +11,9 @@ import httpx
 import jwt
 from jwt.exceptions import ExpiredSignatureError, InvalidSignatureError, InvalidTokenError
 
-# Load environment configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-# TODO: point this at Tangent's actual backend URL
 BACKEND_URL = (
     os.getenv("BACKEND_URL")
     if os.getenv("IS_PRODUCTION") == "1"
@@ -23,6 +21,7 @@ BACKEND_URL = (
 )
 
 GOOGLE_REDIRECT_URI = f"{BACKEND_URL}/auth/callback/google"
+GOOGLE_REAUTH_REDIRECT_URI = f"{BACKEND_URL}/auth/callback/reauth/google"
 
 
 def generate_state_token() -> str:
@@ -45,12 +44,12 @@ def generate_pkce_pair() -> tuple[str, str]:
 # GOOGLE OIDC METADATA & CRYPTO PROCESSING
 # ==========================================
 
-def get_google_auth_url(state: str, code_challenge: str) -> str:
+def get_google_auth_url(state: str, code_challenge: str, redirect_uri: str = GOOGLE_REDIRECT_URI) -> str:
     """Constructs the raw initiation URL for the Google OIDC consent screen with PKCE."""
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
         "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "state": state,
@@ -103,7 +102,7 @@ async def verify_google_id_token(id_token: str) -> Dict[str, Any]:
         raise ValueError(f"Cryptographic signature check failed: {str(e)}")
 
 
-async def exchange_google_code_for_tokens(code: str, code_verifier: str) -> Dict[str, Any]:
+async def exchange_google_code_for_tokens(code: str, code_verifier: str, redirect_uri: str = GOOGLE_REDIRECT_URI) -> Dict[str, Any]:
     """Back-channel POST to exchange the auth code for tokens using PKCE."""
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -112,7 +111,7 @@ async def exchange_google_code_for_tokens(code: str, code_verifier: str) -> Dict
                 "client_id": GOOGLE_CLIENT_ID,
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
                 "code_verifier": code_verifier,
             },
