@@ -1,31 +1,22 @@
-/* The one CSS entry point (imported by layout.tsx). See DESIGN.md §2.
+/* The one CSS entry point (imported by layout.tsx).
  *
- * Priority, lowest to highest:  @layer reset  →  @layer ui  →  unlayered
- *                               (the * reset)    (components)   (pages, features)
- *
- * The reset MUST be inside a layer. Cascade layers outrank specificity, and
- * unlayered declarations outrank every layer — so an unlayered `* { padding: 0 }`
- * silently beats `@layer ui { [data-ui="button"] { padding: ... } }` despite the
- * far more specific selector, and every component loses its padding and margin
- * with no warning from the cascade.
- *
- * The `@layer reset, ui;` statement also pins the order independently of which
- * CSS chunk the bundler loads first. */
+ * `@layer ui;` pins the layer order before anything declares into it. Component
+ * CSS lives in that layer; page and feature CSS stays UNLAYERED, because
+ * unlayered CSS always beats layered CSS — that's what lets a page override a
+ * component without specificity fights. See DESIGN.md §2 and §4. */
 
-@layer reset, ui;
+@layer ui;
 
 @import "../ui/components/tokens/index.css";
 
-@layer reset {
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-  body {
-    font-family: system-ui, sans-serif;
-    background: var(--color-surface);
-    color: var(--color-text);
-  }
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
