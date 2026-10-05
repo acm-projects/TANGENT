@@ -1,0 +1,7 @@
+/* Feature CSS: its own layout only. Unlayered, so it beats @layer ui. */
+
+.workspace-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

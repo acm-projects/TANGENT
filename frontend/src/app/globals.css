@@ -1,0 +1,38 @@
+/* The one CSS entry point (imported by layout.tsx).
+ *
+ * Cascade order, weakest to strongest:
+ *
+ *   @layer reset    ← the * reset below
+ *   @layer ui       ← component CSS (ui/components/ **)
+ *   unlayered       ← page and feature CSS
+ *
+ * The reset MUST be inside a layer. Unlayered CSS beats EVERY layer regardless
+ * of specificity, so an unlayered `* { padding: 0 }` silently outranks a
+ * component's own padding — and no specificity change can fix that, only layer
+ * order can.
+ *
+ * Page and feature CSS stays unlayered on purpose, so it still wins over
+ * component CSS without specificity fights. See DESIGN.md §2 and §4. */
+
+@layer reset, ui;
+
+@import "../ui/components/tokens/index.css";
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
