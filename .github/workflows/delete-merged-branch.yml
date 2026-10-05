@@ -1,0 +1,19 @@
+name: Delete branch after merge to dev
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev]
+permissions:
+  contents: write
+jobs:
+  delete-branch:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "$BRANCH" == "main" || "$BRANCH" == "dev" ]]; then exit 0; fi
+          gh api -X DELETE "repos/$REPO/git/refs/heads/$BRANCH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
