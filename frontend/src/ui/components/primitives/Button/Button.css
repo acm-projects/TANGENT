@@ -1,40 +1,35 @@
 /* Button — see DESIGN.md §4.
  *
- * Published hooks (a consumer may set these; part of Button's interface):
- *   --button-bg, --button-bg-hover, --button-fg, --button-padding, --button-font-size
+ * Real properties from semantic tokens. No private --_vars, no published
+ * hooks, no var(a, b) fallbacks: the base rule always defines every value, so
+ * a fallback could only ever hide a typo (DESIGN.md Principle 2).
  *
- * Internals are `--_`-prefixed and private. Variants set only those private
- * vars rather than final properties, so a variant can never fight the :hover
- * rule — everything inside :where() has zero specificity, which means source
- * order is the ONLY tiebreaker. Setting vars instead of properties keeps that
- * from mattering. */
+ * Two mechanical rules this file follows:
+ *   1. Every selector is qualified with [data-ui="button"], so a variant is
+ *      (0,2,0) and beats the base rule's (0,1,0) by specificity, not by source
+ *      order.
+ *   2. The base :hover rule is (0,3,0), so it outranks any plain variant rule.
+ *      A variant with a different hover therefore needs its own hover rule. */
 
 @layer ui {
-  :where([data-ui="button"]) {
-    /* private defaults = the primary variant, md size */
-    --_bg: var(--color-brand);
-    --_bg-hover: var(--color-brand-hover);
-    --_fg: var(--color-text-on-brand);
-    --_border: transparent;
-    --_pad: var(--space-2) var(--space-4);
-    --_font: var(--font-size-md);
-
+  /* base = the primary variant at md size */
+  [data-ui="button"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
 
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+
     font-family: inherit;
-    font-size: var(--button-font-size, var(--_font));
+    font-size: var(--font-size-md);
     font-weight: var(--font-weight-medium);
     line-height: var(--line-height-tight);
 
-    padding: var(--button-padding, var(--_pad));
-    border: 1px solid var(--_border);
-    border-radius: var(--radius-md);
-
-    background: var(--button-bg, var(--_bg));
-    color: var(--button-fg, var(--_fg));
+    background: var(--color-brand);
+    color: var(--color-text-on-brand);
 
     cursor: pointer;
     transition:
@@ -43,41 +38,47 @@
       opacity var(--motion-fast) var(--ease-out);
   }
 
-  /* variants — set private vars only */
-  :where([data-ui="button"][data-variant="ghost"]) {
-    --_bg: transparent;
-    --_bg-hover: var(--color-surface-raised);
-    --_fg: var(--color-text);
-    --_border: var(--color-border);
+  [data-ui="button"]:hover:not(:disabled) {
+    background: var(--color-brand-hover);
   }
 
-  :where([data-ui="button"][data-variant="danger"]) {
-    --_bg: var(--color-danger);
-    --_bg-hover: var(--color-danger-hover);
+  /* variants */
+  [data-ui="button"][data-variant="ghost"] {
+    background: transparent;
+    border-color: var(--color-border);
+    color: var(--color-text);
   }
 
-  /* sizes — set private vars only */
-  :where([data-ui="button"][data-size="sm"]) {
-    --_pad: var(--space-1) var(--space-3);
-    --_font: var(--font-size-sm);
+  [data-ui="button"][data-variant="ghost"]:hover:not(:disabled) {
+    background: var(--color-surface-raised);
   }
 
-  :where([data-ui="button"][data-size="lg"]) {
-    --_pad: var(--space-3) var(--space-6);
-    --_font: var(--font-size-lg);
+  [data-ui="button"][data-variant="danger"] {
+    background: var(--color-danger);
+  }
+
+  [data-ui="button"][data-variant="danger"]:hover:not(:disabled) {
+    background: var(--color-danger-hover);
+  }
+
+  /* sizes */
+  [data-ui="button"][data-size="sm"] {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--font-size-sm);
+  }
+
+  [data-ui="button"][data-size="lg"] {
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-lg);
   }
 
   /* states */
-  :where([data-ui="button"]:hover:not(:disabled)) {
-    background: var(--button-bg-hover, var(--_bg-hover));
-  }
-
-  :where([data-ui="button"]:focus-visible) {
+  [data-ui="button"]:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
   }
 
-  :where([data-ui="button"]:disabled) {
+  [data-ui="button"]:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
