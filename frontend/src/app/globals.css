@@ -1,0 +1,22 @@
+/* The one CSS entry point (imported by layout.tsx).
+ *
+ * `@layer ui;` pins the layer order before anything declares into it. Component
+ * CSS lives in that layer; page and feature CSS stays UNLAYERED, because
+ * unlayered CSS always beats layered CSS — that's what lets a page override a
+ * component without specificity fights. See DESIGN.md §2 and §4. */
+
+@layer ui;
+
+@import "../ui/components/tokens/index.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
