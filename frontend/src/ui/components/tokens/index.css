@@ -1,6 +1,0 @@
-/* The two token tiers plus motion, in order.
- * Order matters: semantic.css references base.css. See DESIGN.md Rule 1. */
-
-@import "./base.css";
-@import "./semantic.css";
-@import "./motion.css";

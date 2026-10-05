@@ -14,7 +14,7 @@
 
 @layer reset, ui;
 
-@import "../ui/components/tokens/index.css";
+@import "../ui/library/tokens/index.css";
 
 @layer reset {
   * {
@@ -24,7 +24,7 @@
   }
 
   body {
-    font-family: system-ui, sans-serif;
+    font-family: var(--font-content);
     background: var(--color-surface);
     color: var(--color-text);
   }

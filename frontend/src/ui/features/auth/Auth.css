@@ -1,0 +1,26 @@
+/* Auth — the feature's own layout and one-offs, unlayered (DESIGN.md §2, Rule 6). */
+
+.auth {
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--space-6);
+}
+
+.auth-header {
+  text-align: center;
+}
+
+/* One-off: the wordmark is brand-coloured, spaced out, in the heading face. */
+.auth-wordmark {
+  font-family: var(--font-heading);
+  letter-spacing: 0.2em;
+  color: var(--color-brand);
+}
+
+.auth-google {
+  width: 100%;
+}
+
+.auth-legal {
+  text-align: center;
+}
