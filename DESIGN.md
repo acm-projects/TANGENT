@@ -93,6 +93,7 @@ frontend/src/
   store/                       ← cross-page state
     treeStore.ts
 frontend/AGENTS.md             ← rules for AI agents building features
+docs/DEVELOPMENT.md            ← repo setup, workflow, backend design, testing
 DESIGN.md                      ← this file
 ```
 
@@ -130,8 +131,10 @@ Button/
   index.ts             ← export { Button } from "./Button";
 ```
 
-Add `Button.stories.tsx` if and when Storybook is installed; it is not currently a
-dependency, so stories are optional rather than part of the anatomy.
+A component should be viewable in isolation — if it needs a page, a route, or a
+logged-in session to look at, it isn't a component yet. A component explorer
+(Storybook or similar) is **[planned]**, not installed; when it lands, each folder
+also gets a `Button.stories.tsx` covering every variant and state.
 
 ### Feature anatomy
 
@@ -432,7 +435,9 @@ outlines without replacing them.
 5. Style only with semantic tokens, inside `@layer ui` and `:where()`.
 6. Use motion tokens for any transition or animation.
 7. Add a `:focus-visible` style if it's interactive.
-8. Export it from `ui/components/index.ts`.
+8. Check it in both themes (flip `data-theme="dark"` on `:root` in devtools) — if
+   it doesn't re-theme, it hardcoded a colour.
+9. Export it from `ui/components/index.ts`.
 
 ### Adding a page
 

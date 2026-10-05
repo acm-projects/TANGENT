@@ -257,6 +257,8 @@ CI runs all of this on every PR; red CI blocks merging into `dev`.
 
 **Where tests go:** backend in `backend/tests/` (mirrors `app/`; features under `tests/features/<f>/`); frontend next to the code (`foo.test.ts`). Backend imports use `from app.context.flatten import ...`; run pytest from `backend/`.
 
+**Component explorer [planned].** `src/ui/components/` has no isolated preview harness yet. Storybook 10.6 was tried and backed out: `@storybook/nextjs` aliases bare `react`/`react-dom` into Next's private `next/dist/compiled/react`, and on Next 16.3.8 the preview iframe dies at runtime with `class heritage ....Component is not an object or null` — the production build compiles fine, so `build-storybook` does not catch it. If retried: either pin the React aliases back to the real deduped `react` in `.storybook/main.ts`, or use `@storybook/react-webpack5`, which does no Next-specific aliasing. Avoid `@storybook/nextjs-vite` — it wants Vite 7 as a peer and would collide with the Vite 5 that `vitest` bundles. We are not using Vite.
+
 **Patterns**
 1. **Pure logic in, plain data out.** No DB or network inside the function under test.
 2. **Inject the transport.** `createApiClient` accepts an `adapter`, so tests fake the network instead of mocking modules.
