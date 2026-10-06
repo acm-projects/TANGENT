@@ -156,7 +156,7 @@ frontend/
         │   ├── tokens/        design decisions as CSS custom properties
         │   ├── types/         shared prop vocabularies (TextSize, Hierarchy, Elevation)
         │   ├── primitives/    wrap one native tag each (Text/, Panel/, Icon/, Frame/, Link/,
-        │   │                  Image/, Input/, TextArea/, Divider/)
+        │   │                  Image/, Input/, TextArea/, Divider/, ProgressiveBlur/)
         │   ├── components/    built from primitives and other components (Button/)
         │   └── index.ts       the barrel features and pages import from
         ├── features/          features used by TWO OR MORE pages, or planned to be (auth/)

@@ -43,8 +43,10 @@ const db = {
 };
 
 /** NodeMeta is Node without chats -- what GET /trees/:id returns per node. */
-function toMeta({ chats: _chats, ...meta }: Node): NodeMeta {
-  return meta;
+function toMeta(node: Node): NodeMeta {
+  const meta: Partial<Node> = { ...node };
+  delete meta.chats;
+  return meta as NodeMeta;
 }
 
 function nextId(prefix: string) {

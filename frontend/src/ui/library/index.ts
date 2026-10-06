@@ -18,6 +18,7 @@ export { Image } from "./primitives/Image/Image";
 export { Input } from "./primitives/Input/Input";
 export { TextArea } from "./primitives/TextArea/TextArea";
 export { Divider } from "./primitives/Divider/Divider";
+export { ProgressiveBlur } from "./primitives/ProgressiveBlur/ProgressiveBlur";
 export { Button } from "./components/Button/Button";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";

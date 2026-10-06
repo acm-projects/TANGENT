@@ -26,12 +26,17 @@
 
   /* elevation — tier 1: raw values, never named by a component */
   --shadow-md: 0 0 8px rgb(0 0 0 / 0.25);
-  --blur-lg: 15px;
+  --blur-sm: 30px;
+  --blur-lg: 30px;
 
   /* elevation — tier 2: meaning */
   --shadow-floating: var(--shadow-md);
   /* --shadow-selected lives in colors.css: it is a glow whose colour changes per theme */
   --blur-floating: var(--blur-lg);
+  /* the two layers of ProgressiveBlur: a soft one reaching far in, a strong
+   * one at the edge. Match these to the Figma effect's start/end radius. */
+  --blur-progressive-soft: var(--blur-sm);
+  --blur-progressive-strong: var(--blur-lg);
 
   /* how much of a floating surface's colour shows through the glass */
   --glass-mix: 50%;

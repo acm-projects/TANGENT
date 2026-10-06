@@ -110,6 +110,7 @@ frontend/src/
         Input/                 ← single-line field; also the hidden file picker
         TextArea/              ← growing multi-line field
         Divider/               ← hairline rule
+        ProgressiveBlur/       ← blur that ramps toward an edge (scroll fades)
       components/
         Button/                ← Panel + Text + Icon
       index.ts                 ← the entry point features and pages import from

@@ -6,7 +6,16 @@
  * hierarchy × floating pair has its own rule. Those are (0,3,0) and beat both
  * the hierarchy rules and the floating rule (0,2,0) by specificity. The
  * floating rule itself never sets background, so it never ties with a
- * hierarchy rule. */
+ * hierarchy rule.
+ *
+ * The glass blur is drawn by a ::before layer behind the content, never by
+ * backdrop-filter on the Panel itself. A backdrop-filter makes its element a
+ * "backdrop root", and any glass nested inside it then blurs against an
+ * incomplete backdrop: Chromium renders it unblurred (the chat's message box,
+ * floating inside the floating chat panel, showed crisp text behind it). With
+ * the blur on a pseudo-element, the Panel stays an ordinary box, so glass
+ * nests to any depth. `isolation: isolate` keeps the z-index:-1 layer inside
+ * the Panel without creating a backdrop root. */
 
 @layer ui {
   [data-ui="panel"] {
@@ -35,7 +44,18 @@
 
   /* elevation */
   [data-ui="panel"][data-elevation="floating"] {
+    position: relative;
+    isolation: isolate;
     box-shadow: var(--shadow-floating);
+  }
+
+  [data-ui="panel"][data-elevation="floating"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
     -webkit-backdrop-filter: blur(var(--blur-floating));
     backdrop-filter: blur(var(--blur-floating));
   }

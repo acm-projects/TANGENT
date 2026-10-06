@@ -119,13 +119,16 @@ export function useChat() {
       },
     });
 
-    // The server may have titled the node or tagged an attachment; refresh its
-    // metadata so the map shows it.
+    // Re-read the node the server just saved. Its metadata may have changed
+    // (a new title, an attachment tag) and the map should show it; its chats
+    // are the persisted copy, which replaces the optimistic one built while
+    // streaming.
     // TODO(backend): replace with api.nodes.get(nodeId)
     const fresh = await mockApi.nodes.get(nodeId).catch(() => null);
-    if (fresh) {
-      const { chats: _chats, ...meta } = fresh;
+    if (fresh && !useTreeStore.getState().streaming) {
+      const { chats, ...meta } = fresh;
       useTreeStore.getState().updateNode(meta);
+      useTreeStore.getState().setChats(nodeId, chats);
     }
   }
 

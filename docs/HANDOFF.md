@@ -135,13 +135,20 @@ These are outside the frontend's scope and were **not** changed:
   spacing looks off, re-pull that frame with the Figma MCP's
   `get_design_context` and adjust that feature's own CSS.
 - The mind map **doesn't auto-pan** to a newly created branch; the user pans to it.
+- **Chat glass.** Messages scroll under a progressive blur at the top and under
+  the frosted message box at the bottom. The blur strengths are tokens
+  (`--blur-progressive-soft` / `--blur-progressive-strong` in `shape.css`, and
+  `--blur-floating`). They were set by eye; match them to the Figma effect's
+  values once the Chat frame can be inspected.
 
 ## 7. Library additions
 
 New primitives (`src/ui/library/primitives/`): `Link`, `Image`, `Input`,
-`TextArea`, `Divider`. Changes to existing ones:
+`TextArea`, `Divider`, `ProgressiveBlur`. Changes to existing ones:
 - **Frame:** a `justify` prop, gaps `0` and `8`, more `as` tags.
-- **Panel:** more `as` tags, and a 32px radius.
+- **Panel:** more `as` tags, and a 32px radius. Floating Panels draw their glass
+  blur on a `::before` layer rather than on themselves, so glass can nest inside
+  glass; ProgressiveBlur.tsx and Panel.css explain why.
 - **Button:** a `pressed` prop.
 
 New tokens:

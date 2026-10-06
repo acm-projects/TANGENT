@@ -15,10 +15,11 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
 
 type MessageFieldProps = {
   blocker: SendBlocker;
+  className?: string;
   onSend(content: string, files: File[]): void;
 };
 
-export function MessageField({ blocker, onSend }: MessageFieldProps) {
+export function MessageField({ blocker, onSend, className }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -46,7 +47,13 @@ export function MessageField({ blocker, onSend }: MessageFieldProps) {
   }
 
   return (
-    <Panel as="footer" className="message-field" data-disabled={disabled || undefined}>
+    // Floating = frosted glass: the messages scrolling behind it stay visible, blurred.
+    <Panel
+      as="footer"
+      elevation="floating"
+      className={["message-field", className].filter(Boolean).join(" ")}
+      data-disabled={disabled || undefined}
+    >
       <Frame gap="2">
         {files.length > 0 && (
           <Frame as="ol" direction="row" gap="2" className="message-field-files" aria-label="Attachments">

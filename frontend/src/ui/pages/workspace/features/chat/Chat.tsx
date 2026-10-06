@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Button, Frame, Panel, Text } from "@/ui/library";
+import { Button, Frame, Panel, ProgressiveBlur, Text } from "@/ui/library";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
@@ -14,6 +14,12 @@ import "./Chat.css";
  *   docked     the default: floats over the right half of the map
  *   expanded   full screen (the top-left button)
  *   collapsed  just a button to bring it back (the top-right chevron)
+ *
+ * The history scrolls UNDER two glass layers, as in Figma: a progressive blur
+ * at the top, where messages leave view, and the message box at the bottom,
+ * which floats over the newest messages. Both are sticky children of the one
+ * scroll container (.chat-scroll), so their backdrop blur sees the messages
+ * scrolling behind them -- see ProgressiveBlur.tsx for why that placement matters.
  */
 
 type Layout = "docked" | "expanded" | "collapsed";
@@ -25,12 +31,12 @@ export function Chat({ className }: ChatProps) {
   const classes = ["chat", className].filter(Boolean).join(" ");
 
   // Keep the newest message in view as history loads and tokens stream in.
-  const historyRef = useRef<HTMLOListElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const lastSection = chat.history.at(-1);
   // `layout` is in the key because reopening a collapsed panel remounts the list.
   const scrollKey = `${layout}:${chat.activeNodeId}:${lastSection?.messages?.length ?? 0}:${chat.streaming?.text.length ?? 0}`;
   useEffect(() => {
-    const el = historyRef.current;
+    const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [scrollKey]);
 
@@ -76,56 +82,60 @@ export function Chat({ className }: ChatProps) {
           />
         </Frame>
 
-        {chat.history.length === 0 ? (
-          <Frame justify="center" align="center" className="chat-empty">
-            <Text content="Select a node to start chatting." />
-          </Frame>
-        ) : (
-          <Frame as="ol" ref={historyRef} gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
-            {chat.history.map((section, i) => (
-              <Fragment key={section.node.id}>
-                {i > 0 && (
-                  <Frame as="li">
-                    <BranchDivider />
-                  </Frame>
-                )}
-                {section.messages === undefined && (
-                  <Frame as="li">
-                    <Text hierarchy="tertiary" size="s" content="Loading…" />
-                  </Frame>
-                )}
-                {section.messages?.map((m) => (
-                  <MessageBubble
-                    key={`${section.node.id}-${m.seq}-${m.role}`}
-                    message={m}
-                    onBranch={() => chat.fork(section.node.id)}
-                  />
-                ))}
-                {section.messages?.length === 0 && !streamingHere && (
-                  <Frame as="li" className="chat-hint">
-                    <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
-                  </Frame>
-                )}
-              </Fragment>
-            ))}
-            {streamingHere && (
-              <MessageBubble
-                streaming
-                message={{
-                  role: "assistant",
-                  content: streamingHere.text,
-                  seq: -1,
-                  branch_source: null,
-                  created_at: "",
-                }}
-              />
-            )}
-          </Frame>
-        )}
+        <Frame ref={scrollRef} gap="0" className="chat-scroll">
+          <ProgressiveBlur edge="top" className="chat-blur-top" />
 
-        {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
+          {chat.history.length === 0 ? (
+            <Frame justify="center" align="center" className="chat-empty">
+              <Text content="Select a node to start chatting." />
+            </Frame>
+          ) : (
+            <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
+              {chat.history.map((section, i) => (
+                <Fragment key={section.node.id}>
+                  {i > 0 && (
+                    <Frame as="li">
+                      <BranchDivider />
+                    </Frame>
+                  )}
+                  {section.messages === undefined && (
+                    <Frame as="li">
+                      <Text hierarchy="tertiary" size="s" content="Loading…" />
+                    </Frame>
+                  )}
+                  {section.messages?.map((m) => (
+                    <MessageBubble
+                      key={`${section.node.id}-${m.seq}-${m.role}`}
+                      message={m}
+                      onBranch={() => chat.fork(section.node.id)}
+                    />
+                  ))}
+                  {section.messages?.length === 0 && !streamingHere && (
+                    <Frame as="li" className="chat-hint">
+                      <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
+                    </Frame>
+                  )}
+                </Fragment>
+              ))}
+              {streamingHere && (
+                <MessageBubble
+                  streaming
+                  message={{
+                    role: "assistant",
+                    content: streamingHere.text,
+                    seq: -1,
+                    branch_source: null,
+                    created_at: "",
+                  }}
+                />
+              )}
+            </Frame>
+          )}
 
-        <MessageField blocker={chat.blocker} onSend={chat.send} />
+          {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
+
+          <MessageField blocker={chat.blocker} onSend={chat.send} className="chat-field" />
+        </Frame>
       </Frame>
     </Panel>
   );

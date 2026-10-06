@@ -28,23 +28,50 @@
   min-height: 0;
 }
 
+/* The one scroll container. Three children, top to bottom:
+ *   .chat-blur-top   sticky; overlays the first messages (negative margin)
+ *   .chat-history    the messages
+ *   .chat-field      sticky; the glass message box
+ * Messages scroll beneath both sticky layers, which blur them. */
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* keep keyboard-focused messages clear of both glass layers */
+  scroll-padding-block: var(--chat-blur-height) var(--space-8);
+  --chat-blur-height: 6rem;
+}
+
+.chat-blur-top {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  height: var(--chat-blur-height);
+  /* overlay the content instead of pushing it down */
+  margin-bottom: calc(-1 * var(--chat-blur-height));
+}
+
 .chat-empty {
   flex: 1;
   color: var(--color-text-secondary);
 }
 
-.chat-history {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-2) var(--space-2) var(--space-4);
-}
-
 /* A short conversation sits at the bottom, like any chat. Done with a leading
  * auto margin, not `justify-content: flex-end`, which makes the top of an
- * overflowing list unreachable by scrolling. */
-.chat-history > :first-child {
+ * overflowing list unreachable by scrolling. The top padding lets the first
+ * message scroll fully out from under the blur. */
+.chat-history {
   margin-top: auto;
+  padding: var(--chat-blur-height) var(--space-2) var(--space-4);
+}
+
+.chat-field {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: none;
 }
 
 .chat-hint {
