@@ -1,0 +1,74 @@
+/* Button — see DESIGN.md §4.
+ *
+ * Button's root is a Panel, so Panel.css already supplies the surface for each
+ * hierarchy and elevation (background, border, colour, glass). This file adds only what makes it a
+ * button: layout, padding by size, cursor, and interaction states.
+ *
+ * Every selector is [data-ui="panel"][data-component="button"] (0,2,0): it
+ * beats Panel's base rule outright, and it never sets a property Panel's
+ * hierarchy and elevation rules set, so the two never compete. Hover rules
+ * carry :hover:not(:disabled) and outrank all of Panel's rules; each
+ * hierarchy or elevation that hovers differently adds its attribute to
+ * outrank the shared hover. */
+
+@layer ui {
+  [data-ui="panel"][data-component="button"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font: inherit;
+    cursor: pointer;
+    transition:
+      background var(--motion-fast) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out),
+      opacity var(--motion-fast) var(--ease-out);
+  }
+
+  /* sizes — padding follows the TextSize handed to Text and Icon */
+  [data-ui="panel"][data-component="button"]:is([data-size="xxs"], [data-size="xs"], [data-size="s"]):not([data-icon-only]) {
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+  }
+
+  [data-ui="panel"][data-component="button"]:is([data-size="l"], [data-size="xl"], [data-size="xxl"], [data-size="display"]):not([data-icon-only]) {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-6);
+  }
+
+  /* icon-only: square */
+  [data-ui="panel"][data-component="button"][data-icon-only] {
+    padding: var(--space-2);
+  }
+
+  /* hover — flat: secondary and tertiary share one, primary has its own */
+  [data-ui="panel"][data-component="button"]:hover:not(:disabled) {
+    background: var(--color-surface-raised);
+  }
+
+  [data-ui="panel"][data-component="button"][data-hierarchy="primary"]:hover:not(:disabled) {
+    background: var(--color-brand-hover);
+  }
+
+  /* hover — floating: stays glass, with more of its colour showing (0,5,0) */
+  [data-ui="panel"][data-component="button"][data-elevation="floating"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-surface) var(--glass-mix-hover), transparent);
+  }
+
+  /* (0,6,0) — beats both the primary hover and the floating hover */
+  [data-ui="panel"][data-component="button"][data-hierarchy="primary"][data-elevation="floating"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-brand) var(--glass-mix-hover), transparent);
+  }
+
+  /* states */
+  [data-ui="panel"][data-component="button"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  [data-ui="panel"][data-component="button"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

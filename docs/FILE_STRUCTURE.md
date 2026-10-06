@@ -36,7 +36,7 @@ foundation ──X──►  any feature        never
 ```
 
 **Foundation** is `backend/app/context/`, `backend/app/models.py`,
-`frontend/src/api/`, `frontend/src/store/`, `frontend/src/ui/components/` — plus
+`frontend/src/api/`, `frontend/src/store/`, `frontend/src/ui/library/` — plus
 `backend/app/core/` once it holds anything. Everything converges on it, so
 changes there are small, additive, and reviewed.
 
@@ -142,14 +142,16 @@ frontend/
     │   └── index.ts           what features import: `import { api } from "@/api"`
     ├── store/                 foundation: state shared across pages
     │   └── treeStore.ts       tree structure + node content. Nothing feature-specific.
-    ├── features/             features used by TWO OR MORE pages (currently empty)
     └── ui/
-        ├── components/        foundation: the design library. Knows nothing about Tangent.
+        ├── library/           foundation: the design library. Knows nothing about Tangent.
         │   ├── tokens/        design decisions as CSS custom properties
-        │   ├── primitives/    single-purpose components (Button/)
-        │   ├── composites/    components assembled from primitives
-        │   └── index.ts       the barrel pages and features import from
-        └── pages/             one folder per screen of the site
+        │   ├── types/         shared prop vocabularies (TextSize, Hierarchy, Elevation)
+        │   ├── primitives/    wrap one native tag each (Text/, Panel/, Icon/, Frame/)
+        │   ├── components/    built from primitives and other components (Button/)
+        │   └── index.ts       the barrel features and pages import from
+        ├── features/          features used by TWO OR MORE pages, or planned to be (auth/)
+        └── pages/             one folder per route, named after it
+            ├── login/         the /login screen
             └── workspace/     the chat + mind map screen                          [planned]
                 └── features/  features used only by this page (chat/, toolbar/)
 ```
@@ -189,9 +191,9 @@ inside a request handler.
 | A URL | `src/app/<route>/page.tsx` — it renders a page component and nothing else |
 | A whole screen | `src/ui/pages/<name>/` (see DESIGN.md "Adding a page") |
 | A piece of a screen with its own state or data calls | `src/ui/pages/<page>/features/<name>/` |
-| That same piece, once a **second** page needs it | move it to `src/features/<name>/`, update the imports |
-| A reusable, app-agnostic component | `src/ui/components/primitives/` or `composites/` (DESIGN.md §2) |
-| A colour, spacing or duration value | `src/ui/components/tokens/semantic.css` (DESIGN.md Rule 1) |
+| That same piece, once a **second** page needs it (or one is planned) | `src/ui/features/<name>/`, update the imports |
+| A reusable, app-agnostic component | `src/ui/library/primitives/` or `components/` (DESIGN.md §1) |
+| A colour, spacing or duration value | the matching file in `src/ui/library/tokens/`: `colors.css`, `shape.css`, `text.css` or `motion.css` (DESIGN.md Rule 1) |
 | A call to a new endpoint group | a new file in `src/api/endpoints/`, wired in `src/api/index.ts` |
 | A call to an existing endpoint group | that `src/api/endpoints/<group>.ts` file |
 | A type describing a request or response | `src/api/types.ts` |
@@ -207,9 +209,10 @@ another page, it's a **feature**. Full version in DESIGN.md §1.
 
 ### Decision for "page feature or shared feature?"
 
-Start it inside the page that needs it. Move it to `src/features/` the moment a
-**second** page needs it. Don't pre-promote on a guess that it'll be reused — a
-feature is written so this move costs only an import change.
+Start it inside the page that needs it. Move it to `src/ui/features/` the moment
+a **second** page needs it. Don't pre-promote on a guess that it'll be reused — a
+feature is written so this move costs only an import change. The one exception is a
+second user that is already planned; see DESIGN.md §2.
 
 ---
 
@@ -233,7 +236,7 @@ A feature is named after what it *does*, not the route it happens to serve.
 |---|---|---|
 | Python module | `snake_case.py` | `flatten.py` |
 | Python test | `test_<subject>.py` | `test_flatten.py` |
-| Component | `PascalCase.tsx` + `PascalCase.css` + `index.ts` | `Button.tsx` |
+| Component | `PascalCase.tsx` + `PascalCase.css` — two files, no `index.ts` | `Button.tsx` |
 | Hook | `useThing.ts` | `useChat.ts` |
 | TS test | `<subject>.test.ts`, beside the subject | `client.test.ts` |
 | Everything else TS | `camelCase.ts` | `treeStore.ts` |
@@ -256,7 +259,7 @@ distinguish them — which is the reason the folder is being retired.
 
 ```ts
 import { api } from "@/api";              // yes
-import { Button } from "@/ui/components"; // yes
+import { Button } from "@/ui/library";    // yes
 import { useChat } from "./useChat";      // yes — same folder
 import { api } from "../../../api";       // no
 ```
@@ -266,8 +269,8 @@ The alias is declared in `tsconfig.json` and mirrored in `vitest.config.ts`.
 
 **Two barrels you must not import from inside:**
 
-- Files inside `src/ui/components/` import each other by direct relative path
-  (`../primitives/Button`), never through `@/ui/components`.
+- Files inside `src/ui/library/` import each other by direct relative path
+  (`../../primitives/Text/Text`), never through `@/ui/library`.
 - Files inside `src/api/` import each other by relative path, never through
   `@/api`.
 
@@ -341,15 +344,14 @@ app.include_router(polls_router.router)
 ```
 frontend/src/api/endpoints/polls.ts          createPollsApi — wired in api/index.ts
 frontend/src/ui/pages/workspace/features/polls/
-  Polls.tsx         the UI, built from @/ui/components
+  Polls.tsx         the UI, built from @/ui/library
   Polls.css         its layout and one-off styling (unlayered — DESIGN.md §2)
   usePolls.ts       its state and behaviour
-  index.ts          export { Polls } from "./Polls";
   usePolls.test.ts  test the hook, not the pixels
 ```
 
 It lives under `workspace/features/` while only the workspace uses it, and moves
-to `src/features/polls/` the moment a second page does.
+to `src/ui/features/polls/` the moment a second page does.
 
 ---
 
