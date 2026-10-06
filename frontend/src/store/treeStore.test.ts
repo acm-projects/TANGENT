@@ -29,4 +29,16 @@ describe("tree store", () => {
     expect(after.nodesById).toBe(before.nodesById);
     expect(after.childrenByParent).toBe(before.childrenByParent);
   });
+
+  it("updateNode replaces metadata without changing tree shape", () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("c", "r", 1)]);
+    const before = useTreeStore.getState();
+    before.updateNode({ ...node("c", "r", 1), title: "Renamed" });
+    const after = useTreeStore.getState();
+    expect(after.nodesById["c"]?.title).toBe("Renamed");
+    expect(after.childrenByParent).toBe(before.childrenByParent);
+    // Unknown ids are ignored rather than inserted as orphans.
+    after.updateNode(node("ghost", "r", 9));
+    expect(useTreeStore.getState().nodesById["ghost"]).toBeUndefined();
+  });
 });

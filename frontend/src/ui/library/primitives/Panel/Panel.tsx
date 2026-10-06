@@ -6,7 +6,7 @@ import "./Panel.css";
  * so a page's <main> or <section> is a Panel, and Button's root is
  * <Panel as="button">. */
 
-type PanelTag = "div" | "main" | "section" | "header" | "footer" | "button";
+type PanelTag = "div" | "main" | "section" | "header" | "footer" | "aside" | "article" | "li" | "button";
 
 type PanelProps<T extends PanelTag> = ComponentProps<T> & {
   as?: T;

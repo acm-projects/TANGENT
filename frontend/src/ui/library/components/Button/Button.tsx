@@ -22,6 +22,9 @@ type ButtonProps = Omit<ComponentProps<"button">, "children"> & {
   showIcon?: boolean;
   showLabel?: boolean;
   iconAlign?: "left" | "right";
+  /** Toggle buttons only: true while the thing it opens is open. Renders
+   * aria-pressed, which is also what Button.css styles (Figma: tile "Open"). */
+  pressed?: boolean;
 };
 
 export function Button({
@@ -33,6 +36,7 @@ export function Button({
   showIcon = false,
   showLabel = true,
   iconAlign = "left",
+  pressed,
   type = "button",
   ...rest
 }: ButtonProps) {
@@ -45,6 +49,7 @@ export function Button({
       elevation={elevation}
       /* An icon-only button still needs an accessible name. */
       aria-label={showLabel ? undefined : label}
+      aria-pressed={pressed}
       {...rest}
       data-component="button"
       data-size={size}

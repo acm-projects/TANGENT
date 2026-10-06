@@ -12,7 +12,9 @@
   [data-ui="panel"] {
     padding: var(--space-4);
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    /* Figma "FloatingPanel": every surface is a 32px-radius rounded rect,
+     * which also makes a short Panel (a Button) a pill. */
+    border-radius: var(--radius-xxl);
     background: var(--color-surface);
     color: var(--color-text);
   }

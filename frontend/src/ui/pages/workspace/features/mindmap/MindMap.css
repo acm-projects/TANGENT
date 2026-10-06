@@ -1,0 +1,96 @@
+/* MindMap — layout and one-offs, unlayered (DESIGN.md §2).
+ * Measurements: Figma "Node" (18:377) and "NodeGraph" (160:4383).
+ *
+ * React Flow is a third-party renderer, so this file also styles its own
+ * classes (.react-flow__*). base.css (imported in MindMap.tsx) supplies only
+ * the structural rules; every colour here comes from our tokens. */
+
+.mindmap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mindmap-status {
+  margin: auto;
+}
+
+/* the dot grid (Figma "BG-Grid-Dot") */
+.mindmap-dots {
+  fill: var(--color-surface-raised);
+}
+
+/* edges: dim by default, brighter on the selected path */
+.mindmap .mindmap-edge .react-flow__edge-path {
+  stroke: var(--color-surface-raised);
+  stroke-width: 1.5;
+}
+
+.mindmap .mindmap-edge-path .react-flow__edge-path {
+  stroke: var(--color-text-faint);
+}
+
+/* the dots where an edge meets a node */
+.mindmap .mindmap-handle {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: var(--color-text-faint);
+}
+
+/* ── the node ─────────────────────────────────────────────── */
+
+.mindmap-node {
+  padding: var(--space-2) var(--space-6);
+  min-height: 4rem;
+  font: inherit;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+}
+
+.mindmap-node[data-state="path"] {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+/* Figma draws selected and hovered nodes with a 2px border. A 1px border
+ * plus a 1px ring looks the same without resizing the node, which would
+ * nudge its edges on every hover. */
+.mindmap-node[data-state="selected"] {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  box-shadow: var(--shadow-selected), 0 0 0 1px var(--color-border-strong);
+}
+
+.mindmap-node:hover {
+  border-color: var(--color-border-emphasis);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px var(--color-border-emphasis);
+}
+
+.mindmap-node[data-state="selected"]:hover {
+  box-shadow: var(--shadow-selected), 0 0 0 1px var(--color-border-emphasis);
+}
+
+.mindmap-node:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.mindmap-node-title {
+  padding-block: var(--space-2);
+}
+
+/* an attachment tag: a small round glass chip at the end of the node */
+.mindmap-node-tag {
+  padding: var(--space-2);
+  border-color: currentColor;
+  color: inherit;
+}

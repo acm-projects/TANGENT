@@ -13,6 +13,11 @@ export { Text } from "./primitives/Text/Text";
 export { Icon } from "./primitives/Icon/Icon";
 export { Panel } from "./primitives/Panel/Panel";
 export { Frame } from "./primitives/Frame/Frame";
+export { Link } from "./primitives/Link/Link";
+export { Image } from "./primitives/Image/Image";
+export { Input } from "./primitives/Input/Input";
+export { TextArea } from "./primitives/TextArea/TextArea";
+export { Divider } from "./primitives/Divider/Divider";
 export { Button } from "./components/Button/Button";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";

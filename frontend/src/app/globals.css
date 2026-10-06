@@ -23,6 +23,13 @@
     padding: 0;
   }
 
+  /* Lists are used for semantics (a conversation, a grid of cards), never
+   * for bullets; the library draws whatever a list item looks like. */
+  ol,
+  ul {
+    list-style: none;
+  }
+
   body {
     font-family: var(--font-content);
     background: var(--color-surface);

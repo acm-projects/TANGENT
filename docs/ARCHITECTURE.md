@@ -12,6 +12,7 @@ them. It is deliberately not a how-to:
 | Where a new file goes | [FILE_STRUCTURE.md](FILE_STRUCTURE.md) |
 | How to run, test and ship it | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | How the UI is layered and styled | [DESIGN.md](DESIGN.md) |
+| What the frontend skeleton mocks, and how to wire it to the backend | [HANDOFF.md](HANDOFF.md) |
 
 **Markers.** **[built]** exists and is tested. **[assumed]** code relies on it but
 it has not been verified against a real backend or database. **[planned]** agreed,
@@ -240,10 +241,13 @@ surviving spike that predates this table. Don't build on it.
 
 ### Current state of the client halves
 
-- `/` is a placeholder. The login/onboarding/dashboard screens were a throwaway
-  spike and have been **removed**; their API wrappers survive in
-  `src/api/endpoints/auth.ts` because the contract is real.
-- No screen is built yet. `src/ui/pages/workspace/` is scaffolded.
+- The Figma screens are built: `/[slug]/dashboard` and `/[slug]/[projectId]`
+  (the workspace: mind map, chat, toolbar). `/` redirects to a dashboard;
+  `/login` is a static mockup.
+- **They run on mocks.** Every feature hook calls `src/mocks/mockApi.ts`, an
+  in-memory fake with the same signatures as the real calls. No request
+  reaches the backend yet. [HANDOFF.md](HANDOFF.md) maps each mock to its
+  endpoint; `grep -rn "TODO(backend)" frontend/src` lists every call site.
 
 ---
 
@@ -288,11 +292,16 @@ are identical after `appendToken`.
 `treeStore` is for tree structure and node content only. Feature-specific state
 belongs in the feature.
 
-### 7.3 Mind map [planned]
+### 7.3 Mind map [built]
 
 Derive node layout from the tree structure; **do not** store x/y on a node. A
 stored position is a second source of truth that drifts out of sync with the
 real tree. Keep custom node components memoised — ReactFlow already virtualises.
+
+The adapter lives in `ui/pages/workspace/features/mindmap/`: `layout.ts` (a
+pure tidy-tree layout) and `toFlow.ts` (structure slice → React Flow nodes and
+edges, plus path highlighting). Both are unit-tested. Nodes aren't draggable,
+because a dragged position would have to be stored.
 
 ### 7.4 UI layering
 

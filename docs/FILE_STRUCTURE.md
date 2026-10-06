@@ -11,6 +11,7 @@ one sentence, the file you're about to add probably belongs somewhere else.
 | Why the system is shaped like this | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | How to run, test and ship it | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | How the UI is layered and styled | [DESIGN.md](DESIGN.md) |
+| What the frontend skeleton mocks, and how to wire it to the backend | [HANDOFF.md](HANDOFF.md) |
 
 For anything about UI layers, component anatomy or styling, **DESIGN.md wins
 over this file.** This doc covers placement across the whole repo; DESIGN.md is
@@ -51,11 +52,13 @@ own small PR. You do not import sideways.
 TANGENT/
 ├── README.md                  the pitch, MVP, stack, roadmap, team, learning links
 ├── .gitignore                 what never gets committed
-├── docs/                      every long-form doc. Four files, four jobs.
+├── docs/                      every long-form doc. One job per file.
 │   ├── ARCHITECTURE.md        how the system works, and why
 │   ├── FILE_STRUCTURE.md      this file
 │   ├── DEVELOPMENT.md         setup, workflow, testing, troubleshooting
-│   └── DESIGN.md              UI layers and styling (authority inside src/ui/)
+│   ├── DESIGN.md              UI layers and styling (authority inside src/ui/)
+│   ├── HANDOFF.md             the frontend skeleton's mocks, and how to wire them up
+│   └── Figma_TANGENT.md       link to the wireframe the screens are built from
 ├── .github/workflows/         CI. One job per half of the stack.
 ├── backend/                   the FastAPI service
 └── frontend/                  the Next.js app
@@ -131,7 +134,10 @@ frontend/
 └── src/
     ├── app/                   Next.js App Router. ROUTES ONLY — no UI, no logic.
     │   ├── layout.tsx         the root layout; imports globals.css
-    │   ├── page.tsx           "/" — a route file renders a page component, nothing more
+    │   ├── page.tsx           "/" — redirects to a dashboard
+    │   ├── login/page.tsx     "/login"
+    │   ├── [slug]/dashboard/page.tsx     "/{workspace}/dashboard"
+    │   ├── [slug]/[projectId]/page.tsx   "/{workspace}/{project}" — the workspace screen
     │   └── globals.css        the ONE CSS entry point (see DESIGN.md §2)
     ├── api/                   foundation: the seam to the backend
     │   ├── client.ts          transport: axios factory, auth header, single-flight refresh
@@ -142,18 +148,24 @@ frontend/
     │   └── index.ts           what features import: `import { api } from "@/api"`
     ├── store/                 foundation: state shared across pages
     │   └── treeStore.ts       tree structure + node content. Nothing feature-specific.
+    ├── mocks/                 TEMPORARY in-memory backend. Deleted once wired up (HANDOFF.md)
+    │   ├── fixtures.ts        the Figma sample data
+    │   └── mockApi.ts         fakes with the real calls' signatures; only feature hooks call it
     └── ui/
         ├── library/           foundation: the design library. Knows nothing about Tangent.
         │   ├── tokens/        design decisions as CSS custom properties
         │   ├── types/         shared prop vocabularies (TextSize, Hierarchy, Elevation)
-        │   ├── primitives/    wrap one native tag each (Text/, Panel/, Icon/, Frame/)
+        │   ├── primitives/    wrap one native tag each (Text/, Panel/, Icon/, Frame/, Link/,
+        │   │                  Image/, Input/, TextArea/, Divider/)
         │   ├── components/    built from primitives and other components (Button/)
         │   └── index.ts       the barrel features and pages import from
         ├── features/          features used by TWO OR MORE pages, or planned to be (auth/)
-        └── pages/             one folder per route, named after it
+        └── pages/             one folder per screen
             ├── login/         the /login screen
-            └── workspace/     the chat + mind map screen                          [planned]
-                └── features/  features used only by this page (chat/, toolbar/)
+            ├── dashboard/     the project grid
+            │   └── features/  projects/
+            └── workspace/     the mind map + chat screen
+                └── features/  mindmap/, chat/, toolbar/ — used only by this page
 ```
 
 `.gitkeep` files hold scaffolded-but-empty folders in git (git won't track an
@@ -201,6 +213,7 @@ inside a request handler.
 | State for one feature | the feature's own store. **Not** `treeStore`. |
 | State about tree structure or node content | `src/store/treeStore.ts` |
 | A test | next to the code: `treeStore.ts` → `treeStore.test.ts` |
+| Sample data or a fake call while an endpoint doesn't exist | `src/mocks/mockApi.ts`, called only from a feature hook, marked `TODO(backend)` |
 
 ### Decision for "is this a feature or a page?"
 

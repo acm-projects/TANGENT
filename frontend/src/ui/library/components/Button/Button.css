@@ -61,6 +61,23 @@
     background: color-mix(in srgb, var(--color-brand) var(--glass-mix-hover), transparent);
   }
 
+  /* hover — the outline brightens too, as Figma's hover states do. Panel's
+   * secondary rule sets border-color at (0,2,0); this is (0,4,0). */
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"]:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
+  }
+
+  /* pressed: a toggle whose panel is open (Figma ToolBar Tile "Open") */
+  [data-ui="panel"][data-component="button"][aria-pressed="true"] {
+    border-color: var(--color-border-emphasis);
+    color: var(--color-text);
+  }
+
+  /* (0,5,0) — a pressed button keeps its bright outline under the hover rule */
+  [data-ui="panel"][data-component="button"][aria-pressed="true"]:hover:not(:disabled) {
+    border-color: var(--color-border-emphasis);
+  }
+
   /* states */
   [data-ui="panel"][data-component="button"]:focus-visible {
     outline: 2px solid var(--color-focus-ring);
