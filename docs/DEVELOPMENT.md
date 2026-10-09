@@ -8,6 +8,7 @@ How to run Tangent, how to work on it, and what to do when it breaks.
 | Why the system is shaped like this | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Where a new file goes | [FILE_STRUCTURE.md](FILE_STRUCTURE.md) |
 | How the UI is layered and styled | [DESIGN.md](DESIGN.md) |
+| What the frontend skeleton mocks, and how to wire it to the backend | [HANDOFF.md](HANDOFF.md) |
 
 ---
 
@@ -224,7 +225,12 @@ TypeScript to an exact version.
 
 **Blocking teammates**
 
-- ReactFlow adapter: `nodesById` / `childrenByParent` → nodes/edges + layout
+- Wire the frontend skeleton to the backend: every `TODO(backend)` in
+  `frontend/src`, mapped endpoint by endpoint in [HANDOFF.md](HANDOFF.md) §2.
+  Then delete `frontend/src/mocks/`
+- `backend/app/routers/nodes_router.py` is empty but mounted, so the backend
+  can't start; `app/main.py` also ends with a stray second `app = FastAPI()`
+  (HANDOFF.md §4)
 - Server-side leaf enforcement on the prompt endpoint (ARCHITECTURE.md §8)
 - MSW mock handlers and a dev-DB seed script (a small tree including a merge node)
 - The real auth, branch, projects and workspace routers — `app/routers/` holds

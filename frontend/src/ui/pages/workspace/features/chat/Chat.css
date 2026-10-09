@@ -1,0 +1,166 @@
+/* Chat — layout and one-offs, unlayered (DESIGN.md §2).
+ * Measurements: Figma "Chat" (24:531), "ChatBubble" (16:219),
+ * "MessageField" (10:39). */
+
+/* ── the panel ─────────────────────────────────────────────── */
+
+.chat {
+  width: min(45.5rem, calc(50% + var(--space-2)));
+  margin: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-xxl);
+}
+
+.chat[data-layout="expanded"] {
+  /* full screen, leaving the toolbar column visible */
+  width: calc(100% - 5rem);
+}
+
+.chat[data-layout="collapsed"] {
+  width: auto;
+  align-self: start;
+  margin: var(--space-4);
+  padding: 0;
+}
+
+.chat-inner {
+  height: 100%;
+  min-height: 0;
+}
+
+/* The one scroll container. Three children, top to bottom:
+ *   .chat-blur-top   sticky; overlays the first messages (negative margin)
+ *   .chat-history    the messages
+ *   .chat-field      sticky; the glass message box
+ * Messages scroll beneath both sticky layers, which blur them. */
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* keep keyboard-focused messages clear of both glass layers */
+  scroll-padding-block: var(--chat-blur-height) var(--space-8);
+  --chat-blur-height: 6rem;
+}
+
+.chat-blur-top {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  height: var(--chat-blur-height);
+  /* overlay the content instead of pushing it down */
+  margin-bottom: calc(-1 * var(--chat-blur-height));
+}
+
+.chat-empty {
+  flex: 1;
+  color: var(--color-text-secondary);
+}
+
+/* A short conversation sits at the bottom, like any chat. Done with a leading
+ * auto margin, not `justify-content: flex-end`, which makes the top of an
+ * overflowing list unreachable by scrolling. The top padding lets the first
+ * message scroll fully out from under the blur. */
+.chat-history {
+  margin-top: auto;
+  padding: var(--chat-blur-height) var(--space-2) var(--space-4);
+}
+
+.chat-field {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: none;
+}
+
+.chat-hint {
+  padding-block: var(--space-4);
+  text-align: center;
+}
+
+.chat-error {
+  padding-inline: var(--space-2);
+  color: var(--color-danger);
+}
+
+/* ── messages ──────────────────────────────────────────────── */
+
+.message {
+  padding-bottom: var(--space-6);
+}
+
+.message-text {
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Figma: rounded on three corners, nearly square bottom-right */
+.message-user-bubble {
+  max-width: min(32rem, 85%);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
+  border-radius: var(--radius-xxl) var(--radius-xl) var(--radius-sm) var(--radius-xxl);
+  background: var(--color-surface-raised);
+}
+
+.message-meta {
+  color: var(--color-text-muted);
+}
+
+.message-actions {
+  color: var(--color-text-muted);
+}
+
+/* The reply still arriving: a soft pulse on its text. */
+.message-assistant[data-streaming] .message-text {
+  animation: chat-streaming var(--motion-slow) var(--ease-in-out) infinite alternate;
+}
+
+@keyframes chat-streaming {
+  from { opacity: 1; }
+  to { opacity: 0.7; }
+}
+
+/* motion tokens are zeroed under reduced motion, but an infinite animation
+ * with 0ms duration still flickers -- switch it off outright (Rule 7). */
+@media (prefers-reduced-motion: reduce) {
+  .message-assistant[data-streaming] .message-text {
+    animation: none;
+  }
+}
+
+.branch-divider {
+  padding-block: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+/* ── message field ─────────────────────────────────────────── */
+
+.message-field {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  border-width: 2px;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.message-field:hover:not([data-disabled]),
+.message-field:focus-within {
+  border-color: var(--color-border-strong);
+}
+
+.message-field-input {
+  max-height: 12rem;
+}
+
+.message-field-files {
+  flex-wrap: wrap;
+}
+
+.message-field-file {
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+}
+
+.message-field-send {
+  border-radius: var(--radius-full);
+}

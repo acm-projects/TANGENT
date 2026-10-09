@@ -74,6 +74,8 @@ This is the distinction that matters most:
 Rule of thumb: if it has a URL, it's a page. If it's a thing *on* a page that
 could move to another page, it's a feature. **A page folder is named after its
 route:** `/login` is `app/login/page.tsx`, which renders `ui/pages/login/Login.tsx`.
+For a route that ends in a dynamic segment, name the folder after the screen
+instead: `/[slug]/[projectId]` renders `ui/pages/workspace/Workspace.tsx`.
 
 ---
 
@@ -83,8 +85,10 @@ route:** `/login` is `app/login/page.tsx`, which renders `ui/pages/login/Login.t
 frontend/src/
   app/                         ← Next.js App Router: routes only, no UI
     layout.tsx                 ← root layout: loads fonts, sets the default theme
-    page.tsx
+    page.tsx                   ← redirects to a dashboard
     login/page.tsx             ← renders ui/pages/login/Login
+    [slug]/dashboard/page.tsx  ← renders ui/pages/dashboard/Dashboard
+    [slug]/[projectId]/page.tsx ← renders ui/pages/workspace/Workspace
     globals.css                ← the one CSS entry point (see below)
   ui/
     library/                   ← the design library: knows nothing about Tangent
@@ -101,6 +105,12 @@ frontend/src/
         Panel/
         Icon/
         Frame/
+        Link/                  ← next/link, for in-app navigation
+        Image/                 ← user-supplied pictures
+        Input/                 ← single-line field; also the hidden file picker
+        TextArea/              ← growing multi-line field
+        Divider/               ← hairline rule
+        ProgressiveBlur/       ← blur that ramps toward an edge (scroll fades)
       components/
         Button/                ← Panel + Text + Icon
       index.ts                 ← the entry point features and pages import from
@@ -108,10 +118,15 @@ frontend/src/
       auth/                    ← the sign-in card
     pages/                     ← one folder per route, named after it
       login/
+      dashboard/
+        features/
+          projects/
       workspace/
         features/              ← features used only by this page
+          mindmap/             ← React Flow; layout.ts + toFlow.ts are pure and tested
           chat/
           toolbar/
+  mocks/                       ← TEMPORARY fake backend; see HANDOFF.md
   api/                         ← the backend seam
     client.ts                  ← transport: auth header, single-flight refresh
     stream.ts                  ← transport: SSE over fetch
@@ -151,6 +166,7 @@ consumer. We rely on global, unhashed selectors on purpose.
 
 @layer reset {
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  ol, ul { list-style: none; }        /* lists are semantics, never bullets */
   body {
     font-family: var(--font-content);
     background: var(--color-surface);

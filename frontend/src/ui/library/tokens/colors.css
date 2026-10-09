@@ -7,57 +7,83 @@
  *      you name it without saying a colour? `--color-danger` passes.
  *      `--color-red` is tier 1 in disguise.
  *
- * Starting-point palette — swap these for the real Tangent values. */
+ * Palette source: the Figma wireframe's "primary" ramp (docs/Figma_TANGENT.md),
+ * a single greyscale scale from #f1f1f1 (100) to #202020 (700). Tangent's UI
+ * is monochrome, so "brand" is the brightest grey rather than a hue. */
 
 :root {
   /* ── tier 1: palette ─────────────────────────────────────────── */
 
-  /* brand ramp */
-  --purple-400: #a78bfa;
-  --purple-500: #7c3aed;
-  --purple-600: #6d28d9;
+  /* Figma "primary/100…700" */
+  --gray-100: #f1f1f1;
+  --gray-200: #d1d1d1;
+  --gray-300: #aaaaaa;
+  --gray-400: #848484;
+  --gray-500: #616161;
+  --gray-600: #3f3f3f;
+  --gray-700: #202020;
+  --white: #ffffff;
 
-  /* status */
+  /* status — not in the wireframe yet; kept for destructive actions */
   --red-500: #ef4444;
   --red-600: #dc2626;
 
-  /* neutrals */
-  --gray-0: #ffffff;
-  --gray-50: #f9fafb;
-  --gray-200: #e5e7eb;
-  --gray-400: #9ca3af;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-
   /* ── tier 2: semantic ────────────────────────────────────────── */
+  /* Light theme. The app ships dark (layout.tsx sets data-theme="dark");
+   * light is the same ramp read the other way round. */
 
-  --color-surface: var(--gray-0);
-  --color-surface-raised: var(--gray-50);
+  --color-surface: var(--gray-100);
+  --color-surface-raised: var(--gray-200);
 
-  --color-text: var(--gray-900);
+  /* Four text emphases, strongest first. Figma uses each one:
+   *   text            selected node, chat messages
+   *   text-secondary  headings, nodes on the selected path
+   *   text-muted      section labels, chat metadata ("Thought for 32s")
+   *   text-faint      unselected nodes, placeholders */
+  --color-text: var(--gray-700);
+  --color-text-secondary: var(--gray-600);
   --color-text-muted: var(--gray-400);
-  --color-text-on-brand: var(--gray-0);
+  --color-text-faint: var(--gray-300);
+  --color-text-on-brand: var(--gray-100);
 
-  --color-border: var(--gray-200);
+  /* Three border emphases: resting, on the selected path, active/hovered. */
+  --color-border: var(--gray-300);
+  --color-border-strong: var(--gray-600);
+  --color-border-emphasis: var(--gray-700);
 
-  --color-brand: var(--purple-500);
-  --color-brand-hover: var(--purple-600);
+  --color-brand: var(--gray-700);
+  --color-brand-hover: var(--gray-600);
 
   --color-danger: var(--red-500);
   --color-danger-hover: var(--red-600);
 
-  --color-focus-ring: var(--purple-400);
+  --color-focus-ring: var(--gray-500);
+
+  /* The soft inner glow on a selected surface (Figma: selected node). A
+   * shadow, but kept here because its colour is what changes per theme. */
+  --shadow-selected: inset 0 0 25px var(--gray-200);
 }
 
 /* The payoff of tier 2: a whole theme, and not one component file changes,
- * because no component ever named a colour. */
+ * because no component ever named a colour. These are the Figma values. */
 :root[data-theme="dark"] {
-  --color-surface: var(--gray-900);
-  --color-surface-raised: var(--gray-800);
+  --color-surface: var(--gray-700);
+  --color-surface-raised: var(--gray-600);
 
-  --color-text: var(--gray-50);
-  --color-text-muted: var(--gray-400);
+  --color-text: var(--gray-100);
+  --color-text-secondary: var(--gray-200);
+  --color-text-muted: var(--gray-300);
+  --color-text-faint: var(--gray-500);
+  --color-text-on-brand: var(--gray-700);
 
-  --color-border: var(--gray-700);
+  --color-border: var(--gray-500);
+  --color-border-strong: var(--gray-200);
+  --color-border-emphasis: var(--gray-100);
+
+  --color-brand: var(--gray-200);
+  --color-brand-hover: var(--gray-100);
+
+  --color-focus-ring: var(--gray-200);
+
+  --shadow-selected: inset 0 0 25px var(--gray-600);
 }

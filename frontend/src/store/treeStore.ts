@@ -14,6 +14,8 @@ interface StructureSlice {
   activeNodeId: string | null;
   hydrateTree(rootId: string | null, nodes: NodeMeta[]): void;
   addNode(node: NodeMeta): void;
+  /** Replace an existing node's metadata (title, tags) without touching tree shape. */
+  updateNode(node: NodeMeta): void;
   setActive(nodeId: string | null): void;
 }
 
@@ -64,6 +66,9 @@ export const useTreeStore = create<TreeState>()((set) => ({
       }
       return { nodesById, childrenByParent, rootId: s.rootId ?? (node.parent_id ? null : node.id) };
     }),
+
+  updateNode: (node) =>
+    set((s) => (s.nodesById[node.id] ? { nodesById: { ...s.nodesById, [node.id]: node } } : s)),
 
   setActive: (nodeId) => set({ activeNodeId: nodeId }),
 

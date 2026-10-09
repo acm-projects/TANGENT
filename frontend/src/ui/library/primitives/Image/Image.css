@@ -1,0 +1,10 @@
+/* Image — see DESIGN.md §4. Fills its box and crops, so a consumer sizes the
+ * box (width/height in its own CSS) and never distorts the picture. */
+
+@layer ui {
+  [data-ui="image"] {
+    display: block;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+  }
+}

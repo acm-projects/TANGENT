@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+slowapi
+python-dotenv
+sqlalchemy[asyncio]
+asyncpg
+python-jose
+PyJWT
+cryptography
+httpx
+pydantic[email]
+jinja2

@@ -48,8 +48,3 @@ app.include_router(workspace_router.router)
 app.include_router(projects_router.router)
 app.include_router(shares_router.router)
 app.include_router(nodes_router.router)
-from fastapi import FastAPI
-from app.routers import chats_router
-
-app = FastAPI()
-app.include_router(chats_router.router)

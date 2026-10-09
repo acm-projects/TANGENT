@@ -1,0 +1,68 @@
+/* ProgressiveBlur — see DESIGN.md §4.
+ *
+ * CSS has no blur whose radius varies across an element, so this stacks
+ * layers: a soft blur reaching most of the way in, a strong blur only near
+ * the edge, each faded out with a gradient mask. Seen together the radius
+ * ramps from strong (edge) to none (far side). A surface-tinted gradient
+ * underneath fades the text as well, so it reads as receding.
+ *
+ * The root itself carries no filter, mask or opacity on purpose: any of those
+ * would make it a backdrop root, and the two blur layers (its pseudo-elements)
+ * would then blur only the empty root instead of the content behind it.
+ *
+ * Masks use black/transparent: a mask reads only alpha, so this is a
+ * structural constant, not a colour (Rule 1). */
+
+@layer ui {
+  [data-ui="progressive-blur"] {
+    position: relative;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-surface) var(--glass-mix), transparent),
+      transparent
+    );
+  }
+
+  [data-ui="progressive-blur"]::before,
+  [data-ui="progressive-blur"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  /* soft layer: reaches most of the way in */
+  [data-ui="progressive-blur"]::before {
+    -webkit-backdrop-filter: blur(var(--blur-progressive-soft));
+    backdrop-filter: blur(var(--blur-progressive-soft));
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 35%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0%, black 35%, transparent 100%);
+  }
+
+  /* strong layer: only close to the edge */
+  [data-ui="progressive-blur"]::after {
+    -webkit-backdrop-filter: blur(var(--blur-progressive-strong));
+    backdrop-filter: blur(var(--blur-progressive-strong));
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 55%);
+    mask-image: linear-gradient(to bottom, black 0%, transparent 55%);
+  }
+
+  /* bottom edge: the same three gradients, pointing up */
+  [data-ui="progressive-blur"][data-edge="bottom"] {
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--color-surface) var(--glass-mix), transparent),
+      transparent
+    );
+  }
+
+  [data-ui="progressive-blur"][data-edge="bottom"]::before {
+    -webkit-mask-image: linear-gradient(to top, black 0%, black 35%, transparent 100%);
+    mask-image: linear-gradient(to top, black 0%, black 35%, transparent 100%);
+  }
+
+  [data-ui="progressive-blur"][data-edge="bottom"]::after {
+    -webkit-mask-image: linear-gradient(to top, black 0%, transparent 55%);
+    mask-image: linear-gradient(to top, black 0%, transparent 55%);
+  }
+}

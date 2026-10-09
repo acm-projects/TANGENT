@@ -6,15 +6,31 @@ from fastapi import Request
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import event, text
+from sqlalchemy.engine import make_url
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
-if not DATABASE_URL:
+_raw_url = os.getenv("DATABASE_URL")
+if not _raw_url:
     raise ValueError("DATABASE_URL environment variable is missing!")
+
+
+def _build_url(raw: str):
+    """The team's shared .env holds a JDBC-style URL (jdbc:postgresql://host:5432/db) with no
+    credentials. Accept that or a normal SQLAlchemy URL, force the asyncpg driver, and fill in
+    DB_USER / DB_PASSWORD (from the environment) when the URL carries none."""
+    url = make_url(raw.removeprefix("jdbc:")).set(drivername="postgresql+asyncpg")
+    if not url.username and os.getenv("DB_USER"):
+        url = url.set(username=os.getenv("DB_USER"), password=os.getenv("DB_PASSWORD"))
+    # asyncpg takes `ssl`, not libpq's `sslmode`; we set ssl in connect_args below.
+    return url.difference_update_query(["sslmode", "ssl"])
+
+
+DATABASE_URL = _build_url(_raw_url)
+_local = DATABASE_URL.host in (None, "localhost", "127.0.0.1")
 
 engine = create_async_engine(
     DATABASE_URL,
@@ -22,7 +38,8 @@ engine = create_async_engine(
     future=True,
     pool_size=20,
     max_overflow=10,
-    connect_args={"statement_cache_size": 0}
+    # ponytail: remote hosts (RDS) use ssl="require": encrypted but cert not verified; load the AWS CA bundle to verify.
+    connect_args={"statement_cache_size": 0, **({} if _local else {"ssl": "require"})},
 )
 
 AsyncSessionLocal = async_sessionmaker(

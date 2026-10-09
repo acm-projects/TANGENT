@@ -18,6 +18,21 @@ export const setAccessToken = (t: string | null) => {
   accessToken = t;
 };
 
+/**
+ * The backend's OAuth callback redirects here with `?access_token=<jwt>`.
+ * Keep it in memory and strip it from the address bar so it never lands in
+ * history or a copied link. Returns true if a token was found.
+ */
+export function takeTokenFromUrl(): boolean {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("access_token");
+  if (!token) return false;
+  setAccessToken(token);
+  url.searchParams.delete("access_token");
+  window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  return true;
+}
+
 /** "/api" is proxied to the backend by next.config.ts, so the refresh cookie stays same-origin. */
 export const apiClient = createApiClient({
   baseURL: "/api",
@@ -25,15 +40,15 @@ export const apiClient = createApiClient({
     getAccessToken,
     setAccessToken,
     onAuthFailure: () => {
-      // The login screen was a throwaway spike and has been removed. Send the
-      // user to the root until a real one exists.
+      // To the login screen. Not "/": that redirects to a dashboard, whose
+      // first request would 401 again and bounce straight back here.
       //
       // A hard navigation on purpose, not router.push(): this fires from an
       // axios interceptor, where there is no router, and a full reload is what
       // we want anyway -- it drops every store holding data for a session that
       // no longer exists.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      if (typeof window !== "undefined") window.location.assign("/");
+      if (typeof window !== "undefined") window.location.assign("/login");
     },
   },
 });
