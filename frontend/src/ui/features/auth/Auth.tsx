@@ -1,11 +1,14 @@
+"use client";
+
 import { Button, Frame, Panel, Text } from "@/ui/library";
 import "./Auth.css";
 
 /* The sign-in card. A shared feature (ui/features/) because a second user is
  * planned — e.g. a re-auth dialog when a session expires in the workspace.
  *
- * Mockup only: the button does nothing yet. Wiring it up means navigating to
- * the backend's GET /auth/login/google, which runs the OAuth flow. */
+ * The button is a full-page navigation (not axios) to the backend's
+ * GET /auth/login/google, which runs the OAuth flow and redirects back to
+ * /onboarding (new user) or /{slug} (returning user) with ?access_token=. */
 export function Auth() {
   return (
     <Panel as="section" hierarchy="secondary" elevation="floating" className="auth">
@@ -23,6 +26,9 @@ export function Auth() {
           showIcon
           iconAlign="right"
           className="auth-google"
+          // Absolute URL to the backend, not an internal Next page.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          onClick={() => window.location.assign(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login/google`)}
         />
 
         <Text
