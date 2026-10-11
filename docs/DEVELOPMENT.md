@@ -70,14 +70,18 @@ machine whose global `~/.npmrc` points elsewhere should install with
   - `NEXT_PUBLIC_API_BASE_URL` — the backend origin the browser navigates to for
     Google login (`http://localhost:8000`).
   - `BACKEND_URL` — where `next.config.ts` proxies `/api/*`.
-- **Backend:** variables are read from the environment or a gitignored
-  `backend/.env` (loaded with `python-dotenv`). `app/auth.py` refuses to import
+- **Backend:** variables are read from the environment or a gitignored `.env`
+  in `backend/` or the repo root (`python-dotenv` searches upward from
+  `backend/app/`). `app/auth.py` refuses to import
   without `JWT_SECRET_KEY`.
-  - Required to run: `JWT_SECRET_KEY`, `DATABASE_URL`, `DB_USER`, `DB_PASSWORD`,
-    `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BACKEND_URL`, `FRONTEND_URL`.
+  - Required to run: `JWT_SECRET_KEY`, `DATABASE_URL`, `DB_USER`, `DB_PASSWORD`
+    (the shared `DATABASE_URL` has no credentials; without `DB_USER`/`DB_PASSWORD`
+    the server starts but every database query fails, including the Google callback),
+    `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
   - Optional: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (invite
-    emails; sharing returns 500 without them), `OPENROUTER_API_KEY` (chat),
-    `IS_PRODUCTION`.
+    emails; sharing returns 500 without them), `OPENROUTER_API_KEY` (chat).
+    `IS_PRODUCTION`, `BACKEND_URL` and `FRONTEND_URL` matter only in production:
+    locally the code defaults to `http://localhost:8000` and `http://localhost:5173`.
   - The Google OAuth client needs `http://localhost:8000/auth/callback/google`
     as an authorized redirect URI.
 
