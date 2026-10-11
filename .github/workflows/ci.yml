@@ -17,10 +17,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
-      # TODO: once pyproject.toml declares dependencies (+ a "dev" extra with pytest),
-      # replace this line with: pip install -e ".[dev]"
-      - run: pip install pydantic pytest
+          cache-dependency-path: backend/requirements.txt
+      # pyproject.toml is still empty; requirements.txt is the dependency list. pytest isn't in it.
+      - run: pip install -r requirements.txt pytest
       - run: python -m pytest -q
 
   frontend:

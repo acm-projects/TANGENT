@@ -1,10 +1,18 @@
 """End-to-end login/signup flow against the real DB. Only Google's token exchange is faked.
-Needs DATABASE_URL (+ DB_USER/DB_PASSWORD) and JWT_SECRET_KEY in the environment/.env."""
+Needs DATABASE_URL (+ DB_USER/DB_PASSWORD) and JWT_SECRET_KEY in the environment/.env.
+Skipped when they are missing (CI has no database)."""
 import asyncio
+import os
 import uuid
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv()  # the same lookup app.database does, so a local .env counts
+if not (os.getenv("DATABASE_URL") and os.getenv("JWT_SECRET_KEY")):
+    pytest.skip("needs DATABASE_URL and JWT_SECRET_KEY (a real database)", allow_module_level=True)
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
