@@ -12,12 +12,14 @@
 import { createAuthApi } from "./endpoints/auth";
 import { createNodesApi } from "./endpoints/nodes";
 import { createTreesApi } from "./endpoints/trees";
+import { createWorkspacesApi } from "./endpoints/workspaces";
 import { apiClient } from "./session";
 
 export const api = {
   auth: createAuthApi(apiClient),
   nodes: createNodesApi(apiClient),
   trees: createTreesApi(apiClient),
+  workspaces: createWorkspacesApi(apiClient),
 };
 
 export type Api = typeof api;

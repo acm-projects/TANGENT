@@ -33,6 +33,10 @@ export function takeTokenFromUrl(): boolean {
   return true;
 }
 
+/** Pages a signed-out visitor may stay on. A failed refresh must not bounce them to /login. */
+export const isPublicPath = (pathname: string) =>
+  pathname === "/login" || pathname === "/signup" || pathname.startsWith("/invite/");
+
 /** "/api" is proxied to the backend by next.config.ts, so the refresh cookie stays same-origin. */
 export const apiClient = createApiClient({
   baseURL: "/api",
@@ -47,8 +51,11 @@ export const apiClient = createApiClient({
       // axios interceptor, where there is no router, and a full reload is what
       // we want anyway -- it drops every store holding data for a session that
       // no longer exists.
+      //
+      // Skipped on public pages: the invite page must survive a failed refresh
+      // and show the invite, and /login must not reload itself.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      if (typeof window !== "undefined") window.location.assign("/login");
+      if (typeof window !== "undefined" && !isPublicPath(window.location.pathname)) window.location.assign("/login");
     },
   },
 });
