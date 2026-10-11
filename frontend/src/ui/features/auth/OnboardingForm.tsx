@@ -9,8 +9,9 @@ import "./Auth.css";
 
 /* The workspace-name card shown to a brand-new user (POST /auth/onboarding).
  * Reuses the .auth card styles. On success the backend returns where to go
- * ("/{slug}"), which app/[slug]/page.tsx forwards to the dashboard. */
-export function OnboardingForm() {
+ * ("/{slug}", or the invite path when `next` was passed), which
+ * app/[slug]/page.tsx forwards to the dashboard. */
+export function OnboardingForm({ next }: { next?: string }) {
   const router = useRouter();
   const session = useSessionBoot();
   const [name, setName] = useState("");
@@ -22,7 +23,7 @@ export function OnboardingForm() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.auth.onboarding(name.trim());
+      const res = await api.auth.onboarding(name.trim(), next);
       router.replace(res.redirect);
     } catch {
       setError("Couldn't create your workspace. Please try again.");

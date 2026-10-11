@@ -108,3 +108,33 @@ export interface Source {
   /** How many messages reference it ("Used 1 time"). */
   use_count: number;
 }
+
+/** shares_router.py: status of a row in a project's member list. */
+export type ShareStatus = "ACCEPTED" | "PENDING" | "EXPIRED";
+
+/** GET /shares/:slug/:projectId/shares -- one accepted member or one invitation. */
+export interface ShareItem {
+  type: "share" | "invitation";
+  id: string;
+  email: string;
+  name: string | null;
+  status: ShareStatus;
+  /** Accepted shares only. */
+  permission?: string;
+  /** Invitations only (ISO timestamp). */
+  expires_at?: string;
+}
+
+/** GET /shares/:token -- unauthenticated, so the invite page can render before login. */
+export interface InviteDetails {
+  project_name: string;
+  inviter_name: string;
+  email: string;
+}
+
+/** POST /shares/:token/accept */
+export interface AcceptInviteResponse {
+  message: string;
+  project_id: string;
+  workspace_slug: string;
+}
