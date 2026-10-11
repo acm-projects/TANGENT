@@ -21,6 +21,7 @@
   width: 100%;
 }
 
-.auth-legal {
+.auth-legal,
+.auth-switch {
   text-align: center;
 }

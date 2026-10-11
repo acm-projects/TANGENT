@@ -10,8 +10,9 @@ import type { OnboardingResponse } from "../types";
  */
 export function createAuthApi({ http }: ApiClient) {
   return {
-    onboarding: (workspaceName: string) =>
-      http.post<OnboardingResponse>("/auth/onboarding", { workspace_name: workspaceName }).then((r) => r.data),
+    /** `next` is an /invite/... path; the backend echoes it back as `redirect` instead of the dashboard. */
+    onboarding: (workspaceName: string, next?: string) =>
+      http.post<OnboardingResponse>("/auth/onboarding", { workspace_name: workspaceName, next }).then((r) => r.data),
     logout: () => http.post("/auth/logout").then((r) => r.data),
   };
 }

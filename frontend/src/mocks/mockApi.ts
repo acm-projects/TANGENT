@@ -199,19 +199,4 @@ export const mockApi = {
       return structuredClone(source);
     },
   },
-
-  shares: {
-    /**
-     * Real call: none yet. The backend shares by email invitation
-     * (POST /shares/:slug/:projectId/share {email}); the Figma "Share Copy"
-     * panel shows a copyable link instead, which needs a new endpoint.
-     */
-    async getLink(projectId: string): Promise<string> {
-      await wait();
-      // A stable, hash-looking token per project, like Figma's ".../share/4af56e90".
-      let h = 0;
-      for (const ch of projectId) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
-      return `https://tangent.io/share/${h.toString(16).padStart(8, "0")}`;
-    },
-  },
 };

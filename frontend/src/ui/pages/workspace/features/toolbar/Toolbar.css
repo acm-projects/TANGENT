@@ -140,9 +140,27 @@
   color: var(--color-text-secondary);
 }
 
-.share-link {
+.share-invite {
+  flex: 1;
+  min-width: 0;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--color-surface-raised);
   color: var(--color-text-secondary);
+}
+
+/* Long member lists scroll inside the card instead of growing it. */
+.share-list {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.share-member {
+  min-width: 0;
+}
+
+.share-member-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

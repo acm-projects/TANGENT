@@ -11,18 +11,23 @@
 
 import { createAuthApi } from "./endpoints/auth";
 import { createNodesApi } from "./endpoints/nodes";
+import { createSharesApi } from "./endpoints/shares";
 import { createTreesApi } from "./endpoints/trees";
+import { createWorkspacesApi } from "./endpoints/workspaces";
 import { apiClient } from "./session";
 
 export const api = {
   auth: createAuthApi(apiClient),
   nodes: createNodesApi(apiClient),
+  shares: createSharesApi(apiClient),
   trees: createTreesApi(apiClient),
+  workspaces: createWorkspacesApi(apiClient),
 };
 
 export type Api = typeof api;
 
 // Streaming is not request/response, so it is not part of `api`.
 export { streamMessage } from "./stream";
+export { apiErrorMessage, apiErrorStatus } from "./errors";
 export { apiClient, getAccessToken, setAccessToken, takeTokenFromUrl } from "./session";
 export type * from "./types";

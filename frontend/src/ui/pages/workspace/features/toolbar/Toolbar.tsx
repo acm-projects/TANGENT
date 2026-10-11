@@ -63,7 +63,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
       </Frame>
 
       {open === "sources" && <SourcesPanel projectId={projectId} onClose={() => setOpen(null)} />}
-      {open === "share" && <SharePanel projectId={projectId} onClose={() => setOpen(null)} />}
+      {open === "share" && <SharePanel slug={slug} projectId={projectId} onClose={() => setOpen(null)} />}
     </Frame>
   );
 }

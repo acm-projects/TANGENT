@@ -209,8 +209,16 @@ hand-written to match the backend's Pydantic models; generating it from
 
 ```
 GET  /auth/login/google                   -> OAuth redirect     # [assumed] full-page nav, not axios; signup == login
-POST /auth/onboarding { workspace_name }  -> { redirect }        # [assumed] redirect is "/{slug}/dashboard"; 400 if already done
+POST /auth/onboarding { workspace_name, next? } -> { redirect }   # redirect is "/{slug}" (forwarded to the dashboard), or `next` when it is an /invite/... path; 400 if already done
 POST /auth/refresh                        -> { access_token }
+GET  /workspaces/                         -> { workspace_name, workspace_slug }[]   # unordered
+POST /shares/:slug/:projectId/share { email }              -> { message }   # owner only; sends the invite email
+GET  /shares/:slug/:projectId/shares                       -> { shares: ShareItem[] }   # members + invitations; owner only
+DELETE /shares/:slug/:projectId/shares/:id                 -> revoke an accepted member
+DELETE /shares/:slug/:projectId/invitations/:id            -> revoke a PENDING invitation
+POST /shares/:slug/:projectId/invitations/:id/resend       -> new token + email; PENDING or EXPIRED
+GET  /shares/:token                                        -> InviteDetails   # unauthenticated; 404/400 with { detail } if unusable
+POST /shares/:token/accept                                 -> { project_id, workspace_slug }   # JWT; email must match the invite (403)
 GET  /trees/:id                           -> { tree, nodes: NodeMeta[] }   # flat, no chats
 GET  /nodes/:id                           -> Node                          # includes chats
 POST /nodes/:id/fork                      -> NodeMeta
@@ -242,11 +250,12 @@ surviving spike that predates this table. Don't build on it.
 ### Current state of the client halves
 
 - The Figma screens are built: `/[slug]/dashboard` and `/[slug]/[projectId]`
-  (the workspace: mind map, chat, toolbar). `/` redirects to a dashboard;
-  `/login` is a static mockup.
-- **They run on mocks.** Every feature hook calls `src/mocks/mockApi.ts`, an
-  in-memory fake with the same signatures as the real calls. No request
-  reaches the backend yet. [HANDOFF.md](HANDOFF.md) maps each mock to its
+  (the workspace: mind map, chat, toolbar). `/` redirects to the user's first
+  workspace. `/login`, `/signup`, `/onboarding` and `/invite/[token]` are real.
+- **The data screens run on mocks.** Every feature hook except auth, `/`, the
+  invite page and the share panel calls `src/mocks/mockApi.ts`, an in-memory
+  fake with the same signatures as the real calls. Those four use the real
+  backend (`api.auth`, `api.workspaces`, `api.shares`). [HANDOFF.md](HANDOFF.md) maps each mock to its
   endpoint; `grep -rn "TODO(backend)" frontend/src` lists every call site.
 
 ---

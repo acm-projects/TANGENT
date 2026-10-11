@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getAccessToken, setAccessToken, takeTokenFromUrl } from "./session";
+import { getAccessToken, isPublicPath, setAccessToken, takeTokenFromUrl } from "./session";
 
 function stubWindow(href: string) {
   const replaceState = vi.fn();
@@ -25,5 +25,15 @@ describe("takeTokenFromUrl", () => {
     expect(takeTokenFromUrl()).toBe(false);
     expect(getAccessToken()).toBeNull();
     expect(replaceState).not.toHaveBeenCalled();
+  });
+});
+
+describe("isPublicPath", () => {
+  it("is true for login, signup and invite pages", () => {
+    for (const p of ["/login", "/signup", "/invite/abc123"]) expect(isPublicPath(p)).toBe(true);
+  });
+
+  it("is false for everything else", () => {
+    for (const p of ["/", "/acme/dashboard", "/onboarding", "/invitex"]) expect(isPublicPath(p)).toBe(false);
   });
 });

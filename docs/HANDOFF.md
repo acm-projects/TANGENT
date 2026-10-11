@@ -27,8 +27,9 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 | Route | Page | Figma frame | What works |
 |---|---|---|---|
-| `/` | redirect | — | Sends you to the mock workspace's dashboard |
-| `/login` | `ui/pages/login` | — (not in Figma) | Unchanged from before; restyled by the new tokens. Button still inert |
+| `/` | `ui/features/auth/RootRedirect` | — | Signed in: first workspace's dashboard, or `/onboarding` if none. Signed out: `/login` |
+| `/login`, `/signup` | `ui/pages/login`, `ui/pages/signup` | — (not in Figma) | Same Google button on both (`GET /auth/login/google`); only the copy differs. Both forward `?next=` (an `/invite/...` path) |
+| `/invite/[token]` | `ui/pages/invite` | — (not in Figma) | The emailed link. Shows the invite (`GET /shares/:token`, works signed out). Signed out: Log in / Sign up, returning here via `?next=`. Signed in: Accept (`POST /shares/:token/accept`), then goes to `/{owner slug}/{projectId}`. Shows the backend's message for expired, revoked, used or wrong-account invites |
 | `/[slug]/dashboard` | `ui/pages/dashboard` | Dashboard `313:9882` | Loads projects, loading / empty / error states, cards link to the workspace |
 | `/[slug]/[projectId]` | `ui/pages/workspace` | Normal `204:7587`, Node 1–5 | Everything below |
 
@@ -38,7 +39,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 |---|---|---|
 | Mind map | `workspace/features/mindmap/` | Loads the tree; derived tidy layout (no stored x/y); click a node to select it; the selected node's ancestors and edges highlight as the "path"; click empty canvas to deselect; pan / zoom; attachment tags on nodes; keyboard: Tab + Enter |
 | Chat | `workspace/features/chat/` | Shows the selected node's full root→leaf history with branch dividers; lazy-loads each node's chats once (cached); send with Enter (Shift+Enter = newline); streamed reply; Copy and **Branch from here** on every reply (creates a child node and selects it); attach files / images; "Uploaded / Viewed / Thought for…" lines; only leaves accept prompts; full-screen and collapse |
-| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (copy link); ⋮ expands to History / Settings. Escape closes panels |
+| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (invite by email, member list with Resend / Revoke, owner-only); ⋮ expands to History / Settings. Escape closes panels |
 
 ## 2. How the seam works
 
@@ -63,17 +64,20 @@ grep -rn "TODO(backend)" frontend/src
 |---|---|---|---|
 | `dashboard/features/projects/useProjects.ts` | `mockApi.projects.list()` | `api.projects.list()` | ✅ `GET /projects/` — needs the client wrapper |
 | `workspace/features/mindmap/useMindMap.ts` | `mockApi.trees.getForProject(projectId)` | `api.trees.get(treeId)` | ⚠️ `GET /trees/:id` is on the contract, but **nothing maps a project to its tree id** |
-| `workspace/features/chat/useChat.ts` (load) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ `nodes_router.py` is empty |
+| `workspace/features/chat/useChat.ts` (load) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ `nodes_router.py` defines no routes yet |
 | `workspace/features/chat/useChat.ts` (send) | `mockApi.streamMessage({...})` | `streamMessage({...})` from `@/api` | ❌ same |
 | `workspace/features/chat/useChat.ts` (after send) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ same — refreshes the node's title and tags |
 | `workspace/features/chat/useChat.ts` (branch) | `mockApi.nodes.fork(id)` | `api.nodes.fork(id)` | ❌ same |
 | `workspace/features/toolbar/useSources.ts` | `mockApi.sources.list / add` | — | ❌ no table, no router |
-| `workspace/features/toolbar/useShareLink.ts` | `mockApi.shares.getLink` | — | ❌ see §4 |
-| `app/page.tsx` | `MOCK_WORKSPACE.workspace_slug` | `GET /workspaces/`, most recent | ✅ — needs the client wrapper |
+| `workspace/features/toolbar/useShares.ts` | — (no mock; already real) | `api.shares.list / invite / revokeShare / revokeInvitation / resend` | ✅ done. Needs a real project's `slug` and `projectId` in the URL, and SMTP on the backend to send invites |
+| `app/page.tsx` | `RootRedirect` → `api.workspaces.list()` | `GET /workspaces/` | ✅ done. Takes the first workspace returned; the endpoint has no ordering, so "most recent" needs `last_used_at` ordering server-side |
 
-Also wire the `/login` button (`ui/features/auth/Auth.tsx`). It should do a
-full-page navigation to `/api/auth/login/google`, not an axios call. A failed
-token refresh already sends users to `/login` (`src/api/session.ts`).
+The `/login` and `/signup` button (`ui/features/auth/Auth.tsx`) is wired: a
+full-page navigation to `${NEXT_PUBLIC_API_BASE_URL}/auth/login/google`, not an
+axios call. It needs `frontend/.env.local` (copy `.env.example`; see
+DEVELOPMENT.md §1). A failed token refresh sends users to `/login`, except on
+the public pages (`/login`, `/signup`, `/invite/*`, see `isPublicPath` in
+`src/api/session.ts`).
 
 When the last one is done, **delete `src/mocks/`**. If the build still passes,
 nothing depends on it.
@@ -103,13 +107,15 @@ delete them and the UI that reads them:
 
 These are outside the frontend's scope and were **not** changed:
 
-1. **The backend can't start.** `app/main.py` does `app.include_router(nodes_router.router)`, but `app/routers/nodes_router.py` is an empty file.
-2. **`app/main.py` ends with a stray second app**: `app = FastAPI()` plus `include_router(chats_router.router)`, which replaces the configured app (CORS, rate limiter, every router) with a bare one.
-3. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
-4. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
-5. **Share.** The backend shares by email invitation (`POST /shares/:slug/:projectId/share {email}`); the Figma "Share Copy" panel shows a copyable link. Either add a link endpoint, or redesign the panel as an email form. `SharePanel.tsx` is the only file that changes.
-6. **Naming.** The Figma "Recent Workspaces" cards are backend *projects*. The label is kept as designed; worth settling with the designer.
-7. **CORS is now configured** in `main.py`, but ARCHITECTURE.md §6 still says the backend has no CORS. The frontend keeps using the same-origin `/api` proxy, which is still the right choice for the refresh cookie.
+1. **No node/chat endpoints.** `app/routers/nodes_router.py` is an empty `APIRouter` (mounted by `app/main.py`), and `chats_router.py` is imported but never mounted, so the calls `api.nodes` expects don't exist yet. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
+2. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
+3. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
+4. **Share.** The backend shares by email invitation, so `SharePanel.tsx` is now an email-invite form with a member list, not Figma's "Share Copy" link panel. Worth showing the designer. If a copy-link flow is wanted later it needs a new backend endpoint. The member list is a scrollable list; drag-to-reorder was not built.
+5. **Naming.** The Figma "Recent Workspaces" cards are backend *projects*. The label is kept as designed; worth settling with the designer.
+6. **CORS is now configured** in `main.py`, but ARCHITECTURE.md §6 still says the backend has no CORS. The frontend keeps using the same-origin `/api` proxy, which is still the right choice for the refresh cookie.
+7. **`email_verified` is never checked.** `verify_google_id_token` (`app/core/oauth_utils.py`) returns the ID token claims and `auth_router.py` uses only `email`. Accepting an invite trusts that the Google email equals the invited address, so an unverified email claim would pass. Normally fine for Google accounts; worth a check by whoever owns the OAuth code.
+8. **Shared projects carry the owner's workspace slug.** `ProjectSummary.workspace_slug` comes from the project's own workspace, so once `useProjects` is wired, its `p.workspace_slug === slug` filter would hide projects shared *with* the user from their dashboard (`role: "shared"`). Decide how shared projects should appear when wiring it.
+9. **Inviting needs SMTP.** `POST /shares/:slug/:projectId/share` and `/resend` return 500 ("Failed to dispatch email") unless `SMTP_*` is configured, and roll back the invitation.
 
 ## 5. Design gaps (`TODO(design)`)
 
@@ -119,7 +125,7 @@ These are outside the frontend's scope and were **not** changed:
 | Clicking a **source card** / its "Used N times" | `toolbar/components/SourcesPanel.tsx` | Hover states match Figma; no action |
 | Toolbar `State=Hidden` variant | — | Not built; unclear from the frame |
 | `Popup` component (empty frame) | — | Not built; nothing uses it yet |
-| Login, onboarding, account settings | — | Not in Figma. `/login` predates this work |
+| Login, signup, onboarding, invite page, account settings | — | Not in Figma. `/login` predates this work; `/signup` and `/invite/[token]` were built without a design |
 | Merge two branches | — | Not in Figma. `api.nodes.merge` exists in the client |
 
 ## 6. Fidelity notes
