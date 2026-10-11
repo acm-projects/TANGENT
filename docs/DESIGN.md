@@ -87,6 +87,7 @@ frontend/src/
     layout.tsx                 ← root layout: loads fonts, sets the default theme
     page.tsx                   ← redirects to a dashboard
     login/page.tsx             ← renders ui/pages/login/Login
+    signup/page.tsx            ← renders ui/pages/signup/Signup
     [slug]/dashboard/page.tsx  ← renders ui/pages/dashboard/Dashboard
     [slug]/[projectId]/page.tsx ← renders ui/pages/workspace/Workspace
     globals.css                ← the one CSS entry point (see below)
@@ -118,6 +119,7 @@ frontend/src/
       auth/                    ← the sign-in card
     pages/                     ← one folder per route, named after it
       login/
+      signup/
       dashboard/
         features/
           projects/

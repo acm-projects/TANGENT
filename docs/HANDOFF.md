@@ -27,8 +27,8 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 | Route | Page | Figma frame | What works |
 |---|---|---|---|
-| `/` | redirect | — | Sends you to the mock workspace's dashboard |
-| `/login` | `ui/pages/login` | — (not in Figma) | Unchanged from before; restyled by the new tokens. Button still inert |
+| `/` | `ui/features/auth/RootRedirect` | — | Signed in: first workspace's dashboard, or `/onboarding` if none. Signed out: `/login` |
+| `/login`, `/signup` | `ui/pages/login`, `ui/pages/signup` | — (not in Figma) | Same Google button on both (`GET /auth/login/google`); only the copy differs. Both forward `?next=` (an `/invite/...` path) |
 | `/[slug]/dashboard` | `ui/pages/dashboard` | Dashboard `313:9882` | Loads projects, loading / empty / error states, cards link to the workspace |
 | `/[slug]/[projectId]` | `ui/pages/workspace` | Normal `204:7587`, Node 1–5 | Everything below |
 
@@ -63,17 +63,20 @@ grep -rn "TODO(backend)" frontend/src
 |---|---|---|---|
 | `dashboard/features/projects/useProjects.ts` | `mockApi.projects.list()` | `api.projects.list()` | ✅ `GET /projects/` — needs the client wrapper |
 | `workspace/features/mindmap/useMindMap.ts` | `mockApi.trees.getForProject(projectId)` | `api.trees.get(treeId)` | ⚠️ `GET /trees/:id` is on the contract, but **nothing maps a project to its tree id** |
-| `workspace/features/chat/useChat.ts` (load) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ `nodes_router.py` is empty |
+| `workspace/features/chat/useChat.ts` (load) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ `nodes_router.py` defines no routes yet |
 | `workspace/features/chat/useChat.ts` (send) | `mockApi.streamMessage({...})` | `streamMessage({...})` from `@/api` | ❌ same |
 | `workspace/features/chat/useChat.ts` (after send) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ same — refreshes the node's title and tags |
 | `workspace/features/chat/useChat.ts` (branch) | `mockApi.nodes.fork(id)` | `api.nodes.fork(id)` | ❌ same |
 | `workspace/features/toolbar/useSources.ts` | `mockApi.sources.list / add` | — | ❌ no table, no router |
 | `workspace/features/toolbar/useShareLink.ts` | `mockApi.shares.getLink` | — | ❌ see §4 |
-| `app/page.tsx` | `MOCK_WORKSPACE.workspace_slug` | `GET /workspaces/`, most recent | ✅ — needs the client wrapper |
+| `app/page.tsx` | `RootRedirect` → `api.workspaces.list()` | `GET /workspaces/` | ✅ done. Takes the first workspace returned; the endpoint has no ordering, so "most recent" needs `last_used_at` ordering server-side |
 
-Also wire the `/login` button (`ui/features/auth/Auth.tsx`). It should do a
-full-page navigation to `/api/auth/login/google`, not an axios call. A failed
-token refresh already sends users to `/login` (`src/api/session.ts`).
+The `/login` and `/signup` button (`ui/features/auth/Auth.tsx`) is wired: a
+full-page navigation to `${NEXT_PUBLIC_API_BASE_URL}/auth/login/google`, not an
+axios call. It needs `frontend/.env.local` (copy `.env.example`; see
+DEVELOPMENT.md §1). A failed token refresh sends users to `/login`, except on
+the public pages (`/login`, `/signup`, `/invite/*`, see `isPublicPath` in
+`src/api/session.ts`).
 
 When the last one is done, **delete `src/mocks/`**. If the build still passes,
 nothing depends on it.
@@ -103,8 +106,7 @@ delete them and the UI that reads them:
 
 These are outside the frontend's scope and were **not** changed:
 
-1. **The backend can't start.** `app/main.py` does `app.include_router(nodes_router.router)`, but `app/routers/nodes_router.py` is an empty file.
-2. **`app/main.py` ends with a stray second app**: `app = FastAPI()` plus `include_router(chats_router.router)`, which replaces the configured app (CORS, rate limiter, every router) with a bare one.
+1. **No node/chat endpoints.** `app/routers/nodes_router.py` is an empty `APIRouter` (mounted by `app/main.py`), and `chats_router.py` is imported but never mounted, so the calls `api.nodes` expects don't exist yet. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
 3. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
 4. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
 5. **Share.** The backend shares by email invitation (`POST /shares/:slug/:projectId/share {email}`); the Figma "Share Copy" panel shows a copyable link. Either add a link endpoint, or redesign the panel as an email form. `SharePanel.tsx` is the only file that changes.

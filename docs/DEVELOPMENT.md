@@ -30,16 +30,16 @@ cd TANGENT && git switch dev
 cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install fastapi uvicorn pydantic httpx python-dotenv pytest
-python -m pytest -q                # 5 passing
+pip install -r requirements.txt pytest
+python -m pytest -q                # test_auth_flow.py needs the database + JWT env below
 uvicorn app.main:app --reload      # serves on http://localhost:8000
 ```
 
-Dependencies are installed by hand because **neither `pyproject.toml` nor
-`requirements.txt` declares anything yet** — both files are empty. CI gets away
-with `pip install pydantic pytest` because the only tests cover `app/context/`,
-which imports nothing else. Declaring them is an open item (§6); until then, if
-an import fails, install it and add it to the list above.
+`requirements.txt` lists the runtime dependencies; `pyproject.toml` is still
+empty and pytest is not in either. CI (`.github/workflows/ci.yml`) still runs
+`pip install pydantic pytest`, which no longer covers `test_auth_flow.py` (it
+imports `app.main`, so it needs the full dependency list and a database). Fixing
+CI is an open item (§6).
 
 Run `pytest` and `uvicorn` **from `backend/`**. That is what puts `app` on the
 import path — there is no packaging config doing it for you.
@@ -57,10 +57,29 @@ Port 5173 is not arbitrary — the backend's dev `FRONTEND_URL` points there, an
 `next.config.ts` proxies `/api/*` to the backend so the browser never makes a
 cross-origin request. See ARCHITECTURE.md §6.
 
-Environment: copy `.env.example` to `.env.local` in `frontend/` once it exists
-(**[planned]**). `OPENROUTER_API_KEY` is the only backend variable currently
-read — `app/routers/chats_router.py` loads it via `python-dotenv`. Put it in a
-gitignored `backend/.env`.
+**If `npm install` fails or pulls from a private registry:** this project uses
+public npm (`package-lock.json` resolves everything to `registry.npmjs.org`). A
+machine whose global `~/.npmrc` points elsewhere should install with
+`npm install --registry https://registry.npmjs.org/`. Check `npm config get registry`.
+
+**Environment.**
+
+- **Frontend:** copy `frontend/.env.example` to `frontend/.env.local`, then
+  restart `npm run dev` (`NEXT_PUBLIC_*` values are read at startup). Without it
+  the login button navigates to `/undefined/auth/login/google` and 404s.
+  - `NEXT_PUBLIC_API_BASE_URL` — the backend origin the browser navigates to for
+    Google login (`http://localhost:8000`).
+  - `BACKEND_URL` — where `next.config.ts` proxies `/api/*`.
+- **Backend:** variables are read from the environment or a gitignored
+  `backend/.env` (loaded with `python-dotenv`). `app/auth.py` refuses to import
+  without `JWT_SECRET_KEY`.
+  - Required to run: `JWT_SECRET_KEY`, `DATABASE_URL`, `DB_USER`, `DB_PASSWORD`,
+    `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BACKEND_URL`, `FRONTEND_URL`.
+  - Optional: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (invite
+    emails; sharing returns 500 without them), `OPENROUTER_API_KEY` (chat),
+    `IS_PRODUCTION`.
+  - The Google OAuth client needs `http://localhost:8000/auth/callback/google`
+    as an authorized redirect URI.
 
 ---
 
@@ -228,25 +247,26 @@ TypeScript to an exact version.
 - Wire the frontend skeleton to the backend: every `TODO(backend)` in
   `frontend/src`, mapped endpoint by endpoint in [HANDOFF.md](HANDOFF.md) §2.
   Then delete `frontend/src/mocks/`
-- `backend/app/routers/nodes_router.py` is empty but mounted, so the backend
-  can't start; `app/main.py` also ends with a stray second `app = FastAPI()`
-  (HANDOFF.md §4)
+- `backend/app/routers/nodes_router.py` defines no routes yet (an empty
+  `APIRouter`, mounted by `app/main.py`), and `chats_router.py` is imported but
+  never mounted. The node/chat endpoints the frontend's `api.nodes` expects don't
+  exist (HANDOFF.md §4)
 - Server-side leaf enforcement on the prompt endpoint (ARCHITECTURE.md §8)
 - MSW mock handlers and a dev-DB seed script (a small tree including a merge node)
-- The real auth, branch, projects and workspace routers — `app/routers/` holds
-  empty placeholder files for all four
+- The branch (fork/merge) endpoints. The auth, workspace, projects and shares
+  routers exist
 
 **Not blocking** (track as GitHub issues)
 
 - **Backend layout.** `app/core/` and `app/features/` are scaffolded and empty
   while the code sits in a flat `app/routers/`. Pick one and finish the move;
   see [FILE_STRUCTURE.md](FILE_STRUCTURE.md) §2. Belongs to the backend owner.
-- **Backend dependencies are undeclared.** `pyproject.toml` and
-  `requirements.txt` are both empty, so setup is manual and CI installs a
-  hand-written subset. Consolidate on one manifest.
+- **Backend dependencies live in two places.** `requirements.txt` lists the
+  runtime dependencies, `pyproject.toml` is empty, and CI installs a
+  hand-written subset (`pydantic pytest`) that no longer covers
+  `test_auth_flow.py`. Consolidate on one manifest and make CI install it.
 - `/model_call` is a spike that predates the API contract. Fold it into
   `POST /nodes/:id/messages` or delete it.
-- `app/database.py` and `app/models.py` are empty; no DB access exists yet.
 - `app/routers/chats_router.py` reads `os.getenv` and builds its HTTP call
   inline. A `core/config.py` plus a service split would make it testable.
 - OpenAPI → generated TS types, with a CI drift check
@@ -256,4 +276,3 @@ TypeScript to an exact version.
 - Lint zones (`import/no-restricted-paths` or `dependency-cruiser`) to enforce
   the import graph in CI — worth doing while there are zero violations to fix
 - Verify the **[assumed]** items in ARCHITECTURE.md §6 against the real backend
-- `frontend/.env.example` doesn't exist yet

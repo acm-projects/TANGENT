@@ -136,6 +136,7 @@ frontend/
     │   ├── layout.tsx         the root layout; imports globals.css
     │   ├── page.tsx           "/" — redirects to a dashboard
     │   ├── login/page.tsx     "/login"
+    │   ├── signup/page.tsx    "/signup"
     │   ├── [slug]/dashboard/page.tsx     "/{workspace}/dashboard"
     │   ├── [slug]/[projectId]/page.tsx   "/{workspace}/{project}" — the workspace screen
     │   └── globals.css        the ONE CSS entry point (see DESIGN.md §2)
@@ -144,7 +145,7 @@ frontend/
     │   ├── stream.ts          transport: SSE over fetch
     │   ├── session.ts         the app's one client instance + the in-memory token
     │   ├── types.ts           wire types, matching the backend's Pydantic models
-    │   ├── endpoints/         one file per endpoint group: auth.ts, nodes.ts, trees.ts
+    │   ├── endpoints/         one file per endpoint group: auth.ts, nodes.ts, trees.ts, workspaces.ts
     │   └── index.ts           what features import: `import { api } from "@/api"`
     ├── store/                 foundation: state shared across pages
     │   └── treeStore.ts       tree structure + node content. Nothing feature-specific.
@@ -162,6 +163,7 @@ frontend/
         ├── features/          features used by TWO OR MORE pages, or planned to be (auth/)
         └── pages/             one folder per screen
             ├── login/         the /login screen
+            ├── signup/        the /signup screen
             ├── dashboard/     the project grid
             │   └── features/  projects/
             └── workspace/     the mind map + chat screen
