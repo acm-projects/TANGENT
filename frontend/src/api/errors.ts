@@ -10,3 +10,8 @@ export function apiErrorMessage(e: unknown, fallback: string): string {
   const detail = (e.response?.data as { detail?: unknown } | undefined)?.detail;
   return typeof detail === "string" ? detail : fallback;
 }
+
+/** The HTTP status of a failed request, or undefined if there was no response (or `e` isn't an axios error). */
+export function apiErrorStatus(e: unknown): number | undefined {
+  return axios.isAxiosError(e) ? e.response?.status : undefined;
+}

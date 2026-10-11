@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { describe, expect, it } from "vitest";
-import { apiErrorMessage } from "./errors";
+import { apiErrorMessage, apiErrorStatus } from "./errors";
 
 const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
 const failed = (status: number, data: unknown) =>
@@ -29,5 +29,16 @@ describe("apiErrorMessage", () => {
 
   it("falls back for a non-axios error", () => {
     expect(apiErrorMessage(new Error("boom"), "fallback")).toBe("fallback");
+  });
+});
+
+describe("apiErrorStatus", () => {
+  it("returns the HTTP status of a failed response", () => {
+    expect(apiErrorStatus(failed(403, { detail: "Only the project owner can share this project." }))).toBe(403);
+  });
+
+  it("is undefined when there was no response, or the error isn't from axios", () => {
+    expect(apiErrorStatus(new AxiosError("Network Error", "ERR_NETWORK"))).toBeUndefined();
+    expect(apiErrorStatus(new Error("boom"))).toBeUndefined();
   });
 });

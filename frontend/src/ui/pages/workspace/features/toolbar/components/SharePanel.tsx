@@ -1,37 +1,103 @@
+import { useState } from "react";
 import { Button, Frame, Input, Panel, Text } from "@/ui/library";
-import { useShareLink } from "../useShareLink";
+import { rowActions } from "../sharesView";
+import { useShares } from "../useShares";
 
-/* The share popover (Figma Toolbar "State=Share", 293:9193, and "Share",
- * 293:9185): a copyable link to this project. */
+/* The share popover (Figma Toolbar "State=Share"): invite someone by email,
+ * then manage who has access. Accepted members read bold, invitations that
+ * haven't been accepted are faint and can be resent. Owner-only (backend). */
 
-type SharePanelProps = { projectId: string; onClose(): void };
+type SharePanelProps = { slug: string; projectId: string; onClose(): void };
 
-export function SharePanel({ projectId, onClose }: SharePanelProps) {
-  const { link, copied, copy } = useShareLink(projectId);
+export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
+  const shares = useShares(slug, projectId);
+  const [email, setEmail] = useState("");
+  const { state, busyId, actionError } = shares;
+
+  async function send() {
+    if (!email.trim() || busyId !== null) return;
+    if (await shares.invite(email.trim())) setEmail("");
+  }
 
   return (
     <Panel as="section" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
       <Frame gap="3">
         <Frame direction="row" justify="between" align="center">
-          <Text as="h2" id="share-heading" size="m" className="share-title" content="Share Copy" />
+          <Text as="h2" id="share-heading" size="m" className="share-title" content="Share" />
           <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="s" onClick={onClose} />
         </Frame>
-        <Panel className="share-link">
-          <Frame direction="row" gap="3" align="center">
-            <Button
-              hierarchy="tertiary"
-              size="s"
-              label={copied ? "Copied" : "Copy link"}
-              icon={copied ? "check" : "link"}
-              showIcon
-              showLabel={false}
-              disabled={!link}
-              onClick={copy}
-            />
-            <Input readOnly aria-label="Share link" value={link ?? "Creating link…"} onFocus={(e) => e.target.select()} />
-          </Frame>
-        </Panel>
-        {copied && <Text role="status" size="xs" hierarchy="tertiary" content="Link copied to clipboard." />}
+
+        {state.status === "loading" && <Text role="status" size="s" hierarchy="tertiary" content="Loading…" />}
+        {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
+        {state.status === "forbidden" && (
+          <Text role="alert" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
+        )}
+
+        {state.status === "ready" && (
+          <>
+            <Frame direction="row" gap="2" align="center">
+              <Panel className="share-invite">
+                <Input
+                  type="email"
+                  aria-label="Invite by email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
+                />
+              </Panel>
+              <Button
+                hierarchy="primary"
+                size="s"
+                label="Invite"
+                disabled={busyId !== null || !email.trim()}
+                onClick={send}
+              />
+            </Frame>
+
+            {actionError && <Text role="alert" size="xs" content={actionError} />}
+
+            {state.items.length === 0 ? (
+              <Text size="s" hierarchy="tertiary" content="No one has been invited yet." />
+            ) : (
+              <Frame as="ol" gap="2" className="share-list">
+                {state.items.map((item) => {
+                  const accepted = item.status === "ACCEPTED";
+                  return (
+                    <Frame as="li" key={`${item.type}-${item.id}`} direction="row" justify="between" align="center" gap="2">
+                      <Frame gap="0" className="share-member">
+                        <Text
+                          size="s"
+                          hierarchy={accepted ? "primary" : "tertiary"}
+                          className="share-member-name"
+                          content={item.name ?? item.email}
+                        />
+                        <Text
+                          size="xs"
+                          hierarchy="tertiary"
+                          className="share-member-name"
+                          content={accepted ? item.email : item.status === "EXPIRED" ? "Expired" : "Pending"}
+                        />
+                      </Frame>
+                      <Frame direction="row" gap="1" align="center">
+                        {rowActions(item).map((action) => (
+                          <Button
+                            key={action}
+                            hierarchy="tertiary"
+                            size="s"
+                            label={action === "resend" ? "Resend" : "Revoke"}
+                            disabled={busyId !== null}
+                            onClick={() => (action === "resend" ? shares.resend(item) : shares.revoke(item))}
+                          />
+                        ))}
+                      </Frame>
+                    </Frame>
+                  );
+                })}
+              </Frame>
+            )}
+          </>
+        )}
       </Frame>
     </Panel>
   );

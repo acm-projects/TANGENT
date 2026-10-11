@@ -88,6 +88,7 @@ frontend/src/
     page.tsx                   ← redirects to a dashboard
     login/page.tsx             ← renders ui/pages/login/Login
     signup/page.tsx            ← renders ui/pages/signup/Signup
+    invite/[token]/page.tsx    ← renders ui/pages/invite/Invite
     [slug]/dashboard/page.tsx  ← renders ui/pages/dashboard/Dashboard
     [slug]/[projectId]/page.tsx ← renders ui/pages/workspace/Workspace
     globals.css                ← the one CSS entry point (see below)
@@ -116,10 +117,11 @@ frontend/src/
         Button/                ← Panel + Text + Icon
       index.ts                 ← the entry point features and pages import from
     features/                  ← features shared by two or more pages (or planned to be)
-      auth/                    ← the sign-in card
+      auth/                    ← sign-in / sign-up card, onboarding form, invite card
     pages/                     ← one folder per route, named after it
       login/
       signup/
+      invite/
       dashboard/
         features/
           projects/
@@ -134,7 +136,7 @@ frontend/src/
     stream.ts                  ← transport: SSE over fetch
     session.ts                 ← the app's one client instance + in-memory token
     types.ts                   ← wire types
-    endpoints/                 ← one file per endpoint group (nodes, trees, auth)
+    endpoints/                 ← one file per endpoint group (nodes, trees, auth, workspaces, shares)
     index.ts                   ← the entry point features import from
   store/                       ← persisting cross-page state
     treeStore.ts

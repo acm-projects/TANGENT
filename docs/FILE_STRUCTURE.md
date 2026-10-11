@@ -137,15 +137,18 @@ frontend/
     │   ├── page.tsx           "/" — redirects to a dashboard
     │   ├── login/page.tsx     "/login"
     │   ├── signup/page.tsx    "/signup"
+    │   ├── invite/[token]/page.tsx       "/invite/{token}" — the emailed invite link
     │   ├── [slug]/dashboard/page.tsx     "/{workspace}/dashboard"
     │   ├── [slug]/[projectId]/page.tsx   "/{workspace}/{project}" — the workspace screen
     │   └── globals.css        the ONE CSS entry point (see DESIGN.md §2)
     ├── api/                   foundation: the seam to the backend
     │   ├── client.ts          transport: axios factory, auth header, single-flight refresh
     │   ├── stream.ts          transport: SSE over fetch
-    │   ├── session.ts         the app's one client instance + the in-memory token
+    │   ├── session.ts         the app's one client instance + the in-memory token; isPublicPath
+    │   ├── errors.ts          apiErrorMessage / apiErrorStatus: read a failed request's detail and status
+    │   ├── testing.ts         recordingClient: a fake-network ApiClient for endpoint tests
     │   ├── types.ts           wire types, matching the backend's Pydantic models
-    │   ├── endpoints/         one file per endpoint group: auth.ts, nodes.ts, trees.ts, workspaces.ts
+    │   ├── endpoints/         one file per endpoint group: auth.ts, nodes.ts, shares.ts, trees.ts, workspaces.ts
     │   └── index.ts           what features import: `import { api } from "@/api"`
     ├── store/                 foundation: state shared across pages
     │   └── treeStore.ts       tree structure + node content. Nothing feature-specific.
@@ -164,6 +167,7 @@ frontend/
         └── pages/             one folder per screen
             ├── login/         the /login screen
             ├── signup/        the /signup screen
+            ├── invite/        the /invite/{token} screen
             ├── dashboard/     the project grid
             │   └── features/  projects/
             └── workspace/     the mind map + chat screen
