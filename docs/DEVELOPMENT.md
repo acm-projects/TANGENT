@@ -55,7 +55,11 @@ npm run dev                        # serves on http://localhost:5173
 
 Port 5173 is not arbitrary — the backend's dev `FRONTEND_URL` points there, and
 `next.config.ts` proxies `/api/*` to the backend so the browser never makes a
-cross-origin request. See ARCHITECTURE.md §6.
+cross-origin request. See ARCHITECTURE.md §6. The proxy keeps trailing slashes
+(`skipTrailingSlashRedirect` plus a slash-terminated rewrite) because backend
+routes like `GET /workspaces/` and `/projects/` end in one; without that, the
+backend's own redirect sends the browser cross-origin and the `Authorization`
+header is dropped (a silent 401).
 
 **If `npm install` fails or pulls from a private registry:** this project uses
 public npm (`package-lock.json` resolves everything to `registry.npmjs.org`). A
