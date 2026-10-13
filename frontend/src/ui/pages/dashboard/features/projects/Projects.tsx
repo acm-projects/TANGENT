@@ -1,6 +1,7 @@
 "use client";
 
-import { Frame, Icon, Link, Panel, Text } from "@/ui/library";
+import { useState, type FormEvent } from "react";
+import { Button, Frame, Icon, Input, Link, Panel, Text } from "@/ui/library";
 import { useProjects } from "./useProjects";
 import "./Projects.css";
 
@@ -10,14 +11,32 @@ import "./Projects.css";
 type ProjectsProps = { slug: string };
 
 export function Projects({ slug }: ProjectsProps) {
-  const state = useProjects(slug);
+  const { state, create, createError } = useProjects(slug);
+  const [name, setName] = useState("");
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    await create(trimmed);
+    setName("");
+  }
 
   return (
     <Panel as="section" elevation="floating" className="projects" aria-busy={state.status === "loading"}>
+      <form onSubmit={submit} className="projects-new">
+        <Frame direction="row" gap="2" align="center">
+          <Panel hierarchy="tertiary" className="projects-new-field">
+            <Input aria-label="New project name" placeholder="New project name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
+          </Panel>
+          <Button type="submit" label="New project" icon="add" showIcon disabled={!name.trim()} />
+        </Frame>
+        {createError && <Text role="alert" size="s" content={createError} />}
+      </form>
       {state.status === "loading" && <Text hierarchy="tertiary" content="Loading…" />}
       {state.status === "error" && <Text role="alert" content={state.message} />}
       {state.status === "ready" && state.projects.length === 0 && (
-        <Text hierarchy="tertiary" content="No workspaces yet." />
+        <Text hierarchy="tertiary" content="No projects yet. Name one above to start." />
       )}
       {state.status === "ready" && state.projects.length > 0 && (
         <Frame as="ol" direction="row" gap="4" className="projects-grid">

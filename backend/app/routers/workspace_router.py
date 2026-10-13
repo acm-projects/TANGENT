@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -31,6 +32,7 @@ class WorkspaceRenameRequest(BaseModel):
 
 
 class WorkspaceResponse(BaseModel):
+    workspace_id: UUID
     workspace_name: str
     workspace_slug: str
 
@@ -82,13 +84,13 @@ async def get_user_workspaces(
     Fetches all workspaces owned by the currently authenticated user.
     """
     query = (
-        select(Workspace.name, Workspace.slug)
+        select(Workspace.id, Workspace.name, Workspace.slug)
         .where(Workspace.owner_id == current_user.id)
     )
     result = await db.execute(query)
     rows = result.all()
     return [
-        WorkspaceResponse(workspace_name=row.name, workspace_slug=row.slug)
+        WorkspaceResponse(workspace_id=row.id, workspace_name=row.name, workspace_slug=row.slug)
         for row in rows if row.slug is not None
     ]
 

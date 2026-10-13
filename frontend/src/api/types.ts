@@ -97,6 +97,7 @@ export interface OnboardingResponse {
 
 /** GET /workspaces/ -- app/routers/workspace_router.py WorkspaceResponse */
 export interface WorkspaceSummary {
+  workspace_id: string;
   workspace_name: string;
   workspace_slug: string;
 }

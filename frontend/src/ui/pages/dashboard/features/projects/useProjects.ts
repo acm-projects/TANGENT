@@ -1,23 +1,22 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { api, apiErrorMessage } from "@/api";
 import type { ProjectSummary } from "@/api/types";
-import { mockApi } from "@/mocks/mockApi";
 
-/* The dashboard's project list: loading -> ready | error. */
+/* The dashboard's project list: loading -> ready | error, plus creating one. */
 
 export type ProjectsState =
   | { status: "loading" }
   | { status: "ready"; projects: ProjectSummary[] }
   | { status: "error"; message: string };
 
-export function useProjects(slug: string): ProjectsState {
+export function useProjects(slug: string) {
   const [state, setState] = useState<ProjectsState>({ status: "loading" });
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // TODO(backend): replace with api.projects.list() -> GET /projects/
-    // (add src/api/endpoints/projects.ts). That endpoint returns every project
-    // the user can see; keep the filter so only this workspace's show here.
-    mockApi.projects
+    // GET /projects/ returns every project the user can see; only this workspace's show here.
+    api.projects
       .list()
       .then((projects) => {
         if (cancelled) return;
@@ -27,12 +26,28 @@ export function useProjects(slug: string): ProjectsState {
         setState({ status: "ready", projects: mine });
       })
       .catch((e: unknown) => {
-        if (!cancelled) setState({ status: "error", message: e instanceof Error ? e.message : "Could not load projects." });
+        if (!cancelled) setState({ status: "error", message: apiErrorMessage(e, "Could not load projects.") });
       });
     return () => {
       cancelled = true;
     };
   }, [slug]);
 
-  return state;
+  /** Creates a project in this workspace and puts it first in the list. */
+  const create = useCallback(
+    async (name: string) => {
+      setCreateError(null);
+      try {
+        const workspace = (await api.workspaces.list()).find((w) => w.workspace_slug === slug);
+        if (!workspace) throw new Error("Workspace not found.");
+        const project = await api.projects.create(workspace.workspace_id, name);
+        setState((s) => (s.status === "ready" ? { status: "ready", projects: [project, ...s.projects] } : s));
+      } catch (e: unknown) {
+        setCreateError(apiErrorMessage(e, "Could not create the project."));
+      }
+    },
+    [slug],
+  );
+
+  return { state, create, createError };
 }

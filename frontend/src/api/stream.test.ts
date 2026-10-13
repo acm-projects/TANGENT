@@ -48,4 +48,10 @@ describe("streamMessage", () => {
     expect(events).toEqual([{ type: "error", message: "boom" }]);
     vi.unstubAllGlobals();
   });
+
+  it("throws the server's detail message when the request is refused", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Only a leaf node can be prompted; fork it instead" }), { status: 409 }));
+    await expect(streamMessage({ ...opts, onEvent: () => {} })).rejects.toThrow("Only a leaf node can be prompted");
+    vi.unstubAllGlobals();
+  });
 });

@@ -134,7 +134,29 @@ export function Chat({ className }: ChatProps) {
 
           {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
-          <MessageField blocker={chat.blocker} onSend={chat.send} className="chat-field" />
+          {chat.usage && (
+            <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
+              <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
+              <Frame direction="row" gap="3" className="chat-token-counts">
+                <Text size="xs" content={`Prompt: ${chat.usage.prompt_tokens.toLocaleString()}`} />
+                <Text size="xs" content={`Completion: ${chat.usage.completion_tokens.toLocaleString()}`} />
+                <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
+              </Frame>
+            </Frame>
+          )}
+          {chat.usageUnavailable && (
+            <Text size="xs" hierarchy="tertiary" className="chat-token-usage" content="Token usage was not included in the provider stream." />
+          )}
+
+          <MessageField
+            blocker={chat.blocker}
+            models={chat.models}
+            selectedModel={chat.selectedModel}
+            modelsLoading={chat.modelsLoading}
+            onModelChange={chat.setSelectedModel}
+            onSend={chat.send}
+            className="chat-field"
+          />
         </Frame>
       </Frame>
     </Panel>

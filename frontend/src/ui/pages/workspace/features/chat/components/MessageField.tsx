@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Button, Frame, Icon, Input, Panel, Text, TextArea } from "@/ui/library";
+import type { AvailableModel } from "@/api/types";
 import type { SendBlocker } from "../useChat";
 
 /* The message box (Figma "MessageField", 10:39, + "Send Button", 10:54):
@@ -15,18 +16,22 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
 
 type MessageFieldProps = {
   blocker: SendBlocker;
+  models: AvailableModel[];
+  selectedModel: string;
+  modelsLoading: boolean;
+  onModelChange(modelId: string): void;
   className?: string;
   onSend(content: string, files: File[]): void;
 };
 
-export function MessageField({ blocker, onSend, className }: MessageFieldProps) {
+export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, className }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
   const disabled = blocker !== null;
-  const canSend = !disabled && (text.trim().length > 0 || files.length > 0);
+  const canSend = !disabled && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
 
   function submit() {
     if (!canSend) return;
@@ -55,6 +60,22 @@ export function MessageField({ blocker, onSend, className }: MessageFieldProps) 
       data-disabled={disabled || undefined}
     >
       <Frame gap="2">
+        <label className="message-field-model">
+          <Text as="span" size="xs" hierarchy="tertiary" content="Model" />
+          <select
+            aria-label="Chat model"
+            value={selectedModel}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={modelsLoading || blocker === "streaming" || models.length === 0}
+          >
+            {modelsLoading && <option value="">Loading models…</option>}
+            {!modelsLoading && models.length === 0 && <option value="">No models available</option>}
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </label>
+
         {files.length > 0 && (
           <Frame as="ol" direction="row" gap="2" className="message-field-files" aria-label="Attachments">
             {files.map((f, i) => (
@@ -91,20 +112,20 @@ export function MessageField({ blocker, onSend, className }: MessageFieldProps) 
           <Frame direction="row" gap="1">
             <Button
               hierarchy="tertiary"
-              label="Attach file"
+              label="Attach file (not available yet)"
               icon="attach_file"
               showIcon
               showLabel={false}
-              disabled={disabled}
+              disabled // the server takes text only until an upload step exists (docs/HANDOFF.md)
               onClick={() => fileInput.current?.click()}
             />
             <Button
               hierarchy="tertiary"
-              label="Attach image"
+              label="Attach image (not available yet)"
               icon="image"
               showIcon
               showLabel={false}
-              disabled={disabled}
+              disabled
               onClick={() => imageInput.current?.click()}
             />
           </Frame>

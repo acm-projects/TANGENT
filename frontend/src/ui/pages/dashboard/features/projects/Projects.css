@@ -4,6 +4,15 @@
   flex: 1;
 }
 
+.projects-new {
+  padding-bottom: var(--space-4);
+}
+
+.projects-new-field {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+}
+
 /* Figma: four equal columns, 16px gaps. */
 .projects-grid {
   display: grid;

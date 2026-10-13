@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { Attachment, ChatMessage, NodeMeta } from "@/api/types";
-import { mockApi } from "@/mocks/mockApi";
+import { api, apiClient, apiErrorMessage, getAccessToken, streamMessage } from "@/api";
+import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "@/store/treeStore";
 
 /**
@@ -31,6 +31,31 @@ export function useChat() {
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
   const streaming = useTreeStore((s) => s.streaming);
   const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<AvailableModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [usage, setUsage] = useState<ModelUsage | null>(null);
+  const [usageUnavailable, setUsageUnavailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.chats
+      .models()
+      .then((available) => {
+        if (cancelled) return;
+        setModels(available);
+        setSelectedModel(available[0]?.id ?? "");
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(apiErrorMessage(e, "Could not load models."));
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load chats for every node on the path that isn't loaded yet. Cached in the
   // store, so moving between siblings doesn't refetch their shared ancestors.
@@ -40,8 +65,7 @@ export function useChat() {
     if (!missingKey) return;
     let cancelled = false;
     for (const nodeId of missingKey.split(",")) {
-      // TODO(backend): replace with api.nodes.get(nodeId) -> GET /nodes/:id
-      mockApi.nodes
+      api.nodes
         .get(nodeId)
         .then((node) => {
           if (!cancelled) useTreeStore.getState().setChats(nodeId, node.chats);
@@ -70,17 +94,19 @@ export function useChat() {
   async function send(content: string, files: File[] = []) {
     const nodeId = useTreeStore.getState().activeNodeId;
     const text = content.trim();
-    if (!nodeId || blocker || (!text && files.length === 0)) return;
+    if (!nodeId || blocker || !text) return;
+    if (files.length > 0) {
+      // The endpoint takes {content, model} only; there is no upload step yet (docs/HANDOFF.md).
+      setError("Attachments aren't supported yet. Remove them to send.");
+      return;
+    }
+    if (!selectedModel) {
+      setError("Choose a model before sending a message.");
+      return;
+    }
     setError(null);
-
-    // [proposed] attachments. Mock only: object URLs, never uploaded. The real
-    // flow needs an upload endpoint first; see docs/HANDOFF.md.
-    const attachments: Attachment[] = files.map((f, i) => ({
-      id: `local-${Date.now()}-${i}`,
-      name: f.name,
-      kind: f.type === "application/pdf" ? "pdf" : f.type.startsWith("image/") ? "image" : "file",
-      url: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
-    }));
+    setUsage(null);
+    setUsageUnavailable(false);
 
     const store = useTreeStore.getState();
     const seq = store.chatsByNode[nodeId]?.length ?? 0;
@@ -90,41 +116,45 @@ export function useChat() {
       seq,
       branch_source: null,
       created_at: new Date().toISOString(),
-      attachments: attachments.length ? attachments : undefined,
     });
 
-    // TODO(backend): replace with streamMessage from "@/api":
-    //   streamMessage({ baseURL: "/api", nodeId, content: text, getAccessToken,
-    //                   refresh: apiClient.refresh, onEvent })
-    // The real endpoint takes {content} only -- attachments need their own upload step.
-    await mockApi.streamMessage({
-      nodeId,
-      content: text,
-      attachments,
-      onEvent: (e) => {
-        const s = useTreeStore.getState();
-        if (e.type === "token") s.appendToken(e.text);
-        else if (e.type === "done") {
-          s.endStream({
-            role: "assistant",
-            content: s.streaming?.text ?? "",
-            seq: seq + 1,
-            branch_source: null,
-            created_at: new Date().toISOString(),
-          });
-        } else {
-          s.abortStream();
-          setError(e.message);
-        }
-      },
-    });
+    // The server saves the exchange itself once the stream ends; this client only displays it.
+    try {
+      await streamMessage({
+        baseURL: "/api",
+        nodeId,
+        content: text,
+        model: selectedModel,
+        getAccessToken,
+        refresh: apiClient.refresh,
+        onEvent: (e) => {
+          const s = useTreeStore.getState();
+          if (e.type === "token") s.appendToken(e.text);
+          else if (e.type === "done") {
+            setUsage(e.usage ?? null);
+            setUsageUnavailable(!e.usage);
+            s.endStream({
+              role: "assistant",
+              content: s.streaming?.text ?? "",
+              seq: seq + 1,
+              branch_source: null,
+              created_at: new Date().toISOString(),
+            });
+          } else {
+            s.abortStream();
+            setError(e.message);
+          }
+        },
+      });
+    } catch (e: unknown) {
+      useTreeStore.getState().abortStream();
+      setError(e instanceof Error ? e.message : "The message could not be sent.");
+      return;
+    }
 
-    // Re-read the node the server just saved. Its metadata may have changed
-    // (a new title, an attachment tag) and the map should show it; its chats
-    // are the persisted copy, which replaces the optimistic one built while
-    // streaming.
-    // TODO(backend): replace with api.nodes.get(nodeId)
-    const fresh = await mockApi.nodes.get(nodeId).catch(() => null);
+    // Re-read the node the server just saved: its title may have changed and its chats are the
+    // persisted copy, which replaces the optimistic one built while streaming.
+    const fresh = await api.nodes.get(nodeId).catch(() => null);
     if (fresh && !useTreeStore.getState().streaming) {
       const { chats, ...meta } = fresh;
       useTreeStore.getState().updateNode(meta);
@@ -136,16 +166,29 @@ export function useChat() {
   async function fork(nodeId: string) {
     setError(null);
     try {
-      // TODO(backend): replace with api.nodes.fork(nodeId) -> POST /nodes/:id/fork
-      const child = await mockApi.nodes.fork(nodeId);
+      const child = await api.nodes.fork(nodeId);
       const store = useTreeStore.getState();
       store.addNode(child);
       store.setChats(child.id, []);
       store.setActive(child.id);
-    } catch {
-      setError("Could not create a branch.");
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, "Could not create a branch."));
     }
   }
 
-  return { activeNodeId, history, streaming, blocker, error, send, fork };
+  return {
+    activeNodeId,
+    history,
+    streaming,
+    blocker,
+    error,
+    models,
+    selectedModel,
+    modelsLoading,
+    setSelectedModel,
+    usage,
+    usageUnavailable,
+    send,
+    fork,
+  };
 }

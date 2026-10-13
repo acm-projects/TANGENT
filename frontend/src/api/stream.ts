@@ -60,7 +60,11 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
 
   let res = await send(opts.getAccessToken());
   if (res.status === 401) res = await send(await opts.refresh());
-  if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
+  if (!res.ok || !res.body) {
+    // FastAPI errors are { detail: "..." }; show that instead of a bare status code.
+    const detail = await res.json().then((b: { detail?: unknown }) => b.detail, () => undefined);
+    throw new Error(typeof detail === "string" ? detail : `stream failed: ${res.status}`);
+  }
 
   for await (const { event, data } of sseFrames(res.body)) {
     if (event === "token") opts.onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
