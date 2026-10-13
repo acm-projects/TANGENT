@@ -1,0 +1,26 @@
+/* motion.css — durations, easings, reduced motion. See DESIGN.md Rule 7.
+ *
+ * Components use these tokens, never a hard-coded `200ms ease`. */
+
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 400ms;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reduced motion is handled by zeroing the duration tokens — tokens-only, no
+ * blanket `*` rule. This covers every animation that USES the tokens.
+ *
+ * It does NOT catch a hand-written `animation: glow 2s`, and it cannot stop a
+ * JS-driven animation. If you hand-write keyframes, honour the preference
+ * yourself; in JS, check matchMedia("(prefers-reduced-motion: reduce)"). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+}

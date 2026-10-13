@@ -1,0 +1,35 @@
+/* Projects — layout and one-offs, unlayered (DESIGN.md §2). Figma 313:9902. */
+
+.projects {
+  flex: 1;
+}
+
+/* Figma: four equal columns, 16px gaps. */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+
+.project-card {
+  padding: var(--space-2);
+  border-width: 2px;
+  border-radius: var(--radius-xl);
+  color: var(--color-text-secondary);
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.project-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.project-card-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.project-card-name {
+  padding: 0 var(--space-2) var(--space-2);
+}

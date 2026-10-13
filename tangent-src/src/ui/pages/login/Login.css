@@ -1,0 +1,9 @@
+/* Page-level layout only, unlayered (DESIGN.md §2). */
+
+.login {
+  min-height: 100dvh;
+  justify-content: center;
+  padding: var(--space-4);
+  background: radial-gradient(var(--color-surface-raised) 1px, var(--color-surface) 1px);
+  background-size: 16px 16px;
+}

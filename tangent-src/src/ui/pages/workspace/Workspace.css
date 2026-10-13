@@ -1,0 +1,28 @@
+/* Page-level layout only, unlayered (DESIGN.md §2).
+ *
+ * Every feature sits in the same single grid cell, so they stack: the map at
+ * the back, toolbar and chat floating over it. Each feature sizes itself;
+ * this file only places them. */
+
+.workspace {
+  display: grid;
+  grid-template: 1fr / 1fr;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.workspace > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+}
+
+.workspace-toolbar {
+  justify-self: start;
+  z-index: 2;
+}
+
+.workspace-chat {
+  justify-self: end;
+  z-index: 1;
+}

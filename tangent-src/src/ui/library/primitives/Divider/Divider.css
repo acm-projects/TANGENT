@@ -1,0 +1,11 @@
+/* Divider — see DESIGN.md §4. */
+
+@layer ui {
+  [data-ui="divider"] {
+    flex: 1;
+    align-self: center;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+}

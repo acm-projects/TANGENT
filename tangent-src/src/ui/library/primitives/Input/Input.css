@@ -1,0 +1,25 @@
+/* Input — see DESIGN.md §4. */
+
+@layer ui {
+  [data-ui="input"] {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-content);
+    font-size: var(--font-size-s);
+    line-height: var(--line-height-normal);
+    text-overflow: ellipsis;
+  }
+
+  [data-ui="input"]::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  [data-ui="input"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}

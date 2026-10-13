@@ -1,0 +1,25 @@
+/* TextArea — see DESIGN.md §4. */
+
+@layer ui {
+  [data-ui="textarea"] {
+    field-sizing: content;
+    width: 100%;
+    resize: none;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-content);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+  }
+
+  [data-ui="textarea"]::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  /* The surrounding Panel shows focus (see the consumer's :focus-within), so
+   * the field itself draws none. */
+  [data-ui="textarea"]:focus-visible {
+    outline: none;
+  }
+}

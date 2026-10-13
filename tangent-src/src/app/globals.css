@@ -1,0 +1,38 @@
+/* The one CSS entry point (imported by layout.tsx). See DESIGN.md §2.
+ *
+ * Priority, lowest to highest:  @layer reset  →  @layer ui  →  unlayered
+ *                               (the * reset)    (components)   (pages, features)
+ *
+ * The reset MUST be inside a layer. Cascade layers outrank specificity, and
+ * unlayered declarations outrank every layer — so an unlayered `* { padding: 0 }`
+ * silently beats `@layer ui { [data-ui="button"] { padding: ... } }` despite the
+ * far more specific selector, and every component loses its padding and margin
+ * with no warning from the cascade.
+ *
+ * The `@layer reset, ui;` statement also pins the order independently of which
+ * CSS chunk the bundler loads first. */
+
+@layer reset, ui;
+
+@import "../ui/library/tokens/index.css";
+
+@layer reset {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Lists are used for semantics (a conversation, a grid of cards), never
+   * for bullets; the library draws whatever a list item looks like. */
+  ol,
+  ul {
+    list-style: none;
+  }
+
+  body {
+    font-family: var(--font-content);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+}

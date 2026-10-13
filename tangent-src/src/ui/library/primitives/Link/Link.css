@@ -1,0 +1,15 @@
+/* Link — see DESIGN.md §4. */
+
+@layer ui {
+  [data-ui="link"] {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    border-radius: var(--radius-xxl);
+  }
+
+  [data-ui="link"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}

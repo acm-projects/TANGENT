@@ -1,0 +1,36 @@
+/* Icon — see DESIGN.md §4. Sizes and hierarchy mirror Text.css, so an Icon
+ * beside a Text of the same size and hierarchy matches it. */
+
+@layer ui {
+  [data-ui="icon"] {
+    font-family: var(--font-icon);
+    font-weight: var(--font-weight-regular);
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    font-feature-settings: "liga";
+    font-variation-settings: "FILL" 1;
+    -webkit-font-smoothing: antialiased;
+    color: inherit;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  [data-ui="icon"][data-hierarchy="tertiary"] {
+    color: var(--color-text-muted);
+  }
+
+  /* sizes — one per TextSize */
+  [data-ui="icon"][data-size="xxs"]     { font-size: var(--font-size-xxs); }
+  [data-ui="icon"][data-size="xs"]      { font-size: var(--font-size-xs); }
+  [data-ui="icon"][data-size="s"]       { font-size: var(--font-size-s); }
+  [data-ui="icon"][data-size="base"]    { font-size: var(--font-size-base); }
+  [data-ui="icon"][data-size="m"]       { font-size: var(--font-size-m); }
+  [data-ui="icon"][data-size="l"]       { font-size: var(--font-size-l); }
+  [data-ui="icon"][data-size="xl"]      { font-size: var(--font-size-xl); }
+  [data-ui="icon"][data-size="xxl"]     { font-size: var(--font-size-xxl); }
+  [data-ui="icon"][data-size="display"] { font-size: var(--font-size-display); }
+}

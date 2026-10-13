@@ -1,0 +1,8 @@
+/* Every token file, one per kind of value. See DESIGN.md Rule 1.
+ * Each file is self-contained (its tier-2 tokens reference only its own
+ * tier-1 values), so order between files doesn't matter. */
+
+@import "./colors.css";
+@import "./shape.css";
+@import "./text.css";
+@import "./motion.css";

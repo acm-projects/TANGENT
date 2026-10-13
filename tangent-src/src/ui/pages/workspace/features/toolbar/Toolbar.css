@@ -1,0 +1,148 @@
+/* Toolbar — layout and one-offs, unlayered (DESIGN.md §2).
+ * Measurements: Figma "Toolbar" (126:1115), "ToolBar Tile" (18:140),
+ * "File Explorer" (273:7599), "Share" (293:9185). */
+
+.toolbar {
+  padding: var(--space-4);
+  /* the rail is only as wide as its tiles; clicks between tiles reach the map */
+  pointer-events: none;
+}
+
+.toolbar > * {
+  pointer-events: auto;
+}
+
+.toolbar-rail {
+  pointer-events: none;
+}
+
+.toolbar-rail > * {
+  pointer-events: auto;
+}
+
+/* Figma tile: a 48px circle */
+.toolbar-tile {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+/* ── panels opened from the rail ────────────────────────────── */
+
+.toolbar-panel {
+  padding: var(--space-6);
+}
+
+.toolbar-panel-title {
+  font-family: var(--font-content);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* Sources: a full-height column beside the rail */
+.sources {
+  width: 20rem;
+  overflow-y: auto;
+}
+
+.sources-add {
+  width: 100%;
+}
+
+.source-card {
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  cursor: default;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.source-card:hover,
+.source-card:focus-visible {
+  border-color: var(--color-border-strong);
+}
+
+.source-card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.source-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.source-thumb-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* Figma hover: the thumbnail dims and shows an "open" icon */
+.source-thumb-open {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-surface) var(--glass-mix), transparent);
+  color: var(--color-text-secondary);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.source-card:hover .source-thumb-open,
+.source-card:focus-visible .source-thumb-open {
+  opacity: 1;
+}
+
+.source-details {
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.source-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-card:hover .source-name {
+  color: var(--color-text);
+}
+
+/* Figma "Expandable Text": the chevron appears on hover */
+.source-usage-more {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.source-card:hover .source-usage-more {
+  opacity: 1;
+}
+
+/* Share: a small card level with the Share tile */
+.share {
+  align-self: end;
+  width: 20rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-xl);
+}
+
+.share-title {
+  font-family: var(--font-content);
+  color: var(--color-text-secondary);
+}
+
+.share-link {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+}

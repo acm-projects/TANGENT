@@ -1,0 +1,44 @@
+/* Text — see DESIGN.md §4 and Rule 1a.
+ *
+ * Colour is inherited, so Text reads correctly on whatever surface it sits on
+ * (a primary Button's brand fill included) without knowing what that is.
+ * Hierarchy only changes emphasis: primary is heavier, tertiary is muted. */
+
+@layer ui {
+  [data-ui="text"] {
+    font-family: var(--font-content);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-normal);
+    color: inherit;
+  }
+
+  /* Headings use the heading face. Bungee ships one weight, so never bold it. */
+  [data-ui="text"]:is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-heading);
+    line-height: var(--line-height-tight);
+  }
+
+  /* hierarchy */
+  [data-ui="text"][data-hierarchy="primary"] {
+    font-weight: var(--font-weight-medium);
+  }
+
+  [data-ui="text"][data-hierarchy="primary"]:is(h1, h2, h3, h4, h5, h6) {
+    font-weight: var(--font-weight-regular);
+  }
+
+  [data-ui="text"][data-hierarchy="tertiary"] {
+    color: var(--color-text-muted);
+  }
+
+  /* sizes — one per TextSize */
+  [data-ui="text"][data-size="xxs"]     { font-size: var(--font-size-xxs); }
+  [data-ui="text"][data-size="xs"]      { font-size: var(--font-size-xs); }
+  [data-ui="text"][data-size="s"]       { font-size: var(--font-size-s); }
+  [data-ui="text"][data-size="base"]    { font-size: var(--font-size-base); }
+  [data-ui="text"][data-size="m"]       { font-size: var(--font-size-m); }
+  [data-ui="text"][data-size="l"]       { font-size: var(--font-size-l); }
+  [data-ui="text"][data-size="xl"]      { font-size: var(--font-size-xl); }
+  [data-ui="text"][data-size="xxl"]     { font-size: var(--font-size-xxl); }
+  [data-ui="text"][data-size="display"] { font-size: var(--font-size-display); }
+}
