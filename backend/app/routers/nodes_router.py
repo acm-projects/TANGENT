@@ -7,15 +7,17 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.auth import get_current_user
 from app.context.flatten import flatten, to_provider_messages
-from app.context.schemas import PathNode
+from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.database import AsyncSessionLocal, get_db_session
-from app.models import User
+from app.models import Node, Project, User
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/nodes", tags=["Nodes"])
@@ -89,6 +91,56 @@ async def _persist(user_id: UUID, node_id: UUID, user_text: str, assistant_text:
             """),
             {"node_id": node_id, "user_text": user_text, "assistant_text": assistant_text, "now": now},
         )
+
+
+@router.get("/{node_id}", response_model=NodeOut)
+async def get_node(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    _: User = Depends(get_current_user),
+):
+    node = await db.get(Node, node_id)  # RLS: nodes of invisible projects are simply absent
+    if node is None:
+        raise HTTPException(404, "Node not found")
+    return node
+
+
+@router.post("/{node_id}/fork", response_model=NodeMeta)
+async def fork_node(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """New empty child of any node (a "tangent"). fork_index is the next free sibling ordinal."""
+    parent = await db.get(Node, node_id)
+    if parent is None:
+        raise HTTPException(404, "Node not found")
+    owner_id = (await db.execute(select(Project.created_by_id).where(Project.id == parent.project_id))).scalar_one()
+    if owner_id != user.id:
+        raise HTTPException(403, "Only the project owner can branch")
+
+    for _ in range(3):  # two simultaneous forks race for the same index; the unique constraint picks the loser
+        next_index = (
+            await db.execute(
+                select(func.coalesce(func.max(Node.fork_index), 0) + 1).where(Node.parent_id == parent.id)
+            )
+        ).scalar_one()
+        child = Node(
+            tree_id=parent.tree_id,
+            project_id=parent.project_id,
+            parent_id=parent.id,
+            fork_index=next_index,
+            created_by_id=user.id,
+        )
+        db.add(child)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            continue
+        await db.refresh(child)
+        return child
+    raise HTTPException(409, "Could not allocate a branch slot; try again")
 
 
 @router.post("/{node_id}/messages")

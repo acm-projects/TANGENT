@@ -1,0 +1,66 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import defer
+
+from app.auth import get_current_user
+from app.context.schemas import NodeMeta, TreeMeta, TreeOut
+from app.database import get_db_session
+from app.models import Node, Project, Tree, User
+
+router = APIRouter(tags=["Trees"], dependencies=[Depends(get_current_user)])
+
+
+async def _tree_out(db: AsyncSession, tree: Tree) -> TreeOut:
+    nodes = (
+        await db.execute(
+            select(Node).where(Node.tree_id == tree.id).order_by(Node.created_at).options(defer(Node.chats))
+        )
+    ).scalars().all()
+    return TreeOut(
+        tree=TreeMeta.model_validate(tree),
+        nodes=[NodeMeta.model_validate(n) for n in nodes],
+    )
+
+
+@router.get("/trees/{tree_id}", response_model=TreeOut)
+async def get_tree(tree_id: UUID, db: AsyncSession = Depends(get_db_session)):
+    tree = await db.get(Tree, tree_id)  # RLS hides trees of projects the caller can't see
+    if tree is None:
+        raise HTTPException(404, "Tree not found")
+    return await _tree_out(db, tree)
+
+
+@router.get("/projects/{project_id}/tree", response_model=TreeOut)
+async def get_project_tree(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """The project's tree. Nothing creates a tree when a project is created, so the owner's first
+    visit makes it (one empty root node). A sharee never creates: they see nothing until the owner has.
+    ponytail: two simultaneous first visits could make two trees; lock the project row if that bites."""
+    project = await db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(404, "Project not found")
+
+    tree = (
+        await db.execute(select(Tree).where(Tree.project_id == project_id).order_by(Tree.created_at).limit(1))
+    ).scalar_one_or_none()
+
+    if tree is None:
+        if project.created_by_id != user.id:
+            raise HTTPException(404, "Project not found")
+        tree = Tree(project_id=project_id, created_by_id=user.id)
+        db.add(tree)
+        await db.flush()
+        root = Node(tree_id=tree.id, project_id=project_id, parent_id=None, fork_index=0, created_by_id=user.id)
+        db.add(root)
+        await db.flush()
+        tree.root_node_id = root.id
+        await db.commit()
+        await db.refresh(tree)
+
+    return await _tree_out(db, tree)
