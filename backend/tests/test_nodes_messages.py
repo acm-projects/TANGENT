@@ -53,7 +53,7 @@ def client(monkeypatch):
     async def fake_persist(user_id, node_id, user_text, assistant_text):
         persisted.append((user_id, node_id, user_text, assistant_text))
 
-    async def fake_path(db, node_id):
+    async def fake_path(db, node_id, user_id):
         return [PathNode(id="root", chats=[
             {"role": "user", "content": "earlier q", "seq": 0, "created_at": "2026-01-01T00:00:00Z"},
             {"role": "assistant", "content": "earlier a", "seq": 1, "created_at": "2026-01-01T00:00:01Z"},
@@ -122,28 +122,39 @@ def test_requires_auth():
 
 
 class FakeDb:
-    """Stands in for the session: first execute() is the path query, second the child check."""
+    """Stands in for the session: first execute() is the path query, second the has_child/is_owner flags."""
 
-    def __init__(self, path_rows, child):
-        self.results = [SimpleNamespace(all=lambda: path_rows), SimpleNamespace(first=lambda: child)]
+    def __init__(self, path_rows, has_child=False, is_owner=True):
+        flags = SimpleNamespace(has_child=has_child, is_owner=is_owner)
+        self.results = [SimpleNamespace(all=lambda: path_rows), SimpleNamespace(one=lambda: flags)]
 
     async def execute(self, *_):
         return self.results.pop(0)
 
 
+async def load(db):
+    return await nodes_router._load_path(db, NODE, USER.id)
+
+
 @pytest.mark.anyio
 async def test_load_path_404_when_node_missing_or_hidden():
     with pytest.raises(HTTPException) as e:
-        await nodes_router._load_path(FakeDb([], None), NODE)
+        await load(FakeDb([]))
     assert e.value.status_code == 404
 
 
 @pytest.mark.anyio
 async def test_load_path_409_for_non_leaf():
-    row = SimpleNamespace(id="a", chats=[])
     with pytest.raises(HTTPException) as e:
-        await nodes_router._load_path(FakeDb([row], (1,)), NODE)
+        await load(FakeDb([SimpleNamespace(id="a", chats=[])], has_child=True))
     assert e.value.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_load_path_403_for_sharee():
+    with pytest.raises(HTTPException) as e:
+        await load(FakeDb([SimpleNamespace(id="a", chats=[])], is_owner=False))
+    assert e.value.status_code == 403
 
 
 @pytest.fixture

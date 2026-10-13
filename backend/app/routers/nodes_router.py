@@ -42,14 +42,25 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _load_path(db: AsyncSession, node_id: UUID) -> list[PathNode]:
+async def _load_path(db: AsyncSession, node_id: UUID, user_id: UUID) -> list[PathNode]:
     rows = (await db.execute(_PATH_SQL, {"node_id": node_id})).all()
     if not rows:
         raise HTTPException(404, "Node not found")
-    is_parent = (
-        await db.execute(text("SELECT 1 FROM nodes WHERE parent_id = :id LIMIT 1"), {"id": node_id})
-    ).first()
-    if is_parent:
+    flags = (
+        await db.execute(
+            text("""
+                SELECT
+                  EXISTS (SELECT 1 FROM nodes WHERE parent_id = :id) AS has_child,
+                  EXISTS (SELECT 1 FROM nodes n JOIN projects p ON p.id = n.project_id
+                          WHERE n.id = :id AND p.created_by_id = :uid) AS is_owner
+            """),
+            {"id": node_id, "uid": user_id},
+        )
+    ).one()
+    # RLS lets sharees read but not write. Without this the reply would stream and then silently not save.
+    if not flags.is_owner:
+        raise HTTPException(403, "Only the project owner can prompt; fork the project to chat in your own copy")
+    if flags.has_child:
         # ARCHITECTURE.md §8: only leaves take prompts. The UI hint is not enforcement; this is.
         raise HTTPException(409, "Only a leaf node can be prompted; fork it instead")
     return [PathNode(id=r.id, chats=r.chats) for r in rows]
@@ -90,7 +101,7 @@ async def send_message(
     """Prompt a leaf node; stream the reply as SSE `token {text}`, then `done` or `error {message}`.
     The server rebuilds the history from the tree; the client sends only the new message."""
     get_model_or_400(req.model)
-    path = await _load_path(db, node_id)
+    path = await _load_path(db, node_id, user.id)
     messages = to_provider_messages(flatten(path), req.content)
     user_id = user.id
 
@@ -124,4 +135,9 @@ async def send_message(
             return
         yield _sse("done", done)
 
-    return StreamingResponse(events(), media_type="text/event-stream")
+    # no-transform stops Next's /api rewrite from gzip-buffering the stream; X-Accel-Buffering does the same for nginx.
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
