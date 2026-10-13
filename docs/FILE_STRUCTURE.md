@@ -153,8 +153,7 @@ frontend/
     │   └── index.ts           what features import: `import { api } from "@/api"`
     ├── store/                 foundation: state shared across pages
     │   └── treeStore.ts       tree structure + node content. Nothing feature-specific.
-    ├── mocks/                 TEMPORARY in-memory backend. Deleted once wired up (HANDOFF.md)
-    │   ├── fixtures.ts        the Figma sample data
+    ├── mocks/                 TEMPORARY in-memory backend for Sources only. Deleted once wired up (HANDOFF.md)
     │   └── mockApi.ts         fakes with the real calls' signatures; only feature hooks call it
     └── ui/
         ├── library/           foundation: the design library. Knows nothing about Tangent.

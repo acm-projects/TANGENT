@@ -248,20 +248,19 @@ Next on **5173**. Same-origin also keeps the refresh cookie flowing.
 `{ content, model? }` (`model` is an id from `GET /models`; the server default
 applies when omitted) and streams `token {text}`, then `done {usage?, model?}` or
 `error {message}`. The provider client lives in `app/core/openrouter.py`; the
-standalone `/model_call*` spikes are gone. The frontend half (`api.chats.models`,
-`streamMessage`'s `model` and `done` usage) exists, but `useChat` still sends
-through `mockApi` until real nodes exist (HANDOFF.md).
+standalone `/model_call*` spikes are gone. Also built: `GET /projects/:id/tree`
+(creates the tree and its empty root on the owner's first visit), `GET /trees/:id`,
+`GET /nodes/:id`, `POST /nodes/:id/fork` (owner only).
 
 ### Current state of the client halves
 
 - The Figma screens are built: `/[slug]/dashboard` and `/[slug]/[projectId]`
   (the workspace: mind map, chat, toolbar). `/` redirects to the user's first
   workspace. `/login`, `/signup`, `/onboarding` and `/invite/[token]` are real.
-- **The data screens run on mocks.** Every feature hook except auth, `/`, the
-  invite page and the share panel calls `src/mocks/mockApi.ts`, an in-memory
-  fake with the same signatures as the real calls. Those four use the real
-  backend (`api.auth`, `api.workspaces`, `api.shares`). [HANDOFF.md](HANDOFF.md) maps each mock to its
-  endpoint; `grep -rn "TODO(backend)" frontend/src` lists every call site.
+- **The screens run on the real backend**, except the Sources panel, which
+  still calls `src/mocks/mockApi.ts` (no sources table yet).
+  [HANDOFF.md](HANDOFF.md) maps each hook to its endpoint;
+  `grep -rn "TODO(backend)" frontend/src` lists what is left.
 
 ---
 

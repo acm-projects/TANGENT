@@ -16,8 +16,10 @@ the real backend.
 
 ## 1. What exists
 
-Every screen in the Figma wireframe works end to end in the browser against an
-in-memory fake backend (`src/mocks/`). **No request leaves the browser.**
+Every screen in the Figma wireframe works against the real backend, except the
+Sources panel, which still runs on an in-memory fake (`src/mocks/`). You need the
+backend running (see DEVELOPMENT.md) and a signed-in user; a fresh account starts
+with no projects, so use the dashboard's *New project* form.
 
 ```bash
 cd frontend && npm install && npm run dev     # http://localhost:5173
@@ -62,12 +64,12 @@ grep -rn "TODO(backend)" frontend/src
 
 | Hook / file | Mock call | Real call | Endpoint exists? |
 |---|---|---|---|
-| `dashboard/features/projects/useProjects.ts` | `mockApi.projects.list()` | `api.projects.list()` | ✅ `GET /projects/` — needs the client wrapper |
-| `workspace/features/mindmap/useMindMap.ts` | `mockApi.trees.getForProject(projectId)` | `api.trees.get(treeId)` | ⚠️ `GET /trees/:id` is on the contract, but **nothing maps a project to its tree id** |
-| `workspace/features/chat/useChat.ts` (load) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ `nodes_router.py` defines no routes yet |
-| `workspace/features/chat/useChat.ts` (send) | `mockApi.streamMessage({...})` | `streamMessage({...})` from `@/api` | ❌ same |
-| `workspace/features/chat/useChat.ts` (after send) | `mockApi.nodes.get(id)` | `api.nodes.get(id)` | ❌ same — refreshes the node's title and tags |
-| `workspace/features/chat/useChat.ts` (branch) | `mockApi.nodes.fork(id)` | `api.nodes.fork(id)` | ❌ same |
+| `dashboard/features/projects/useProjects.ts` | — (wired) | `api.projects.list / create` | ✅ done. `POST /projects/` needs the workspace id, which `GET /workspaces/` now returns |
+| `workspace/features/mindmap/useMindMap.ts` | — (wired) | `api.trees.forProject(projectId)` | ✅ done. `GET /projects/:id/tree`; the owner's first visit creates the tree and its empty root |
+| `workspace/features/chat/useChat.ts` (load) | — (wired) | `api.nodes.get(id)` | ✅ done |
+| `workspace/features/chat/useChat.ts` (send) | — (wired) | `streamMessage({...})` from `@/api` | ✅ done. Sends `{content, model}`; attachments are disabled until an upload endpoint exists |
+| `workspace/features/chat/useChat.ts` (after send) | — (wired) | `api.nodes.get(id)` | ✅ done — refreshes the node's title |
+| `workspace/features/chat/useChat.ts` (branch) | — (wired) | `api.nodes.fork(id)` | ✅ done. Owner only (sharees 403) |
 | `workspace/features/toolbar/useSources.ts` | `mockApi.sources.list / add` | — | ❌ no table, no router |
 | `workspace/features/toolbar/useShares.ts` | — (no mock; already real) | `api.shares.list / invite / revokeShare / revokeInvitation / resend` | ✅ done. Needs a real project's `slug` and `projectId` in the URL, and SMTP on the backend to send invites |
 | `app/page.tsx` | `RootRedirect` → `api.workspaces.list()` | `GET /workspaces/` | ✅ done. Takes the first workspace returned; the endpoint has no ordering, so "most recent" needs `last_used_at` ordering server-side |
@@ -107,7 +109,7 @@ delete them and the UI that reads them:
 
 These are outside the frontend's scope and were **not** changed:
 
-1. **Only `POST /nodes/:id/messages` exists.** `nodes_router.py` serves the LLM call (and `chats_router.py` `GET /models`), but `GET /nodes/:id`, `GET /trees/:id`, `POST /nodes/:id/fork` and tree creation do not, so no real node exists for the UI to prompt; `useChat.send` stays on `mockApi` until they do. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
+1. **Node endpoints are partial.** `GET /nodes/:id`, `POST /nodes/:id/fork`, `POST /nodes/:id/messages`, `GET /trees/:id`, `GET /projects/:id/tree` exist. `POST /nodes/merge` does not, and the UI has no merge control yet. A sharee can read a tree but cannot prompt or branch it (RLS); the intended flow is to fork the project into their own copy. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
 2. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
 3. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
 4. **Share.** The backend shares by email invitation, so `SharePanel.tsx` is now an email-invite form with a member list, not Figma's "Share Copy" link panel. Worth showing the designer. If a copy-link flow is wanted later it needs a new backend endpoint. The member list is a scrollable list; drag-to-reorder was not built.
