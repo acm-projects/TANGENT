@@ -10,6 +10,7 @@
  */
 
 import { createAuthApi } from "./endpoints/auth";
+import { createChatsApi } from "./endpoints/chats";
 import { createNodesApi } from "./endpoints/nodes";
 import { createSharesApi } from "./endpoints/shares";
 import { createTreesApi } from "./endpoints/trees";
@@ -18,6 +19,7 @@ import { apiClient } from "./session";
 
 export const api = {
   auth: createAuthApi(apiClient),
+  chats: createChatsApi(apiClient),
   nodes: createNodesApi(apiClient),
   shares: createSharesApi(apiClient),
   trees: createTreesApi(apiClient),

@@ -273,10 +273,9 @@ TypeScript to an exact version.
   runtime dependencies, `pyproject.toml` is empty, and CI installs a
   hand-written subset (`pydantic pytest`) that no longer covers
   `test_auth_flow.py`. Consolidate on one manifest and make CI install it.
-- `/model_call` is a spike that predates the API contract. Fold it into
-  `POST /nodes/:id/messages` or delete it.
-- `app/routers/chats_router.py` reads `os.getenv` and builds its HTTP call
-  inline. A `core/config.py` plus a service split would make it testable.
+- `app/core/openrouter.py` reads `OPENROUTER_API_KEY` / `OPENROUTER_URL` from the
+  environment directly; a `core/config.py` would own them. The model list is a
+  hard-coded set of free models.
 - OpenAPI → generated TS types, with a CI drift check
 - Prompt-cache breakpoints in `to_provider_messages`
 - Document-upload representation in `chats`

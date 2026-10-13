@@ -70,8 +70,23 @@ export interface TreeResponse {
 /** SSE events emitted by POST /nodes/:id/messages */
 export type StreamEvent =
   | { type: "token"; text: string }
-  | { type: "done" }
+  | { type: "done"; usage?: ModelUsage; model?: string }
   | { type: "error"; message: string };
+
+/** GET /models */
+export interface AvailableModel {
+  id: string;
+  name: string;
+  description: string;
+  supports_images: boolean;
+}
+
+/** Token counts the provider reports; arrives on the `done` event when available. */
+export interface ModelUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
 
 /** POST /auth/onboarding */
 export interface OnboardingResponse {

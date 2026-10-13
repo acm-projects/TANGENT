@@ -244,8 +244,13 @@ browser never talks to it cross-origin. axios uses `baseURL: "/api"`, which
 Backend dev `FRONTEND_URL` is `http://localhost:5173`, so `npm run dev` serves
 Next on **5173**. Same-origin also keeps the refresh cookie flowing.
 
-**Not on the contract:** `POST /model_call` (`app/routers/chats_router.py`) is a
-surviving spike that predates this table. Don't build on it.
+**LLM call [built, backend only]:** `POST /nodes/:id/messages` takes
+`{ content, model? }` (`model` is an id from `GET /models`; the server default
+applies when omitted) and streams `token {text}`, then `done {usage?, model?}` or
+`error {message}`. The provider client lives in `app/core/openrouter.py`; the
+standalone `/model_call*` spikes are gone. The frontend half (`api.chats.models`,
+`streamMessage`'s `model` and `done` usage) exists, but `useChat` still sends
+through `mockApi` until real nodes exist (HANDOFF.md).
 
 ### Current state of the client halves
 
@@ -382,7 +387,7 @@ to run it.
 | One recursive CTE | N queries walking up | One round trip; the tree depth is unbounded. |
 | Copy messages into merge nodes | Reference both parents | Keeps `parent_id` sufficient to rebuild history, so no consumer special-cases merges. |
 | Server builds context | Client builds context | Trust, staleness, cache stability (§4). |
-| One provider SDK called directly | A router (LiteLLM, OpenRouter) | A moving part with no v1 benefit. Keep base URL + model name as one config value so swapping is free. |
+| One provider SDK called directly | A router (LiteLLM, OpenRouter) | A moving part with no v1 benefit. Keep base URL + model name as one config value so swapping is free. **Update:** the shipped client does call OpenRouter (`app/core/openrouter.py`, the one file that knows the provider); the swap-cost argument still holds. |
 | SSE over `fetch` | XHR, or `fetch-event-source` | XHR streams badly; the library auto-retries a POST. |
 | Single-flight refresh | Refresh per request | Rotation + reuse detection can revoke the session. |
 | In-memory access token | localStorage | localStorage is readable by any injected script. |

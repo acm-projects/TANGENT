@@ -88,10 +88,11 @@ backend/
 │   ├── context/               foundation: ancestor path -> LLM messages. Pure, DB-free.
 │   │   ├── schemas.py         the shapes flatten consumes
 │   │   └── flatten.py         the tree walk. The riskiest code in the project.  [built]
-│   ├── core/                  scaffolded, empty — see the target below
+│   ├── core/                  openrouter.py (the one provider client); rest scaffolded — see the target below
 │   ├── features/              scaffolded, empty — see the target below
 │   └── routers/               where endpoints live today
-│       ├── chats_router.py    the one real endpoint: POST /model_call (a spike)
+│       ├── chats_router.py    GET /models (the picker's list)
+│       ├── nodes_router.py    POST /nodes/:id/messages (the LLM call); other node routes [planned]
 │       ├── auth_router.py     empty placeholder                                [planned]
 │       ├── branch_router.py   empty placeholder                                [planned]
 │       ├── projects_router.py empty placeholder                                [planned]

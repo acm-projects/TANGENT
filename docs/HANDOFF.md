@@ -107,7 +107,7 @@ delete them and the UI that reads them:
 
 These are outside the frontend's scope and were **not** changed:
 
-1. **No node/chat endpoints.** `app/routers/nodes_router.py` is an empty `APIRouter` (mounted by `app/main.py`), and `chats_router.py` is imported but never mounted, so the calls `api.nodes` expects don't exist yet. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
+1. **Only `POST /nodes/:id/messages` exists.** `nodes_router.py` serves the LLM call (and `chats_router.py` `GET /models`), but `GET /nodes/:id`, `GET /trees/:id`, `POST /nodes/:id/fork` and tree creation do not, so no real node exists for the UI to prompt; `useChat.send` stays on `mockApi` until they do. (The earlier "backend can't start" and "stray second `app = FastAPI()`" problems are fixed.)
 2. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
 3. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
 4. **Share.** The backend shares by email invitation, so `SharePanel.tsx` is now an email-invite form with a member list, not Figma's "Share Copy" link panel. Worth showing the designer. If a copy-link flow is wanted later it needs a new backend endpoint. The member list is a scrollable list; drag-to-reorder was not built.

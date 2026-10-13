@@ -1,4 +1,4 @@
-import type { StreamEvent } from "./types";
+import type { ModelUsage, StreamEvent } from "./types";
 
 /** Parse an SSE byte stream into { event, data } frames. */
 export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string }> {
@@ -32,6 +32,8 @@ export interface StreamOptions {
   baseURL: string;
   nodeId: string;
   content: string;
+  /** A model id from GET /models; the server picks its default when omitted. */
+  model?: string;
   getAccessToken(): string | null;
   refresh(): Promise<string>;
   onEvent(e: StreamEvent): void;
@@ -52,7 +54,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content: opts.content }),
+      body: JSON.stringify({ content: opts.content, model: opts.model }),
       signal: opts.signal,
     });
 
@@ -62,7 +64,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
 
   for await (const { event, data } of sseFrames(res.body)) {
     if (event === "token") opts.onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
-    else if (event === "done") return void opts.onEvent({ type: "done" });
+    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string }) });
     else if (event === "error") return void opts.onEvent({ type: "error", message: (JSON.parse(data) as { message: string }).message });
   }
   // Stream closed with no terminal event: surface it instead of hanging the UI in "streaming".

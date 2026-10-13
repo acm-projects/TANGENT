@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { sseFrames } from "./stream";
+import { describe, expect, it, vi } from "vitest";
+import { sseFrames, streamMessage } from "./stream";
+import type { StreamEvent } from "./types";
 
 describe("sseFrames", () => {
   it("parses frames split across chunk boundaries", async () => {
@@ -17,5 +18,34 @@ describe("sseFrames", () => {
       { event: "token", data: '{"text":"hello"}' },
       { event: "done", data: "{}" },
     ]);
+  });
+});
+
+describe("streamMessage", () => {
+  const sse = (...frames: string[]) =>
+    new Response(frames.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const opts = { baseURL: "/api", nodeId: "n1", content: "hi", getAccessToken: () => "t", refresh: async () => "t2" };
+
+  it("sends the model and forwards tokens, then usage from done", async () => {
+    const usage = { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 };
+    const fetchMock = vi.fn(async () =>
+      sse('event: token\ndata: {"text":"a"}\n\n', `event: done\ndata: ${JSON.stringify({ usage, model: "m" })}\n\n`),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const events: StreamEvent[] = [];
+
+    await streamMessage({ ...opts, model: "m", onEvent: (e) => events.push(e) });
+
+    expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ content: "hi", model: "m" });
+    expect(events).toEqual([{ type: "token", text: "a" }, { type: "done", usage, model: "m" }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces an error event", async () => {
+    vi.stubGlobal("fetch", async () => sse('event: error\ndata: {"message":"boom"}\n\n'));
+    const events: StreamEvent[] = [];
+    await streamMessage({ ...opts, onEvent: (e) => events.push(e) });
+    expect(events).toEqual([{ type: "error", message: "boom" }]);
+    vi.unstubAllGlobals();
   });
 });
