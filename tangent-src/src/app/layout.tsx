@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bungee, Roboto } from "next/font/google";
 import localFont from "next/font/local";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 
 const bungee = Bungee({ weight: "400", subsets: ["latin"], variable: "--font-bungee" });
