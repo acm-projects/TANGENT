@@ -8,8 +8,11 @@ import httpx
 import pytest
 
 # app.database refuses to import without these; the engine connects lazily, so dummies are enough.
-os.environ.setdefault("DATABASE_URL", "postgresql://dummy@localhost/dummy")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
+# They are removed again after the import below: the real-DB test modules skip themselves when these
+# are unset, and would otherwise see the dummies (collected after this file) and try to connect.
+_dummies = {"DATABASE_URL": "postgresql://dummy@localhost/dummy", "JWT_SECRET_KEY": "test-secret"}
+_added = [k for k in _dummies if k not in os.environ]
+os.environ.update({k: _dummies[k] for k in _added})
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -20,6 +23,9 @@ from app.core import openrouter
 from app.database import get_db_session
 from app.main import app
 from app.routers import nodes_router
+
+for _k in _added:
+    del os.environ[_k]
 
 NODE = uuid.uuid4()
 USER = SimpleNamespace(id=uuid.uuid4())
