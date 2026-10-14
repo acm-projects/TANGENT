@@ -114,6 +114,21 @@ def test_tree_fork_and_prompt(monkeypatch):
         assert c.get(f"/nodes/{a['id']}").status_code in (401, 403)
 
 
+def test_simultaneous_first_visits_make_one_tree():
+    from concurrent.futures import ThreadPoolExecutor
+
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])},
+                     headers=auth).json()["id"]
+
+        with ThreadPoolExecutor(4) as pool:
+            trees = list(pool.map(lambda _: c.get(f"/projects/{pid}/tree", headers=auth).json(), range(4)))
+
+        assert len({t["tree"]["id"] for t in trees}) == 1 and all(len(t["nodes"]) == 1 for t in trees)
+
+
 def _workspace_id(user_id):
     """The API doesn't expose workspace ids, so read it straight from the table."""
     async def run():

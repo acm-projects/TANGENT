@@ -40,19 +40,21 @@ async def get_project_tree(
     user: User = Depends(get_current_user),
 ):
     """The project's tree. Nothing creates a tree when a project is created, so the owner's first
-    visit makes it (one empty root node). A sharee never creates: they see nothing until the owner has.
-    ponytail: two simultaneous first visits could make two trees; lock the project row if that bites."""
+    visit makes it (one empty root node). A sharee never creates: they see nothing until the owner has."""
     project = await db.get(Project, project_id)
     if project is None:
         raise HTTPException(404, "Project not found")
 
-    tree = (
-        await db.execute(select(Tree).where(Tree.project_id == project_id).order_by(Tree.created_at).limit(1))
-    ).scalar_one_or_none()
+    first_tree = select(Tree).where(Tree.project_id == project_id).order_by(Tree.created_at).limit(1)
+    tree = (await db.execute(first_tree)).scalar_one_or_none()
 
     if tree is None:
         if project.created_by_id != user.id:
             raise HTTPException(404, "Project not found")
+        # Row lock: a second simultaneous first visit waits here, then sees the tree the first one made.
+        await db.execute(select(Project.id).where(Project.id == project_id).with_for_update())
+        tree = (await db.execute(first_tree)).scalar_one_or_none()
+    if tree is None:
         tree = Tree(project_id=project_id, created_by_id=user.id)
         db.add(tree)
         await db.flush()
