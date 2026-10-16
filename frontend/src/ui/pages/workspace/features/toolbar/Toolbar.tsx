@@ -20,8 +20,8 @@ type Panel = "sources" | "share" | null;
 type ToolbarProps = { slug: string; projectId: string; className?: string };
 
 /* TODO(design): Add, History and Settings have no designs behind them yet.
- * They render as in Figma and do nothing until the designer specifies them. */
-const notDesignedYet = () => {};
+ * They render as in Figma but disabled, so they don't look like broken buttons. */
+const notDesignedYet = { disabled: true, onClick: () => {} };
 
 export function Toolbar({ slug, projectId, className }: ToolbarProps) {
   const router = useRouter();
@@ -44,7 +44,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
       <Frame as="nav" justify="between" align="center" aria-label="Workspace tools" className="toolbar-rail">
         <Frame gap="2">
           <Tile icon="home" label="Dashboard" onClick={() => router.push(`/${slug}/dashboard`)} />
-          <Tile icon="add_box" label="Add" onClick={notDesignedYet} />
+          <Tile icon="add_box" label="Add (not available yet)" {...notDesignedYet} />
           <Tile icon="folder" label="Sources" pressed={open === "sources"} onClick={() => toggle("sources")} />
         </Frame>
 
@@ -52,8 +52,8 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
           <Tile icon="ios_share" label="Share" pressed={open === "share"} onClick={() => toggle("share")} />
           {moreOpen ? (
             <>
-              <Tile icon="history" label="History" onClick={notDesignedYet} />
-              <Tile icon="settings" label="Settings" onClick={notDesignedYet} />
+              <Tile icon="history" label="History (not available yet)" {...notDesignedYet} />
+              <Tile icon="settings" label="Settings (not available yet)" {...notDesignedYet} />
               <Tile icon="expand_more" label="Fewer tools" onClick={() => setMoreOpen(false)} />
             </>
           ) : (
@@ -69,9 +69,10 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
 }
 
 /* Figma "ToolBar Tile": a round icon-only button (Default / Hover / Open). */
-function Tile({ icon, label, pressed, onClick }: { icon: string; label: string; pressed?: boolean; onClick(): void }) {
+function Tile({ icon, label, pressed, disabled, onClick }: { icon: string; label: string; pressed?: boolean; disabled?: boolean; onClick(): void }) {
   return (
     <Button
+      disabled={disabled}
       elevation="floating"
       size="l"
       icon={icon}

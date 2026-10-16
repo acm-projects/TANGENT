@@ -14,7 +14,7 @@
   }
 
   [data-ui="textarea"]::placeholder {
-    color: var(--color-text-faint);
+    color: var(--color-text-muted);
   }
 
   /* The surrounding Panel shows focus (see the consumer's :focus-within), so

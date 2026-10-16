@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import "./Input.css";
 
 /* A single-line native <input>. Like TextArea it is transparent and expects a
- * Panel around it for the surface.
+ * Panel around it for the surface and the focus ring (:focus-within).
  *
  * Also the file picker: <Input type="file" hidden ref={...} /> plus a Button
  * that calls ref.current.click(), since a native file input can't be styled. */

@@ -37,7 +37,8 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
   const positions = layoutTree(s.rootId, s.childrenByParent);
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
-  const path = new Set(s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId).map((n) => n.id) : []);
+  const crumbs = s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId).map((n) => n.id) : [];
+  const path = new Set(crumbs);
 
   const stateOf = (id: string): MindMapNodeState =>
     id === s.activeNodeId ? "selected" : path.has(id) ? "path" : "default";
@@ -67,6 +68,9 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         id: `${meta.parent_id}->${id}`,
         source: meta.parent_id,
         target: id,
+        type: "string",
+        // Where this edge falls along the path, root first: lights the string up in sequence.
+        data: { depth: onPath ? crumbs.indexOf(id) - 1 : 0 },
         className: onPath ? "mindmap-edge mindmap-edge-path" : "mindmap-edge",
       });
     }

@@ -33,21 +33,28 @@ export function useProjects(slug: string) {
     };
   }, [slug]);
 
-  /** Creates a project in this workspace and puts it first in the list. */
+  const [creating, setCreating] = useState(false);
+
+  /** Creates a project in this workspace and puts it first in the list. True if it was created. */
   const create = useCallback(
     async (name: string) => {
       setCreateError(null);
+      setCreating(true);
       try {
         const workspace = (await api.workspaces.list()).find((w) => w.workspace_slug === slug);
         if (!workspace) throw new Error("Workspace not found.");
         const project = await api.projects.create(workspace.workspace_id, name);
         setState((s) => (s.status === "ready" ? { status: "ready", projects: [project, ...s.projects] } : s));
+        return true;
       } catch (e: unknown) {
         setCreateError(apiErrorMessage(e, "Could not create the project."));
+        return false;
+      } finally {
+        setCreating(false);
       }
     },
     [slug],
   );
 
-  return { state, create, createError };
+  return { state, create, creating, createError };
 }

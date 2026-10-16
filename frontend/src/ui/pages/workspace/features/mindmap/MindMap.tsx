@@ -2,11 +2,13 @@
 
 import { Background, BackgroundVariant, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { useMemo } from "react";
+import { MotionConfig } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTreeStore } from "@/store/treeStore";
 import { Frame, Text } from "@/ui/library";
-import { MindMapNode } from "./components/MindMapNode";
+import { MindMapNode, StaggerPinIn } from "./components/MindMapNode";
+import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
 import { useMindMap } from "./useMindMap";
 import "./MindMap.css";
@@ -19,6 +21,7 @@ import "./MindMap.css";
 
 // Module-level: React Flow re-mounts every node if this object changes identity.
 const nodeTypes = { tangent: MindMapNode };
+const edgeTypes = { string: StringEdge };
 
 type MindMapProps = { projectId: string; className?: string };
 
@@ -35,16 +38,25 @@ export function MindMap({ projectId, className }: MindMapProps) {
   );
   const setActive = useTreeStore((s) => s.setActive);
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
+  const [stagger, setStagger] = useState(true);
+  useEffect(() => {
+    if (load.status !== "ready") return;
+    const t = setTimeout(() => setStagger(false), 1500);
+    return () => clearTimeout(t);
+  }, [load.status]);
 
   return (
     <Frame as="section" gap="0" className={["mindmap", className].filter(Boolean).join(" ")} aria-label="Conversation map">
       {load.status === "loading" && <Text hierarchy="tertiary" className="mindmap-status" content="Loading map…" />}
       {load.status === "error" && <Text role="alert" className="mindmap-status" content={load.message} />}
       {load.status === "ready" && (
+        <MotionConfig reducedMotion="user">
+        <StaggerPinIn value={stagger}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodeOrigin={[0.5, 0]}
           nodesDraggable={false}
           nodesConnectable={false}
@@ -62,6 +74,8 @@ export function MindMap({ projectId, className }: MindMapProps) {
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>
+        </StaggerPinIn>
+        </MotionConfig>
       )}
     </Frame>
   );

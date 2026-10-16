@@ -11,25 +11,25 @@ import "./Projects.css";
 type ProjectsProps = { slug: string };
 
 export function Projects({ slug }: ProjectsProps) {
-  const { state, create, createError } = useProjects(slug);
+  const { state, create, creating, createError } = useProjects(slug);
   const [name, setName] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
-    await create(trimmed);
-    setName("");
+    if (!trimmed || creating) return;
+    // Keep the name on failure so the user can retry without retyping.
+    if (await create(trimmed)) setName("");
   }
 
   return (
     <Panel as="section" elevation="floating" className="projects" aria-busy={state.status === "loading"}>
       <form onSubmit={submit} className="projects-new">
         <Frame direction="row" gap="2" align="center">
-          <Panel hierarchy="tertiary" className="projects-new-field">
+          <Panel className="projects-new-field">
             <Input aria-label="New project name" placeholder="New project name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
           </Panel>
-          <Button type="submit" label="New project" icon="add" showIcon disabled={!name.trim()} />
+          <Button type="submit" label={creating ? "Creating…" : "New project"} icon="add" showIcon disabled={creating || !name.trim()} />
         </Frame>
         {createError && <Text role="alert" size="s" content={createError} />}
       </form>
@@ -42,7 +42,7 @@ export function Projects({ slug }: ProjectsProps) {
         <Frame as="ol" direction="row" gap="4" className="projects-grid">
           {state.projects.map((p) => (
             <Frame as="li" key={p.id}>
-              <Link href={`/${slug}/${p.id}`} aria-label={`Open ${p.project_name}`}>
+              <Link href={`/${slug}/${p.id}`} aria-label={`Open ${p.project_name}`} className="project-link">
                 <Panel elevation="floating" className="project-card">
                   <Frame gap="2">
                     <Panel hierarchy="tertiary" className="project-card-preview">

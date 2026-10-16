@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Button, Frame, Panel, ProgressiveBlur, Text } from "@/ui/library";
+import { Button, Frame, Panel, Text } from "@/ui/library";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
@@ -15,11 +15,8 @@ import "./Chat.css";
  *   expanded   full screen (the top-left button)
  *   collapsed  just a button to bring it back (the top-right chevron)
  *
- * The history scrolls UNDER two glass layers, as in Figma: a progressive blur
- * at the top, where messages leave view, and the message box at the bottom,
- * which floats over the newest messages. Both are sticky children of the one
- * scroll container (.chat-scroll), so their backdrop blur sees the messages
- * scrolling behind them -- see ProgressiveBlur.tsx for why that placement matters.
+ * The history scrolls in one container (.chat-scroll); the message box is a
+ * sticky child at its bottom, a ruled line on the sheet.
  */
 
 type Layout = "docked" | "expanded" | "collapsed";
@@ -59,7 +56,7 @@ export function Chat({ className }: ChatProps) {
   const streamingHere = chat.streaming && chat.streaming.nodeId === chat.activeNodeId ? chat.streaming : null;
 
   return (
-    <Panel as="aside" elevation="floating" className={classes} data-layout={layout} aria-label="Chat">
+    <Panel as="aside" className={classes} data-layout={layout} aria-label="Chat">
       <Frame gap="2" className="chat-inner">
         <Frame as="header" direction="row" justify="between" align="center">
           <Button
@@ -83,7 +80,6 @@ export function Chat({ className }: ChatProps) {
         </Frame>
 
         <Frame ref={scrollRef} gap="0" className="chat-scroll">
-          <ProgressiveBlur edge="top" className="chat-blur-top" />
 
           {chat.history.length === 0 ? (
             <Frame justify="center" align="center" className="chat-empty">

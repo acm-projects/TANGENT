@@ -8,8 +8,8 @@ import type { SendBlocker } from "../useChat";
  * Enter sends; Shift+Enter adds a new line. Styles live in ../Chat.css. */
 
 const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
-  ready: "Message...",
-  "no-selection": "Message...",
+  ready: "Message…",
+  "no-selection": "Select a node on the map to write here.",
   "not-leaf": "This node has branches. Use Branch on a reply to continue from it.",
   streaming: "Waiting for the reply…",
 };
@@ -52,30 +52,13 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
   }
 
   return (
-    // Floating = frosted glass: the messages scrolling behind it stay visible, blurred.
+    // Opaque paper, so messages scroll out of sight under it; drawn as a ruled line (Chat.css).
     <Panel
       as="footer"
-      elevation="floating"
       className={["message-field", className].filter(Boolean).join(" ")}
       data-disabled={disabled || undefined}
     >
       <Frame gap="2">
-        <label className="message-field-model">
-          <Text as="span" size="xs" hierarchy="tertiary" content="Model" />
-          <select
-            aria-label="Chat model"
-            value={selectedModel}
-            onChange={(e) => onModelChange(e.target.value)}
-            disabled={modelsLoading || blocker === "streaming" || models.length === 0}
-          >
-            {modelsLoading && <option value="">Loading models…</option>}
-            {!modelsLoading && models.length === 0 && <option value="">No models available</option>}
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </label>
-
         {files.length > 0 && (
           <Frame as="ol" direction="row" gap="2" className="message-field-files" aria-label="Attachments">
             {files.map((f, i) => (
@@ -109,7 +92,20 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
         />
 
         <Frame direction="row" justify="between" align="center">
-          <Frame direction="row" gap="1">
+          <Frame direction="row" gap="1" align="center">
+            <select
+              aria-label="Chat model"
+              className="message-field-model"
+              value={selectedModel}
+              onChange={(e) => onModelChange(e.target.value)}
+              disabled={modelsLoading || blocker === "streaming" || models.length === 0}
+            >
+              {modelsLoading && <option value="">Loading models…</option>}
+              {!modelsLoading && models.length === 0 && <option value="">No models available</option>}
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
             <Button
               hierarchy="tertiary"
               label="Attach file (not available yet)"

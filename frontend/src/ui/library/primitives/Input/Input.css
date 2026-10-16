@@ -14,12 +14,12 @@
   }
 
   [data-ui="input"]::placeholder {
-    color: var(--color-text-faint);
+    color: var(--color-text-muted);
   }
 
+  /* Like TextArea: the surrounding Panel shows focus (the consumer's
+   * :focus-within), so a ring here would draw a box inside a box. */
   [data-ui="input"]:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
+    outline: none;
   }
 }

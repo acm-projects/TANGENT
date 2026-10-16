@@ -41,7 +41,7 @@ export function OnboardingForm({ next }: { next?: string }) {
           <Text size="s" hierarchy="tertiary" content="You can change this later." />
         </Frame>
 
-        <Panel hierarchy="primary">
+        <Panel className="auth-field">
           <Input
             aria-label="Workspace name"
             placeholder="Workspace name"

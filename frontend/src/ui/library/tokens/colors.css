@@ -1,89 +1,91 @@
-/* colors.css — palette and colour meanings. See DESIGN.md Rule 1.
+/* colors.css — palette and colour meanings. See DESIGN.md Rule 1 and
+ * docs/VISUAL_LANGUAGE.md §2.
  *
  * Two tiers, top to bottom:
  *   1. Palette: raw values. Never referenced by a component. A name here says
  *      what the value IS, not what it's FOR.
  *   2. Semantic: meaning. The ONLY tier a component may reference. Test: can
  *      you name it without saying a colour? `--color-danger` passes.
- *      `--color-red` is tier 1 in disguise.
+ *      `--color-paper` is tier 1 in disguise.
  *
- * Palette source: the Figma wireframe's "primary" ramp (docs/Figma_TANGENT.md),
- * a single greyscale scale from #f1f1f1 (100) to #202020 (700). Tangent's UI
- * is monochrome, so "brand" is the brightest grey rather than a hue. */
+ * Three materials: paper (surfaces), graphite (ink), flag red (a connection).
+ * Light and dark are both defined here and the OS picks between them, so each
+ * semantic token is written once as light-dark(light, dark). */
 
 :root {
+  color-scheme: light dark;
+
   /* ── tier 1: palette ─────────────────────────────────────────── */
 
-  /* Figma "primary/100…700" */
-  --gray-100: #f1f1f1;
-  --gray-200: #d1d1d1;
-  --gray-300: #aaaaaa;
-  --gray-400: #848484;
-  --gray-500: #616161;
-  --gray-600: #3f3f3f;
-  --gray-700: #202020;
-  --white: #ffffff;
+  --paper-light: #f3f2ef;
+  --paper-dark: #2a2826;
+  --board-light: #e7e5e0;
+  --board-dark: #1f1e1c;
+  --paper-raised-light: #e7e5e0;
+  --paper-raised-dark: #35322f;
 
-  /* status — not in the wireframe yet; kept for destructive actions */
-  --red-500: #ef4444;
-  --red-600: #dc2626;
+  --ink-light: #2a2826;
+  --ink-dark: #ece9e4;
+  --ink-soft-light: #3f3c39;
+  --ink-soft-dark: #d5d1cb;
+  --ink-muted-light: #66625d;
+  --ink-muted-dark: #a19c95;
+  --ink-faint-light: #8f8a84;
+  --ink-faint-dark: #6e6a65;
+
+  --rule-light: #cfcbc4;
+  --rule-dark: #46423e;
+
+  /* One red for both themes: 3.5:1 on light paper, so it only ever colours
+   * graphics (string, pins), never text. */
+  --red-flag: #e5484a;
+  --red-oxblood-light: #9b1c1e;
+  --red-oxblood-dark: #f08a88;
 
   /* ── tier 2: semantic ────────────────────────────────────────── */
-  /* Light theme. The app ships dark (layout.tsx sets data-theme="dark");
-   * light is the same ramp read the other way round. */
 
-  --color-surface: var(--gray-100);
-  --color-surface-raised: var(--gray-200);
+  /* the paper everything is written on, and the board it is pinned to */
+  --color-surface: light-dark(var(--paper-light), var(--paper-dark));
+  --color-surface-raised: light-dark(var(--paper-raised-light), var(--paper-raised-dark));
+  --color-board: light-dark(var(--board-light), var(--board-dark));
 
-  /* Four text emphases, strongest first. Figma uses each one:
+  /* Four text emphases, strongest first:
    *   text            selected node, chat messages
    *   text-secondary  headings, nodes on the selected path
-   *   text-muted      section labels, chat metadata ("Thought for 32s")
-   *   text-faint      unselected nodes, placeholders */
-  --color-text: var(--gray-700);
-  --color-text-secondary: var(--gray-600);
-  --color-text-muted: var(--gray-400);
-  --color-text-faint: var(--gray-300);
-  --color-text-on-brand: var(--gray-100);
+   *   text-muted      section labels, chat metadata ("Thought for 32s"),
+   *                   unselected nodes, placeholders
+   *   text-faint      graphics only: idle string, pins, the dot grid (under
+   *                   4.5:1, so never text) */
+  --color-text: light-dark(var(--ink-light), var(--ink-dark));
+  --color-text-secondary: light-dark(var(--ink-soft-light), var(--ink-soft-dark));
+  --color-text-muted: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
+  --color-text-faint: light-dark(var(--ink-faint-light), var(--ink-faint-dark));
+  --color-text-on-brand: light-dark(var(--paper-light), var(--paper-dark));
 
   /* Three border emphases: resting, on the selected path, active/hovered. */
-  --color-border: var(--gray-300);
-  --color-border-strong: var(--gray-600);
-  --color-border-emphasis: var(--gray-700);
+  --color-border: light-dark(var(--rule-light), var(--rule-dark));
+  --color-border-strong: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
+  --color-border-emphasis: light-dark(var(--ink-light), var(--ink-dark));
 
-  --color-brand: var(--gray-700);
-  --color-brand-hover: var(--gray-600);
+  --color-brand: light-dark(var(--ink-light), var(--ink-dark));
+  --color-brand-hover: light-dark(var(--ink-soft-light), var(--ink-soft-dark));
 
-  --color-danger: var(--red-500);
-  --color-danger-hover: var(--red-600);
+  /* Red means "connected" (string, pins, the selected path), so it is not the
+   * danger colour: a red delete button would read as a link. */
+  --color-string: var(--red-flag);
+  --color-danger: light-dark(var(--red-oxblood-light), var(--red-oxblood-dark));
 
-  --color-focus-ring: var(--gray-500);
+  --color-focus-ring: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
 
-  /* The soft inner glow on a selected surface (Figma: selected node). A
-   * shadow, but kept here because its colour is what changes per theme. */
-  --shadow-selected: inset 0 0 25px var(--gray-200);
-}
+  /* Paper lying on the board: a short contact shadow, and a taller one while
+   * the card is lifted. Shadows get darker and tighter on the dark board. */
+  --shadow-floating: 0 1px 1px light-dark(rgb(40 30 20 / 0.1), rgb(0 0 0 / 0.35)),
+    0 3px 8px -2px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45));
+  --shadow-lift: 0 2px 2px light-dark(rgb(40 30 20 / 0.08), rgb(0 0 0 / 0.3)),
+    0 14px 24px -8px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.6));
 
-/* The payoff of tier 2: a whole theme, and not one component file changes,
- * because no component ever named a colour. These are the Figma values. */
-:root[data-theme="dark"] {
-  --color-surface: var(--gray-700);
-  --color-surface-raised: var(--gray-600);
-
-  --color-text: var(--gray-100);
-  --color-text-secondary: var(--gray-200);
-  --color-text-muted: var(--gray-300);
-  --color-text-faint: var(--gray-500);
-  --color-text-on-brand: var(--gray-700);
-
-  --color-border: var(--gray-500);
-  --color-border-strong: var(--gray-200);
-  --color-border-emphasis: var(--gray-100);
-
-  --color-brand: var(--gray-200);
-  --color-brand-hover: var(--gray-100);
-
-  --color-focus-ring: var(--gray-200);
-
-  --shadow-selected: inset 0 0 25px var(--gray-600);
+  /* --shadow-floating as a `filter`, for a sheet whose outline isn't a box
+   * (the chat's cut corner): drop-shadow follows the painted shape. */
+  --filter-floating: drop-shadow(0 1px 1px light-dark(rgb(40 30 20 / 0.12), rgb(0 0 0 / 0.35)))
+    drop-shadow(0 8px 12px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45)));
 }

@@ -5,15 +5,72 @@
 /* ── the panel ─────────────────────────────────────────────── */
 
 .chat {
+  --fold: 1.75rem;
+  position: relative;
   width: min(45.5rem, calc(50% + var(--space-2)));
   margin: var(--space-2);
   padding: var(--space-2);
-  border-radius: var(--radius-xxl);
+  transition:
+    translate var(--motion-slow) var(--ease-out),
+    opacity var(--motion-slow) var(--ease-out);
+}
+
+/* the sheet slides in from the right when the panel opens */
+@starting-style {
+  .chat {
+    translate: 2rem 0;
+    opacity: 0;
+  }
+}
+
+/* The sheet is a ::before layer so its top-left corner can be cut off at an
+ * angle; a clip-path on the panel itself would clip the shadow too. The shadow
+ * is a drop-shadow filter on the panel, which follows the cut. The cut-off half
+ * of the corner square is see-through; the other half is the folded flap, a
+ * solid fill with a 1px outline. */
+.chat:not([data-layout="collapsed"]) {
+  border: 0;
+  background: none;
+  filter: var(--filter-floating);
+}
+
+/* the header's first button sits clear of the folded corner */
+.chat-inner > header {
+  padding-inline-start: calc(var(--fold) - var(--space-2));
+}
+
+.chat:not([data-layout="collapsed"])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  background:
+    /* the flap's two straight edges */
+    linear-gradient(var(--color-border), var(--color-border))
+      calc(var(--fold) - 1px) 0 / 1px var(--fold) no-repeat,
+    linear-gradient(var(--color-border), var(--color-border))
+      0 calc(var(--fold) - 1px) / var(--fold) 1px no-repeat,
+    /* the flap: outline on the cut, solid fill behind it */
+    linear-gradient(135deg, transparent 50%, var(--color-border) 50% calc(50% + 1px), var(--color-surface-raised) 0)
+      top left / var(--fold) var(--fold) no-repeat,
+    var(--texture-grain),
+    var(--color-surface);
+  /* the panel's old 1px edge, drawn inside the clipped sheet so the cut keeps it */
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  clip-path: polygon(var(--fold) 0, 100% 0, 100% 100%, 0 100%, 0 var(--fold));
 }
 
 .chat[data-layout="expanded"] {
   /* full screen, leaving the toolbar column visible */
   width: calc(100% - 5rem);
+}
+
+/* too narrow for map and chat side by side: the docked sheet takes the screen too */
+@media (max-width: 48rem) {
+  .chat[data-layout="docked"] {
+    width: calc(100% - 5rem);
+  }
 }
 
 .chat[data-layout="collapsed"] {
@@ -28,29 +85,16 @@
   min-height: 0;
 }
 
-/* The one scroll container. Three children, top to bottom:
- *   .chat-blur-top   sticky; overlays the first messages (negative margin)
+/* The one scroll container. Two children, top to bottom:
  *   .chat-history    the messages
- *   .chat-field      sticky; the glass message box
- * Messages scroll beneath both sticky layers, which blur them. */
+ *   .chat-field      sticky; the message box, on paper so messages scroll under it */
 .chat-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* keep keyboard-focused messages clear of both glass layers */
-  scroll-padding-block: var(--chat-blur-height) var(--space-8);
-  --chat-blur-height: 6rem;
-}
-
-.chat-blur-top {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  flex: none;
-  height: var(--chat-blur-height);
-  /* overlay the content instead of pushing it down */
-  margin-bottom: calc(-1 * var(--chat-blur-height));
+  /* keep keyboard-focused messages clear of the message box */
+  scroll-padding-block-end: var(--space-8);
 }
 
 .chat-empty {
@@ -60,11 +104,10 @@
 
 /* A short conversation sits at the bottom, like any chat. Done with a leading
  * auto margin, not `justify-content: flex-end`, which makes the top of an
- * overflowing list unreachable by scrolling. The top padding lets the first
- * message scroll fully out from under the blur. */
+ * overflowing list unreachable by scrolling. */
 .chat-history {
   margin-top: auto;
-  padding: var(--chat-blur-height) var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-2);
 }
 
 .chat-field {
@@ -100,7 +143,7 @@
 .message-user-bubble {
   max-width: min(32rem, 85%);
   padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
-  border-radius: var(--radius-xxl) var(--radius-xl) var(--radius-sm) var(--radius-xxl);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
   background: var(--color-surface-raised);
 }
 
@@ -112,24 +155,6 @@
   color: var(--color-text-muted);
 }
 
-/* The reply still arriving: a soft pulse on its text. */
-.message-assistant[data-streaming] .message-text {
-  animation: chat-streaming var(--motion-slow) var(--ease-in-out) infinite alternate;
-}
-
-@keyframes chat-streaming {
-  from { opacity: 1; }
-  to { opacity: 0.7; }
-}
-
-/* motion tokens are zeroed under reduced motion, but an infinite animation
- * with 0ms duration still flickers -- switch it off outright (Rule 7). */
-@media (prefers-reduced-motion: reduce) {
-  .message-assistant[data-streaming] .message-text {
-    animation: none;
-  }
-}
-
 .branch-divider {
   padding-block: var(--space-4);
   color: var(--color-text-muted);
@@ -137,10 +162,12 @@
 
 /* ── message field ─────────────────────────────────────────── */
 
+/* One ruled line to write on, not a box inside the sheet. */
 .message-field {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-xl);
-  border-width: 2px;
+  padding: var(--space-3) var(--space-2);
+  border-width: 0 0 1px;
+  border-radius: 0;
+  box-shadow: none;
   transition: border-color var(--motion-fast) var(--ease-out);
 }
 
@@ -165,23 +192,25 @@
   border-radius: var(--radius-full);
 }
 
+/* the model picker: a quiet control in the action row, outlined only on hover */
 .message-field-model {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.message-field-model select {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
+  max-width: 14rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: transparent;
+  color: var(--color-text-muted);
   font: inherit;
+  font-size: var(--font-size-s);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out);
 }
 
-.message-field-model select:focus-visible {
+.message-field-model:hover:not(:disabled) {
+  border-color: var(--color-border);
+}
+
+.message-field-model:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }

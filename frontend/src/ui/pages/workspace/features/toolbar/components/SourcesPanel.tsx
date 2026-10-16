@@ -15,8 +15,8 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
     <Panel as="section" elevation="floating" className="toolbar-panel sources" aria-labelledby="sources-heading">
       <Frame gap="6">
         <Frame direction="row" justify="between" align="center">
-          <Text as="h2" id="sources-heading" size="xxl" hierarchy="primary" className="toolbar-panel-title" content="Sources" />
-          <Button label="Close sources" icon="chevron_left" showIcon showLabel={false} size="l" onClick={onClose} />
+          <Text as="h2" id="sources-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Sources" />
+          <Button label="Close sources" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
         <Button

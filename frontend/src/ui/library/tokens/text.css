@@ -1,7 +1,7 @@
 /* text.css — typography. See DESIGN.md Rule 1a.
  *
  * Font files are loaded by next/font in app/layout.tsx, which sets
- * --font-bungee, --font-roboto and --font-material-symbols on <html>. Components name the roles below,
+ * --font-heading, --font-content and --font-symbols on <html>. Components name the roles below,
  * never the font itself.
  *
  * The size scale matches the TextSize type in types/Types.ts one-to-one.
@@ -9,9 +9,7 @@
 
 :root {
   /* families */
-  --font-content: var(--font-roboto), "Roboto", sans-serif;
-  --font-heading: var(--font-bungee), "Bungee", sans-serif;
-  --font-icon: var(--font-material-symbols);
+  --font-icon: var(--font-symbols);
 
   /* sizes — one per TextSize */
   --font-size-xxs: 0.625rem;
