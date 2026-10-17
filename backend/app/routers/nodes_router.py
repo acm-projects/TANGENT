@@ -143,6 +143,25 @@ async def fork_node(
     raise HTTPException(409, "Could not allocate a branch slot; try again")
 
 
+@router.delete("/{node_id}", status_code=204)
+async def delete_node(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Delete a node and every branch under it (nodes.parent_id cascades). The root stays: a tree needs one."""
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(404, "Node not found")
+    owner_id = (await db.execute(select(Project.created_by_id).where(Project.id == node.project_id))).scalar_one()
+    if owner_id != user.id:
+        raise HTTPException(403, "Only the project owner can delete")
+    if node.parent_id is None:
+        raise HTTPException(409, "The root node can't be deleted")
+    await db.delete(node)
+    await db.commit()
+
+
 @router.post("/{node_id}/messages")
 async def send_message(
     node_id: UUID,

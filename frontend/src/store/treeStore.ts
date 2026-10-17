@@ -16,6 +16,8 @@ interface StructureSlice {
   addNode(node: NodeMeta): void;
   /** Replace an existing node's metadata (title, tags) without touching tree shape. */
   updateNode(node: NodeMeta): void;
+  /** Drop a node and its subtree (the server cascades the same way). Selection moves to the parent. */
+  removeNode(nodeId: string): void;
   setActive(nodeId: string | null): void;
 }
 
@@ -69,6 +71,30 @@ export const useTreeStore = create<TreeState>()((set) => ({
 
   updateNode: (node) =>
     set((s) => (s.nodesById[node.id] ? { nodesById: { ...s.nodesById, [node.id]: node } } : s)),
+
+  removeNode: (nodeId) =>
+    set((s) => {
+      const node = s.nodesById[nodeId];
+      if (!node) return s;
+      const gone = new Set<string>();
+      const stack = [nodeId];
+      while (stack.length) {
+        const id = stack.pop()!;
+        gone.add(id);
+        stack.push(...(s.childrenByParent[id] ?? []));
+      }
+      const keep = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.has(k)));
+      const childrenByParent = keep(s.childrenByParent);
+      if (node.parent_id && childrenByParent[node.parent_id]) {
+        childrenByParent[node.parent_id] = childrenByParent[node.parent_id]!.filter((id) => id !== nodeId);
+      }
+      return {
+        nodesById: keep(s.nodesById),
+        childrenByParent,
+        chatsByNode: keep(s.chatsByNode),
+        activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
+      };
+    }),
 
   setActive: (nodeId) => set({ activeNodeId: nodeId }),
 

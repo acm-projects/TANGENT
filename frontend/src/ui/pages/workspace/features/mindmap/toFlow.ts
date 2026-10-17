@@ -69,12 +69,13 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         source: meta.parent_id,
         target: id,
         type: "string",
-        // Where this edge falls along the path, root first: lights the string up in sequence.
-        data: { depth: onPath ? crumbs.indexOf(id) - 1 : 0 },
         className: onPath ? "mindmap-edge mindmap-edge-path" : "mindmap-edge",
       });
     }
   }
 
+  // SVG paints in document order: path edges last, so red always crosses over grey.
+  const onPath = (e: Edge) => Number(e.className?.includes("mindmap-edge-path") ?? false);
+  edges.sort((a, b) => onPath(a) - onPath(b));
   return { nodes, edges };
 }

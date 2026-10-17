@@ -110,6 +110,13 @@ def test_tree_fork_and_prompt(monkeypatch):
         assert [(m["role"], m["content"], m["seq"]) for m in node["chats"]] == [("user", "ping", 0), ("assistant", "pong", 1)]
         assert node["title"] == "ping"
 
+        # deleting a branch takes its children with it; the root can't be deleted
+        a2 = c.post(f"/nodes/{a['id']}/fork", headers=auth).json()
+        assert c.delete(f"/nodes/{a['id']}", headers=auth).status_code == 204
+        assert c.get(f"/nodes/{a2['id']}", headers=auth).status_code == 404
+        assert len(c.get(f"/trees/{t['tree']['id']}", headers=auth).json()["nodes"]) == 2
+        assert c.delete(f"/nodes/{root}", headers=auth).status_code == 409
+
         # unauthenticated callers get nothing
         assert c.get(f"/nodes/{a['id']}").status_code in (401, 403)
 
