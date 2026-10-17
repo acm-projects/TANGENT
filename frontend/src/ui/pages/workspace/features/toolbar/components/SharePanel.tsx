@@ -23,14 +23,14 @@ export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
     <Panel as="section" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
       <Frame gap="3">
         <Frame direction="row" justify="between" align="center">
-          <Text as="h2" id="share-heading" size="m" className="share-title" content="Share" />
-          <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="s" onClick={onClose} />
+          <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Share" />
+          <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
         {state.status === "loading" && <Text role="status" size="s" hierarchy="tertiary" content="Loading…" />}
         {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
         {state.status === "forbidden" && (
-          <Text role="alert" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
+          <Text role="status" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
         )}
 
         {state.status === "ready" && (

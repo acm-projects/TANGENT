@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Bungee, Roboto } from "next/font/google";
+import { Aleo, Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const bungee = Bungee({ weight: "400", subsets: ["latin"], variable: "--font-bungee" });
-const roboto = Roboto({ subsets: ["latin"], variable: "--font-roboto" });
+const heading = Aleo({ weight: "400", subsets: ["latin"], variable: "--font-heading" });
+const content = Outfit({ subsets: ["latin"], variable: "--font-content" });
 
 /* next/font/google doesn't carry Material Symbols, so it comes from the
  * @material-symbols/font-400 package. "block" hides the ligature names
@@ -12,20 +12,19 @@ const roboto = Roboto({ subsets: ["latin"], variable: "--font-roboto" });
 const materialSymbols = localFont({
   src: "../../node_modules/@material-symbols/font-400/material-symbols-rounded.woff2",
   display: "block",
-  variable: "--font-material-symbols",
+  variable: "--font-symbols",
 });
 
 export const metadata: Metadata = {
-  title: "TANGENT",
-  description: "TANGENT",
+  title: "Tangent",
+  description: "A research board where every conversation can branch.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      data-theme="dark"
-      className={`${bungee.variable} ${roboto.variable} ${materialSymbols.variable}`}
+      className={`${heading.variable} ${content.variable} ${materialSymbols.variable}`}
     >
       <body>{children}</body>
     </html>

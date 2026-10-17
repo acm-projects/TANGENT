@@ -17,27 +17,47 @@
 
 /* the dot grid (Figma "BG-Grid-Dot") */
 .mindmap-dots {
-  fill: var(--color-surface-raised);
+  /* keep in step with the dot grid in Login.css */
+  fill: var(--color-text-faint);
+  opacity: 0.45;
 }
 
-/* edges: dim by default, brighter on the selected path */
+/* the string: grey by default, red on the selected path. Each edge lights up
+ * --depth steps after the root, so the path colours in from the top down. */
 .mindmap .mindmap-edge .react-flow__edge-path {
-  stroke: var(--color-surface-raised);
-  stroke-width: 1.5;
+  fill: none;
+  stroke: var(--color-text-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  transition: stroke var(--motion-base) var(--ease-out);
+  transition-delay: calc(var(--depth) * 40ms);
 }
 
 .mindmap .mindmap-edge-path .react-flow__edge-path {
-  stroke: var(--color-text-faint);
+  stroke: var(--color-string);
 }
 
-/* the dots where an edge meets a node */
+/* the pins where a string meets a card */
 .mindmap .mindmap-handle {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   min-width: 0;
   min-height: 0;
   border: 0;
   background: var(--color-text-faint);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.25);
+  transition: background var(--motion-base) var(--ease-out);
+}
+
+.mindmap .mindmap-handle[data-lit] {
+  background: var(--color-string);
+}
+
+/* the delay is a stagger, not a duration, so the zeroed tokens don't cover it */
+@media (prefers-reduced-motion: reduce) {
+  .mindmap .mindmap-edge .react-flow__edge-path {
+    transition-delay: 0s;
+  }
 }
 
 /* ── the node ─────────────────────────────────────────────── */
@@ -45,8 +65,12 @@
 .mindmap-node {
   padding: var(--space-2) var(--space-6);
   min-height: 4rem;
+  border-radius: var(--radius-md);
+  /* one leaf column is 300px wide (layout.ts), so a card never reaches its neighbour */
+  max-width: 17rem;
   font: inherit;
-  color: var(--color-text-faint);
+  /* muted, not faint: an unselected title is still text someone reads (4.5:1) */
+  color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -66,17 +90,18 @@
 .mindmap-node[data-state="selected"] {
   border-color: var(--color-border-strong);
   color: var(--color-text);
-  box-shadow: var(--shadow-selected), 0 0 0 1px var(--color-border-strong);
+  box-shadow: var(--shadow-floating), 0 0 0 1px var(--color-border-strong);
 }
 
+/* hover: the card lifts (the motion is in MindMapNode.tsx), so its shadow grows */
 .mindmap-node:hover {
   border-color: var(--color-border-emphasis);
   color: var(--color-text);
-  box-shadow: 0 0 0 1px var(--color-border-emphasis);
+  box-shadow: var(--shadow-lift);
 }
 
 .mindmap-node[data-state="selected"]:hover {
-  box-shadow: var(--shadow-selected), 0 0 0 1px var(--color-border-emphasis);
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--color-border-emphasis);
 }
 
 .mindmap-node:focus-visible {
@@ -84,12 +109,19 @@
   outline-offset: 2px;
 }
 
+/* Titles are the heading face, with a hair of ink bleed so they read as pen on paper. */
 .mindmap-node-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding-block: var(--space-2);
+  font-family: var(--font-heading);
+  text-shadow: 0 0 0.25px currentColor;
 }
 
-/* an attachment tag: a small round glass chip at the end of the node */
+/* an attachment tag: a small paper chip at the end of the node */
 .mindmap-node-tag {
+  flex: none;
   padding: var(--space-2);
   border-color: currentColor;
   color: inherit;

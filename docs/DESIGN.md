@@ -1,6 +1,7 @@
 # DESIGN.md
 
-How our UI is structured, and the rules that keep it modular.
+How our UI is structured, and the rules that keep it modular. For what it looks
+and moves like (palette, material, motion), see [VISUAL_LANGUAGE.md](VISUAL_LANGUAGE.md).
 
 **The deal:** `src/ui/library/` is a self-contained library that knows nothing
 about Tangent. Everything else (`src/ui/features/`, `src/ui/pages/`, `src/api/`,
@@ -96,7 +97,7 @@ frontend/src/
     library/                   ← the design library: knows nothing about Tangent
       tokens/
         colors.css             ← palette (tier 1) + colour meanings (tier 2) + dark theme
-        shape.css              ← spacing scale, radii, elevation (shadow, blur, glass mix)
+        shape.css              ← spacing scale, radii, paper grain, wash mix
         text.css               ← typography: font families, size scale, weights, line heights
         motion.css             ← durations, easings, reduced-motion rule
         index.css              ← imports the four above
@@ -112,7 +113,6 @@ frontend/src/
         Input/                 ← single-line field; also the hidden file picker
         TextArea/              ← growing multi-line field
         Divider/               ← hairline rule
-        ProgressiveBlur/       ← blur that ramps toward an edge (scroll fades)
       components/
         Button/                ← Panel + Text + Icon
       index.ts                 ← the entry point features and pages import from
@@ -313,19 +313,21 @@ The payoff is still theming. Because no component ever names a colour, a whole t
 is a few lines, and **no component file changes**:
 
 ```css
-:root                   { --color-surface: var(--gray-50);  --color-text: var(--gray-900); }
-:root[data-theme="dark"]{ --color-surface: var(--gray-900); --color-text: var(--gray-50);  }
+:root { color-scheme: light dark; --color-surface: light-dark(var(--paper-light), var(--paper-dark)); }
 ```
+
+`light-dark()` follows `color-scheme`, which follows the OS, so each semantic token is
+written once with both values and there is no theme attribute or JS.
 
 ### Rule 1a: Typography and theme
 
 Typography tokens live in their own file, `tokens/text.css`.
 
 - **Fonts are loaded by `next/font`** in `app/layout.tsx`, which puts
-  `--font-bungee`, `--font-roboto` and `--font-material-symbols` on `<html>`.
+  `--font-heading`, `--font-content` and `--font-symbols` on `<html>`.
   `text.css` maps those to the three roles a component may use:
-  - `--font-heading` (Bungee): headings and display text.
-  - `--font-content` (Roboto): everything else. `body` uses it, so it is the default.
+  - `--font-heading` (Aleo): headings and display text.
+  - `--font-content` (Outfit): everything else. `body` uses it, so it is the default.
   - `--font-icon` (Material Symbols Rounded, filled): only `Icon` uses it.
     `next/font/google` doesn't carry it, so `layout.tsx` loads the file from the
     `@material-symbols/font-400` package with `next/font/local` and
@@ -335,7 +337,8 @@ Typography tokens live in their own file, `tokens/text.css`.
   "Shared types" below): `xxs, xs, s, base, m, l, xl, xxl, display`. Every step
   in the type needs a matching `--font-size-*` token, and each component maps its
   `size` prop onto those tokens. A size in the type with no token is a bug.
-- **Dark is the default theme.** `layout.tsx` sets `data-theme="dark"` on `<html>`.
+- **Light and dark both ship; the OS picks** (`prefers-color-scheme`, through `light-dark()` in
+  `colors.css`). `layout.tsx` sets no theme attribute. Check both by emulating the preference in devtools.
   Check a new component in light as well (remove the attribute in devtools).
 
 ### Shared types
@@ -358,13 +361,12 @@ export type Elevation = "flat" | "floating";
   bordered surface, `tertiary` = transparent) and sets `color` to match. Text and
   Icon use `color: inherit`, so they read correctly on any surface. On Text and
   Icon, hierarchy only changes emphasis: `primary` is heavier, `tertiary` is muted.
-- **`Elevation`** is whether a surface sits flat or floats as frosted glass. Only
+- **`Elevation`** is whether a surface sits flat or lies on the board with a contact shadow. Only
   surfaces take it: Panel, and Button (which hands it to its Panel). It's separate
   from `Hierarchy` because it's a different property. Every combination works:
-  floating mixes the hierarchy's own colour into the glass (brand for `primary`,
-  surface for `secondary`; `tertiary` stays transparent and only gains blur and
-  shadow). A floating Button stays glass on hover, with more colour showing
-  (`--glass-mix` → `--glass-mix-hover`).
+  floating only adds `--shadow-floating`, so it combines with any hierarchy without
+  touching the background. Surfaces carry the paper grain (`--texture-grain`);
+  `primary` is solid ink and `tertiary` is transparent, so neither does.
 - **A shared type must mean something to every component that takes it.** If a
   value would do nothing on one of them, it belongs in a separate prop.
 - Add a type here only once a **second** component needs it, the same rule as for
@@ -517,6 +519,11 @@ Override what the component renders at its root, not how it is built inside.
 }
 ```
 
+- **Springs are the JS half.** Physical motion on the map (a card pinned, lifted, a
+  string drawn) uses the `motion` package. The presets live in `tokens/motion.ts`
+  (`spring.pin`, `spring.lift`, `spring.string`): tune them there, never inline. Wrap
+  motion components in `<MotionConfig reducedMotion="user">`, and gate `pathLength`
+  tweens on `useReducedMotion()` (it isn't covered by the setting).
 - Enter/exit animation is native now: `@starting-style` plus
   `transition-behavior: allow-discrete`. Reach for that before any JS.
 - **Reduced motion** works by zeroing the duration tokens under
@@ -632,7 +639,7 @@ qualified with both: `[data-ui="panel"][data-component="button"]`.
 That selector is `(0,2,0)`, which beats the primitive's base rule. It ties with
 the primitive's own prop rules (`[data-ui="panel"][data-hierarchy="primary"]`),
 so **a component must not set a property the primitive's prop rules set.** Button
-leaves background, border, colour and glass to Panel and adds only layout, padding,
+leaves background, border, colour and shadow to Panel and adds only layout, padding,
 cursor and interaction states. Its hover rules carry `:hover:not(:disabled)`, so they
 outrank Panel's hierarchy rules by specificity, not source order.
 
@@ -693,13 +700,14 @@ properties again:
    immediately rather than one that hides.
 
 **When two props set the same property, write one rule per combination.**
-Panel's `hierarchy` and `elevation` both affect `background`, so a floating primary
-would otherwise depend on which rule comes later in the file. Instead each pair gets
-an explicit rule qualified with both attributes, `(0,3,0)`, which beats either alone:
+If two props both affect `background`, the result would depend on which rule comes
+later in the file. Instead each pair gets an explicit rule qualified with both
+attributes, which beats either alone (Button's primary hover is the pattern:
+`[data-hierarchy="primary"]:hover:not(:disabled)` outranks the shared hover):
 
 ```css
-[data-ui="panel"][data-hierarchy="primary"][data-elevation="floating"] {
-  background: color-mix(in srgb, var(--color-brand) var(--glass-mix), transparent);
+[data-ui="panel"][data-component="button"][data-hierarchy="primary"]:hover:not(:disabled) {
+  background: var(--color-brand-hover);
 }
 ```
 
@@ -766,7 +774,7 @@ outlines without replacing them.
    get one rule per combination (§4).
 7. Use motion tokens for any transition or animation.
 8. Add a `:focus-visible` style if it's interactive.
-9. Check it in both themes (flip `data-theme="dark"` on `:root` in devtools) — if
+9. Check it in both themes (emulate `prefers-color-scheme` in devtools) — if
    it doesn't re-theme, it hardcoded a colour.
 10. Export it from `ui/library/index.ts`, importing the file directly.
 

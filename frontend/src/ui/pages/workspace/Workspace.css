@@ -9,7 +9,7 @@
   grid-template: 1fr / 1fr;
   height: 100dvh;
   overflow: hidden;
-  background: var(--color-surface);
+  background: var(--texture-grain), var(--color-board);
 }
 
 .workspace > * {

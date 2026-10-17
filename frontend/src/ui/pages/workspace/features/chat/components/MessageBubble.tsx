@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChatMessage } from "@/api/types";
-import { Button, Frame, Icon, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, InkText, Panel, Text } from "@/ui/library";
 
 /* One message (Figma "ChatBubble", 16:219).
  *   User:      a filled bubble on the right, with "Uploaded x" lines above it.
@@ -59,7 +59,7 @@ function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubblePr
       {message.thought_seconds !== undefined && (
         <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
       )}
-      <Text content={message.content || "…"} className="message-text" />
+      <InkText content={message.content || "…"} streaming={streaming} className="message-text" />
       {!streaming && (
         <Frame direction="row" gap="1" className="message-actions">
           <Button

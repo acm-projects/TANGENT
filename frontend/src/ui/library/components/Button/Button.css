@@ -1,7 +1,7 @@
 /* Button — see DESIGN.md §4.
  *
  * Button's root is a Panel, so Panel.css already supplies the surface for each
- * hierarchy and elevation (background, border, colour, glass). This file adds only what makes it a
+ * hierarchy and elevation (background, border, colour, shadow). This file adds only what makes it a
  * button: layout, padding by size, cursor, and interaction states.
  *
  * Every selector is [data-ui="panel"][data-component="button"] (0,2,0): it
@@ -23,7 +23,13 @@
     transition:
       background var(--motion-fast) var(--ease-out),
       border-color var(--motion-fast) var(--ease-out),
-      opacity var(--motion-fast) var(--ease-out);
+      opacity var(--motion-fast) var(--ease-out),
+      translate var(--motion-fast) var(--ease-out);
+  }
+
+  /* pressed into the board: a 1px give under the finger */
+  [data-ui="panel"][data-component="button"]:active:not(:disabled) {
+    translate: 0 1px;
   }
 
   /* sizes — padding follows the TextSize handed to Text and Icon */
@@ -49,16 +55,6 @@
 
   [data-ui="panel"][data-component="button"][data-hierarchy="primary"]:hover:not(:disabled) {
     background: var(--color-brand-hover);
-  }
-
-  /* hover — floating: stays glass, with more of its colour showing (0,5,0) */
-  [data-ui="panel"][data-component="button"][data-elevation="floating"]:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-surface) var(--glass-mix-hover), transparent);
-  }
-
-  /* (0,6,0) — beats both the primary hover and the floating hover */
-  [data-ui="panel"][data-component="button"][data-hierarchy="primary"][data-elevation="floating"]:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-brand) var(--glass-mix-hover), transparent);
   }
 
   /* hover — the outline brightens too, as Figma's hover states do. Panel's

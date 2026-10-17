@@ -11,6 +11,6 @@ export type TextSize = "xxs" | "xs" | "s" | "base" | "m" | "l" | "xl" | "xxl" | 
  * parts so they agree on one look. */
 export type Hierarchy = "tertiary" | "secondary" | "primary";
 
-/* Whether a surface sits flat on the page or floats above it as frosted
- * glass. Independent of Hierarchy: any hierarchy can float. */
+/* Whether a surface sits flat on the page or lies on it as paper with a
+ * contact shadow. Independent of Hierarchy: any hierarchy can float. */
 export type Elevation = "flat" | "floating";
