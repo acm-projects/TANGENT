@@ -22,12 +22,68 @@ describe("tree store", () => {
     useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
     const before = useTreeStore.getState();
     before.beginStream("r", { role: "user", content: "q", seq: 0, branch_source: null, created_at: "" });
-    useTreeStore.getState().appendToken("a");
-    useTreeStore.getState().appendToken("b");
+    useTreeStore.getState().appendToken("r", "a");
+    useTreeStore.getState().appendToken("r", "b");
     const after = useTreeStore.getState();
-    expect(after.streaming?.text).toBe("ab");
+    expect(after.streaming["r"]).toBe("ab");
     expect(after.nodesById).toBe(before.nodesById);
     expect(after.childrenByParent).toBe(before.childrenByParent);
+  });
+
+  describe("concurrent streams", () => {
+    const user = (seq = 0) => ({ role: "user" as const, content: "q", seq, branch_source: null, created_at: "" });
+    const assistant = (content: string) => ({ role: "assistant" as const, content, seq: 1, branch_source: null, created_at: "" });
+    const start = () => {
+      useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("b", "r", 2)]);
+      useTreeStore.getState().beginStream("a", user());
+      useTreeStore.getState().beginStream("b", user());
+    };
+
+    it("keeps interleaved tokens separate per node", () => {
+      start();
+      const s = () => useTreeStore.getState();
+      s().appendToken("a", "A1 ");
+      s().appendToken("b", "B1 ");
+      s().appendToken("a", "A2");
+      s().appendToken("b", "B2");
+      expect(s().streaming).toEqual({ a: "A1 A2", b: "B1 B2" });
+    });
+
+    it("done commits only to its own node and leaves the other streaming", () => {
+      start();
+      const s = () => useTreeStore.getState();
+      s().appendToken("a", "A");
+      s().appendToken("b", "B");
+      s().endStream("a", assistant("A"));
+      expect(s().streaming).toEqual({ b: "B" });
+      expect(s().chatsByNode["a"]?.map((m) => m.content)).toEqual(["q", "A"]);
+      expect(s().chatsByNode["b"]?.map((m) => m.content)).toEqual(["q"]);
+      s().appendToken("b", "!");
+      s().endStream("b", assistant("B!"));
+      expect(s().streaming).toEqual({});
+      expect(s().chatsByNode["b"]?.at(-1)?.content).toBe("B!");
+    });
+
+    it("an error on one node clears only that node", () => {
+      start();
+      const s = () => useTreeStore.getState();
+      s().appendToken("a", "A");
+      s().appendToken("b", "B");
+      s().abortStream("b");
+      expect(s().streaming).toEqual({ a: "A" });
+      expect(s().chatsByNode["b"]).toHaveLength(1); // the user message stays; no assistant message committed
+    });
+
+    it("events for a node that stopped streaming (tree re-hydrated) are ignored", () => {
+      start();
+      useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("a", "r", 1)]);
+      const s = () => useTreeStore.getState();
+      s().appendToken("a", "late");
+      s().endStream("a", assistant("late"));
+      s().abortStream("a");
+      expect(s().streaming).toEqual({});
+      expect(s().chatsByNode["a"]).toBeUndefined();
+    });
   });
 
   it("updateNode replaces metadata without changing tree shape", () => {

@@ -49,6 +49,37 @@ describe("streamMessage", () => {
     vi.unstubAllGlobals();
   });
 
+  it("two concurrent streams to different nodes overlap and finish independently", async () => {
+    const enc = new TextEncoder();
+    // One controllable SSE body per node, so the test decides how the two streams interleave.
+    const bodies: Record<string, ReadableStreamDefaultController<Uint8Array>> = {};
+    vi.stubGlobal("fetch", async (url: string) => {
+      const nodeId = url.split("/")[3]!; // /api/nodes/<id>/messages
+      return new Response(new ReadableStream<Uint8Array>({ start: (c) => void (bodies[nodeId] = c) }), { status: 200 });
+    });
+    const send = (c: ReadableStreamDefaultController<Uint8Array>, frame: string) => c.enqueue(enc.encode(frame));
+    const seen: string[] = [];
+    const run = (nodeId: string) =>
+      streamMessage({ ...opts, nodeId, onEvent: (e) => seen.push(`${nodeId}:${e.type === "token" ? e.text : e.type}`) });
+
+    const a = run("a");
+    const b = run("b");
+    await vi.waitFor(() => expect(Object.keys(bodies)).toHaveLength(2)); // both requests in flight at once
+
+    send(bodies["a"]!, 'event: token\ndata: {"text":"A1"}\n\n');
+    send(bodies["b"]!, 'event: token\ndata: {"text":"B1"}\n\n');
+    send(bodies["b"]!, 'event: error\ndata: {"message":"boom"}\n\n');
+    bodies["b"]!.close();
+    await b; // b finished (errored) while a is still open
+    send(bodies["a"]!, 'event: token\ndata: {"text":"A2"}\n\nevent: done\ndata: {}\n\n');
+    bodies["a"]!.close();
+    await a;
+
+    expect(seen.filter((x) => x.startsWith("a:"))).toEqual(["a:A1", "a:A2", "a:done"]);
+    expect(seen.filter((x) => x.startsWith("b:"))).toEqual(["b:B1", "b:error"]);
+    vi.unstubAllGlobals();
+  });
+
   it("throws the server's detail message when the request is refused", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Only a leaf node can be prompted; fork it instead" }), { status: 409 }));
     await expect(streamMessage({ ...opts, onEvent: () => {} })).rejects.toThrow("Only a leaf node can be prompted");

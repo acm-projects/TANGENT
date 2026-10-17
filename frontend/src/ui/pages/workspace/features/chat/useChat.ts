@@ -29,7 +29,8 @@ export function useChat() {
   const path = useTreeStore(useShallow((s) => (s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId) : [])));
   const isLeaf = useTreeStore((s) => (s.activeNodeId ? selectIsLeaf(s, s.activeNodeId) : false));
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
-  const streaming = useTreeStore((s) => s.streaming);
+  // The active node's partial reply, or null when it isn't streaming. Other nodes' streams don't re-render this.
+  const streaming = useTreeStore((s) => (s.activeNodeId ? (s.streaming[s.activeNodeId] ?? null) : null));
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -83,7 +84,7 @@ export function useChat() {
 
   const blocker: SendBlocker = !activeNodeId
     ? "no-selection"
-    : streaming
+    : streaming !== null
       ? "streaming"
       : // A UI hint only. The server is what actually enforces it (ARCHITECTURE.md §8).
         !isLeaf
@@ -94,7 +95,7 @@ export function useChat() {
   async function send(content: string, files: File[] = []) {
     const nodeId = useTreeStore.getState().activeNodeId;
     const text = content.trim();
-    if (!nodeId || blocker || !text) return;
+    if (!nodeId || blocker || nodeId in useTreeStore.getState().streaming || !text) return;
     if (files.length > 0) {
       // The endpoint takes {content, model} only; there is no upload step yet (docs/HANDOFF.md).
       setError("Attachments aren't supported yet. Remove them to send.");
@@ -129,25 +130,25 @@ export function useChat() {
         refresh: apiClient.refresh,
         onEvent: (e) => {
           const s = useTreeStore.getState();
-          if (e.type === "token") s.appendToken(e.text);
+          if (e.type === "token") s.appendToken(nodeId, e.text);
           else if (e.type === "done") {
             setUsage(e.usage ?? null);
             setUsageUnavailable(!e.usage);
-            s.endStream({
+            s.endStream(nodeId, {
               role: "assistant",
-              content: s.streaming?.text ?? "",
+              content: s.streaming[nodeId] ?? "",
               seq: seq + 1,
               branch_source: null,
               created_at: new Date().toISOString(),
             });
           } else {
-            s.abortStream();
+            s.abortStream(nodeId);
             setError(e.message);
           }
         },
       });
     } catch (e: unknown) {
-      useTreeStore.getState().abortStream();
+      useTreeStore.getState().abortStream(nodeId);
       setError(e instanceof Error ? e.message : "The message could not be sent.");
       return;
     }
@@ -155,7 +156,7 @@ export function useChat() {
     // Re-read the node the server just saved: its title may have changed and its chats are the
     // persisted copy, which replaces the optimistic one built while streaming.
     const fresh = await api.nodes.get(nodeId).catch(() => null);
-    if (fresh && !useTreeStore.getState().streaming) {
+    if (fresh && !(nodeId in useTreeStore.getState().streaming)) {
       const { chats, ...meta } = fresh;
       useTreeStore.getState().updateNode(meta);
       useTreeStore.getState().setChats(nodeId, chats);
