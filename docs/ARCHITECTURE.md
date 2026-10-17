@@ -302,6 +302,13 @@ token therefore never invalidates the ReactFlow node/edge derivation, and the
 mind map does not re-render per token. A test asserts the structure references
 are identical after `appendToken`.
 
+`streaming` is a `Record<nodeId, text>`: a key is present exactly while that node
+is streaming. Every stream event (`appendToken`, `endStream`, `abortStream`)
+carries its node id and touches only that node, so independent nodes stream
+concurrently. Events for a node that is no longer streaming (e.g. after the tree
+is re-hydrated) are dropped. The chat panel blocks input only while the *active*
+node is streaming; the server does not guard against two sends to one node.
+
 `treeStore` is for tree structure and node content only. Feature-specific state
 belongs in the feature.
 
@@ -360,8 +367,9 @@ Three patterns:
 
 **Covered [built]:** `flatten` (5: ordering, empty nodes, merge alternation,
 single-branch merge, determinism), `client.ts` (2: single-flight refresh, auth
-failure once), `stream.ts` (1: SSE across chunk boundaries), `treeStore` (2:
-`fork_index` ordering, structure refs stable on `appendToken`).
+failure once), `stream.ts` (SSE across chunk boundaries; two concurrent streams finish
+independently), `treeStore` (`fork_index` ordering, structure refs stable on
+`appendToken`, per-node streaming isolation for tokens, done and error).
 
 **Not covered — needs a real environment.** These are where drift from reality
 will show first:

@@ -31,7 +31,7 @@ export function Chat({ className }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSection = chat.history.at(-1);
   // `layout` is in the key because reopening a collapsed panel remounts the list.
-  const scrollKey = `${layout}:${chat.activeNodeId}:${lastSection?.messages?.length ?? 0}:${chat.streaming?.text.length ?? 0}`;
+  const scrollKey = `${layout}:${chat.activeNodeId}:${lastSection?.messages?.length ?? 0}:${chat.streaming?.length ?? 0}`;
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -52,8 +52,6 @@ export function Chat({ className }: ChatProps) {
       </Frame>
     );
   }
-
-  const streamingHere = chat.streaming && chat.streaming.nodeId === chat.activeNodeId ? chat.streaming : null;
 
   return (
     <Panel as="aside" className={classes} data-layout={layout} aria-label="Chat">
@@ -106,19 +104,19 @@ export function Chat({ className }: ChatProps) {
                       onBranch={() => chat.fork(section.node.id)}
                     />
                   ))}
-                  {section.messages?.length === 0 && !streamingHere && (
+                  {section.messages?.length === 0 && chat.streaming === null && (
                     <Frame as="li" className="chat-hint">
                       <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
                     </Frame>
                   )}
                 </Fragment>
               ))}
-              {streamingHere && (
+              {chat.streaming !== null && (
                 <MessageBubble
                   streaming
                   message={{
                     role: "assistant",
-                    content: streamingHere.text,
+                    content: chat.streaming,
                     seq: -1,
                     branch_source: null,
                     created_at: "",
