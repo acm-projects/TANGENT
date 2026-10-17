@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/library/tokens/motion.css"],"sourcesContent":["/* motion.css — durations, easings, reduced motion. See DESIGN.md Rule 7.\r\n *\r\n * Components use these tokens, never a hard-coded `200ms ease`. */\r\n\r\n:root {\r\n  --motion-fast: 120ms;\r\n  --motion-base: 200ms;\r\n  --motion-slow: 400ms;\r\n\r\n  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);\r\n  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);\r\n}\r\n\r\n/* Reduced motion is handled by zeroing the duration tokens — tokens-only, no\r\n * blanket `*` rule. This covers every animation that USES the tokens.\r\n *\r\n * It does NOT catch a hand-written `animation: glow 2s`, and it cannot stop a\r\n * JS-driven animation. If you hand-write keyframes, honour the preference\r\n * yourself; in JS, check matchMedia(\"(prefers-reduced-motion: reduce)\"). */\r\n@media (prefers-reduced-motion: reduce) {\r\n  :root {\r\n    --motion-fast: 0ms;\r\n    --motion-base: 0ms;\r\n    --motion-slow: 0ms;\r\n  }\r\n}\r\n"],"names":[],"mappings":"AAIA;;;;;;;;AAeA;EACE"}}]
+}

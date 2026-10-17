@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/library/components/InkText/InkText.css"],"sourcesContent":["/* InkText — see DESIGN.md §4. Looks like Text; each streamed slice dries in. */\r\n\r\n@layer ui {\r\n  [data-ui=\"ink-text\"] {\r\n    font-family: var(--font-content);\r\n    font-size: var(--font-size-base);\r\n    font-weight: var(--font-weight-regular);\r\n    line-height: var(--line-height-normal);\r\n    color: inherit;\r\n  }\r\n\r\n  [data-ui=\"ink-text\"] > span {\r\n    animation: ink-in var(--motion-slow) var(--ease-out) both;\r\n  }\r\n\r\n  @keyframes ink-in {\r\n    from {\r\n      opacity: 0;\r\n      filter: blur(1.5px);\r\n    }\r\n  }\r\n}\r\n"],"names":[],"mappings":"AAEA;EACE;;;;;;;;EAQA;;;;EAIA"}}]
+}

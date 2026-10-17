@@ -1,0 +1,18 @@
+/* [project]/frontend/src/ui/library/tokens/motion.css [app-client] (css) */
+:root {
+  --motion-fast: .12s;
+  --motion-base: .2s;
+  --motion-slow: .4s;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0s;
+    --motion-base: 0s;
+    --motion-slow: 0s;
+  }
+}
+
+/*# sourceMappingURL=frontend_src_ui_library_tokens_motion_css_1igg3k2._.single.css.map*/

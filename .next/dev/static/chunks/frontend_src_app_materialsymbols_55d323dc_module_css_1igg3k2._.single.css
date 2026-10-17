@@ -1,0 +1,25 @@
+/* [project]/frontend/src/app/materialsymbols_55d323dc.module.css [app-client] (css) */
+@font-face {
+  font-family: materialSymbols;
+  src: url("../media/material_symbols_rounded-s.p.1oinv86fvof-d.woff2") format("woff2");
+  font-display: block;
+}
+
+@font-face {
+  font-family: materialSymbols Fallback;
+  src: local(Arial);
+  ascent-override: 50.19%;
+  descent-override: 4.56%;
+  line-gap-override: 0.0%;
+  size-adjust: 219.15%;
+}
+
+.materialsymbols_55d323dc-module__j_tEdW__className {
+  font-family: materialSymbols, materialSymbols Fallback;
+}
+
+.materialsymbols_55d323dc-module__j_tEdW__variable {
+  --font-symbols: "materialSymbols", "materialSymbols Fallback";
+}
+
+/*# sourceMappingURL=frontend_src_app_materialsymbols_55d323dc_module_css_1igg3k2._.single.css.map*/
