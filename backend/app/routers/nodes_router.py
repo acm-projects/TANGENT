@@ -7,7 +7,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, text
+from sqlalchemy import func, insert, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -112,33 +112,43 @@ async def fork_node(
     user: User = Depends(get_current_user),
 ):
     """New empty child of any node (a "tangent"). fork_index is the next free sibling ordinal."""
-    parent = await db.get(Node, node_id)
+    # Plain values, not ORM rows: a rollback expires loaded rows, and reading one afterwards (the
+    # retry below) would lazy-load outside the async context. One read covers the 404/403 checks.
+    user_id = user.id
+    parent = (
+        await db.execute(
+            select(Node.tree_id, Node.project_id, Project.created_by_id)
+            .join(Project, Project.id == Node.project_id)
+            .where(Node.id == node_id)
+        )
+    ).one_or_none()
     if parent is None:
         raise HTTPException(404, "Node not found")
-    owner_id = (await db.execute(select(Project.created_by_id).where(Project.id == parent.project_id))).scalar_one()
-    if owner_id != user.id:
+    if parent.created_by_id != user_id:
         raise HTTPException(403, "Only the project owner can branch")
 
     for _ in range(3):  # two simultaneous forks race for the same index; the unique constraint picks the loser
-        next_index = (
-            await db.execute(
-                select(func.coalesce(func.max(Node.fork_index), 0) + 1).where(Node.parent_id == parent.id)
-            )
-        ).scalar_one()
-        child = Node(
-            tree_id=parent.tree_id,
-            project_id=parent.project_id,
-            parent_id=parent.id,
-            fork_index=next_index,
-            created_by_id=user.id,
-        )
-        db.add(child)
+        # Index allocation and insert in one statement. RETURNING brings back the server defaults, so
+        # no refresh (a second transaction, i.e. extra round trips) is needed after the commit.
+        next_index = select(func.coalesce(func.max(Node.fork_index), 0) + 1).where(Node.parent_id == node_id)
         try:
+            child = (
+                await db.execute(
+                    insert(Node)
+                    .values(
+                        tree_id=parent.tree_id,
+                        project_id=parent.project_id,
+                        parent_id=node_id,
+                        fork_index=next_index.scalar_subquery(),
+                        created_by_id=user_id,
+                    )
+                    .returning(Node)
+                )
+            ).scalar_one()
             await db.commit()
         except IntegrityError:
             await db.rollback()
             continue
-        await db.refresh(child)
         return child
     raise HTTPException(409, "Could not allocate a branch slot; try again")
 
