@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.database import DATABASE_URL, _local
+from app.database import DATABASE_URL, _local, engine
 from app.main import app
 from app.routers import auth_router
 
@@ -63,14 +63,31 @@ def google_login(c, next_path=None):
     return c.get("/auth/callback/google", params={"state": state, "code": "x"}, follow_redirects=False)
 
 
-def test_signup_to_logout_flow(google):
+def test_invite_signup_skips_onboarding(google):
     with TestClient(app) as c:
-        # --- signup: new user lands on /onboarding with a token
+        # --- new user arriving via an invite lands straight on it, already onboarded with a default workspace
         r = google_login(c, INVITE)
         assert r.status_code in (302, 307), r.text
         u = urlparse(r.headers["location"])
         q = parse_qs(u.query)
-        assert u.path == "/onboarding" and q["next"] == [INVITE]
+        assert u.path == INVITE and "next" not in q
+        auth = {"Authorization": f"Bearer {q['access_token'][0]}"}
+
+        assert c.get("/auth/me", headers=auth).json()["onboarding_completed"] is True
+        assert len(c.get("/workspaces/", headers=auth).json()) == 1
+        assert c.post("/auth/onboarding", json={"workspace_name": "again"}, headers=auth).status_code == 400
+        # Each TestClient has its own event loop; drop pooled connections bound to this one.
+        c.portal.call(engine.dispose)
+
+
+def test_signup_to_logout_flow(google):
+    with TestClient(app) as c:
+        # --- signup: new user lands on /onboarding with a token
+        r = google_login(c)
+        assert r.status_code in (302, 307), r.text
+        u = urlparse(r.headers["location"])
+        q = parse_qs(u.query)
+        assert u.path == "/onboarding" and "next" not in q
         token = q["access_token"][0]
         assert "refresh_token" in c.cookies
         auth = {"Authorization": f"Bearer {token}"}

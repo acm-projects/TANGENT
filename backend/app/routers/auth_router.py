@@ -41,6 +41,7 @@ from app.core.oauth_utils import (
     verify_google_id_token,
 )
 from app.core.utils import generate_slug
+from app.routers.workspace_router import _unique_slug
 
 is_production = os.getenv("IS_PRODUCTION") == "1"
 FRONTEND_URL = (
@@ -409,9 +410,21 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db_se
         db.add(user)
         await db.flush()
 
+    next_path = _safe_invite_path(request.cookies.get("post_login_next"))
+
+    if next_path and not user.onboarding_completed:
+        # Invitee: skip "name your workspace" so they land on the invite; they can rename it later.
+        workspace_name = f"{user.name}'s workspace"[:100]
+        db.add(Workspace(
+            name=workspace_name,
+            slug=await _unique_slug(db, workspace_name),
+            owner_id=user.id,
+            last_used_at=datetime.now(timezone.utc),
+        ))
+        user.onboarding_completed = True
+
     access_token, refresh_token = await _issue_session(db, user)
 
-    next_path = _safe_invite_path(request.cookies.get("post_login_next"))
     query = f"access_token={access_token}"
 
     if user.onboarding_completed:
