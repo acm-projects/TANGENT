@@ -1,6 +1,10 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import type { ChatMessage } from "@/api/types";
-import { Button, Frame, Icon, InkText, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, Panel, Text } from "@/ui/library";
 
 /* One message (Figma "ChatBubble", 16:219).
  *   User:      a filled bubble on the right, with "Uploaded x" lines above it.
@@ -59,7 +63,14 @@ function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubblePr
       {message.thought_seconds !== undefined && (
         <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
       )}
-      <InkText content={message.content || "…"} streaming={streaming} className="message-text" />
+      <div className="message-text message-markdown" data-streaming={streaming || undefined}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+        >
+          {message.content || "…"}
+        </ReactMarkdown>
+      </div>
       {!streaming && (
         <Frame direction="row" gap="1" className="message-actions">
           <Button

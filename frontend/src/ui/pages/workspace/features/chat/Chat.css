@@ -135,8 +135,110 @@
 
 .message-text {
   color: var(--color-text);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.message-markdown {
+  min-width: 0;
+}
+
+.message-markdown > :first-child {
+  margin-top: 0;
+}
+
+.message-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.message-markdown p,
+.message-markdown ul,
+.message-markdown ol,
+.message-markdown blockquote,
+.message-markdown pre,
+.message-markdown table {
+  margin-block: var(--space-3);
+}
+
+.message-markdown ul {
+  padding-left: var(--space-6);
+  list-style: disc;
+}
+
+.message-markdown ol {
+  padding-left: var(--space-6);
+  list-style: decimal;
+}
+
+.message-markdown blockquote {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+.message-markdown :not(pre) > code {
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.message-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.message-markdown pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+}
+
+.message-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.message-markdown th,
+.message-markdown td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.message-markdown a {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.message-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: var(--space-2);
+}
+
+.message-markdown .katex {
+  font-size: 1.05em;
+}
+
+.message-assistant[data-streaming] .message-markdown {
+  animation: chat-streaming var(--motion-slow) var(--ease-in-out) infinite alternate;
+}
+
+@keyframes chat-streaming {
+  from { opacity: 1; }
+  to { opacity: 0.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-assistant[data-streaming] .message-markdown {
+    animation: none;
+  }
 }
 
 /* Figma: rounded on three corners, nearly square bottom-right */

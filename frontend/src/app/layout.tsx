@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Aleo, Outfit } from "next/font/google";
 import localFont from "next/font/local";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 
 const heading = Aleo({ weight: "400", subsets: ["latin"], variable: "--font-heading" });
