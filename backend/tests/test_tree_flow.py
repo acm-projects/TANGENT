@@ -129,6 +129,24 @@ def test_simultaneous_first_visits_make_one_tree():
         assert len({t["tree"]["id"] for t in trees}) == 1 and all(len(t["nodes"]) == 1 for t in trees)
 
 
+def test_simultaneous_forks_get_distinct_indexes():
+    from concurrent.futures import ThreadPoolExecutor
+
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])},
+                     headers=auth).json()["id"]
+        root = c.get(f"/projects/{pid}/tree", headers=auth).json()["tree"]["root_node_id"]
+
+        # 3 racers, 3 attempts each: a loser can lose at most twice, so every request must succeed
+        with ThreadPoolExecutor(3) as pool:
+            rs = list(pool.map(lambda _: c.post(f"/nodes/{root}/fork", headers=auth), range(3)))
+
+        assert [r.status_code for r in rs] == [200, 200, 200]
+        assert sorted(r.json()["fork_index"] for r in rs) == [1, 2, 3]
+
+
 def _workspace_id(user_id):
     """The API doesn't expose workspace ids, so read it straight from the table."""
     async def run():
