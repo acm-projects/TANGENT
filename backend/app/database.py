@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 import uuid
 from typing import AsyncGenerator
@@ -5,9 +7,11 @@ from typing import AsyncGenerator
 from fastapi import Request
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import event, text
+from sqlalchemy import event, select, text
 from sqlalchemy.engine import make_url
 from dotenv import load_dotenv
+
+from app.models import Base
 
 load_dotenv()
 
@@ -48,6 +52,22 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False
 )
+
+
+async def warm_pool(n: int = 3) -> None:
+    """Open n connections up front so the first requests don't each pay a fresh TLS + auth
+    handshake, plus asyncpg's one-off per-connection lookup of the enum types the tables use
+    (together ~1.3 s to RDS). A LIMIT 0 read of every table triggers that lookup; SELECT 1
+    does not. Best effort: startup must not depend on the database being up."""
+    async def _open():
+        async with engine.connect() as conn:
+            for table in Base.metadata.tables.values():
+                await conn.execute(select(table).limit(0))
+
+    try:
+        await asyncio.gather(*(_open() for _ in range(n)))
+    except Exception as exc:
+        logging.getLogger("uvicorn.error").warning("Pool warm-up skipped: %s", type(exc).__name__)
 
 
 def _user_id_from_request(request: Request) -> str | None:
