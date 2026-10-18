@@ -4,7 +4,8 @@ import type { ShareItem } from "@/api";
 import { sortShares } from "./sharesView";
 
 /* The share panel's data: the project's members and invitations, plus the
- * actions on them. Owner-only on the backend, so a non-owner gets "forbidden". */
+ * actions on them. Owner-only on the backend (a non-owner gets "forbidden"),
+ * so nothing is fetched until `enabled` says the viewer owns the project. */
 
 export type SharesState =
   | { status: "loading" }
@@ -21,7 +22,7 @@ async function load(slug: string, projectId: string): Promise<SharesState> {
   }
 }
 
-export function useShares(slug: string, projectId: string) {
+export function useShares(slug: string, projectId: string, enabled: boolean) {
   const [state, setState] = useState<SharesState>({ status: "loading" });
   /** The row being acted on, or "invite" while inviting. Disables its buttons. */
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function useShares(slug: string, projectId: string) {
   const busy = useRef(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     load(slug, projectId).then((next) => {
       if (!cancelled) setState(next);
@@ -37,7 +39,7 @@ export function useShares(slug: string, projectId: string) {
     return () => {
       cancelled = true;
     };
-  }, [slug, projectId]);
+  }, [slug, projectId, enabled]);
 
   /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed. */
   async function run(id: string, action: () => Promise<unknown>, fallback: string): Promise<boolean> {

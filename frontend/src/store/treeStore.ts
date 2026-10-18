@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, NodeMeta } from "@/api/types";
+import type { ChatMessage, NodeMeta, ProjectDetail } from "@/api/types";
 
 /**
  * Two slices, on purpose:
@@ -34,7 +34,23 @@ interface ContentSlice {
   abortStream(nodeId: string): void;
 }
 
-export type TreeState = StructureSlice & ContentSlice;
+/**
+ * State that outlives a project switch (a sharee's first edit moves them into their own copy), so
+ * hydrateTree leaves it alone. `useMindMap` performs the navigation and consumes `pendingSwitch`.
+ */
+interface SwitchSlice {
+  project: ProjectDetail | null;
+  /** Where to go next; nodeId is opened once that project's tree has loaded. */
+  pendingSwitch: { slug: string; projectId: string; nodeId: string | null } | null;
+  /** A message that must survive the navigation ("You already have your own copy.", a stream error). */
+  notice: string | null;
+  setProject(project: ProjectDetail | null): void;
+  requestSwitch(target: { slug: string; projectId: string; nodeId: string | null }, notice?: string): void;
+  clearSwitch(): void;
+  setNotice(notice: string | null): void;
+}
+
+export type TreeState = StructureSlice & ContentSlice & SwitchSlice;
 
 const byForkIndex = (nodes: Record<string, NodeMeta>) => (a: string, b: string) =>
   (nodes[a]?.fork_index ?? 0) - (nodes[b]?.fork_index ?? 0);
@@ -46,6 +62,14 @@ export const useTreeStore = create<TreeState>()((set) => ({
   activeNodeId: null,
   chatsByNode: {},
   streaming: {},
+  project: null,
+  pendingSwitch: null,
+  notice: null,
+
+  setProject: (project) => set({ project }),
+  requestSwitch: (pendingSwitch, notice) => set((s) => ({ pendingSwitch, notice: notice ?? s.notice })),
+  clearSwitch: () => set({ pendingSwitch: null }),
+  setNotice: (notice) => set({ notice }),
 
   hydrateTree: (rootId, nodes) =>
     set(() => {

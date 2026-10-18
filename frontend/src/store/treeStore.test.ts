@@ -17,6 +17,18 @@ describe("tree store", () => {
     expect(selectBreadcrumb(s, "g").map((n) => n.id)).toEqual(["r", "c1", "g"]);
   });
 
+  // A fork switches projects: the next page's hydrate must not wipe the pending switch or the notice.
+  it("hydrateTree keeps the cross-switch state", () => {
+    const s = useTreeStore.getState();
+    s.requestSwitch({ slug: "me", projectId: "p2", nodeId: "n" }, "You already have your own copy.");
+    s.hydrateTree("r", [node("r", null, 0)]);
+    expect(useTreeStore.getState().pendingSwitch).toEqual({ slug: "me", projectId: "p2", nodeId: "n" });
+    expect(useTreeStore.getState().notice).toBe("You already have your own copy.");
+    useTreeStore.getState().clearSwitch();
+    expect(useTreeStore.getState().pendingSwitch).toBeNull();
+    useTreeStore.getState().setNotice(null);
+  });
+
   // Guards the invariant that a streamed token must not re-render the mind map.
   it("token appends leave structure references untouched", () => {
     useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
