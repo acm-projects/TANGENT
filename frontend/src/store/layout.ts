@@ -3,7 +3,8 @@
  *
  * Positions are never stored (ARCHITECTURE.md §7.3): a stored x/y is a second
  * source of truth that drifts from the real tree. This runs on every structure
- * change instead, which is cheap -- it is one walk of the tree.
+ * change instead, which is cheap -- it is one walk of the tree. The map and the
+ * dashboard's card previews both use it, so it lives in the foundation.
  *
  * The algorithm is a simple tidy tree: leaves take consecutive columns left to
  * right in fork_index order, and each parent sits centred over its first and

@@ -1,0 +1,60 @@
+/* Popup — see Popup.tsx. Enters with a spring (scale and rise), fades the
+ * backdrop, and animates out too: @starting-style plus allow-discrete on
+ * display and overlay (DESIGN.md Rule 7, native first). */
+
+@layer ui {
+  [data-ui="popup"] {
+    width: min(26rem, calc(100% - 2 * var(--space-4)));
+    /* the reset zeroes margins; a modal dialog centres itself with auto ones */
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    overflow: visible;
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 0.75rem;
+    transition:
+      opacity var(--motion-base) var(--ease-out),
+      scale var(--motion-spring) var(--ease-spring),
+      translate var(--motion-spring) var(--ease-spring),
+      overlay var(--motion-base) allow-discrete,
+      display var(--motion-base) allow-discrete;
+  }
+
+  [data-ui="popup"][open] {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+
+  [data-ui="popup"] > [data-ui="panel"] {
+    padding: var(--space-6);
+  }
+
+  [data-ui="popup"]::backdrop {
+    background: color-mix(in srgb, var(--color-board) 60%, transparent);
+    opacity: 0;
+    transition:
+      opacity var(--motion-base) var(--ease-out),
+      overlay var(--motion-base) allow-discrete,
+      display var(--motion-base) allow-discrete;
+  }
+
+  [data-ui="popup"][open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    [data-ui="popup"][open] {
+      opacity: 0;
+      scale: 0.94;
+      translate: 0 0.75rem;
+    }
+
+    [data-ui="popup"][open]::backdrop {
+      opacity: 0;
+    }
+  }
+}

@@ -54,8 +54,8 @@ MessageField's needless `elevation="floating"` (Chat.css removed its shadow).
   Kept as designed; see HANDOFF.md "Naming". Worth settling with the designer.
 - **Next.js dev indicator** (the "N" badge, dev only) covers the bottom toolbar tile.
   Turn it off with `devIndicators: false` in `next.config.ts` if it bothers you.
-- **React Flow attribution** peeks out under the chat's bottom-right corner.
-  Hiding it is meant for paying users (`proOptions.hideAttribution`).
+- **React Flow attribution**: since hidden (`proOptions.hideAttribution`). The MIT
+  license allows it; React Flow asks commercial users who hide it to subscribe to Pro.
 - **Revoke has no confirmation.** It is recoverable by re-inviting; add an undo
   if it causes trouble.
 - **`/` and `/{slug}` render nothing while redirecting**, and `/` stays blank if

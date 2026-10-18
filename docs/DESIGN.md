@@ -127,7 +127,7 @@ frontend/src/
           projects/
       workspace/
         features/              ← features used only by this page
-          mindmap/             ← React Flow; layout.ts + toFlow.ts are pure and tested
+          mindmap/             ← React Flow; toFlow.ts is pure and tested (layout: store/layout.ts)
           chat/
           toolbar/
   mocks/                       ← TEMPORARY fake backend; see HANDOFF.md
@@ -519,11 +519,10 @@ Override what the component renders at its root, not how it is built inside.
 }
 ```
 
-- **Springs are the JS half.** Physical motion on the map (a card pinned, lifted, a
-  string drawn) uses the `motion` package. The presets live in `tokens/motion.ts`
-  (`spring.pin`, `spring.lift`, `spring.string`): tune them there, never inline. Wrap
-  motion components in `<MotionConfig reducedMotion="user">`, and gate `pathLength`
-  tweens on `useReducedMotion()` (it isn't covered by the setting).
+- **Springs are the JS half.** Physical motion on the map (a card pinned, lifted)
+  uses the `motion` package. The presets live in `tokens/motion.ts` (`spring.pin`,
+  `spring.lift`): tune them there, never inline. Wrap motion components in
+  `<MotionConfig reducedMotion="user">`. Strings don't animate.
 - Enter/exit animation is native now: `@starting-style` plus
   `transition-behavior: allow-discrete`. Reach for that before any JS.
 - **Reduced motion** works by zeroing the duration tokens under

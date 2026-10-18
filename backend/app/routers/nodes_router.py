@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ from app.context.flatten import flatten, to_provider_messages
 from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.database import AsyncSessionLocal, get_db_session
-from app.models import Node, NodeMergeSource, User
+from app.models import Node, NodeMergeSource, Project, User
 from app.project_forking import (
     ForkInfo,
     build_fork_info,
@@ -83,7 +84,7 @@ async def _load_path(
         )
     ).one()
     if flags.owner_id != user_id:
-        # A sharee prompting the original is fine: the first write forks the project (see _persist).
+        # A sharee prompting the original is fine: the first write forks the project (see _prepare_write).
         # If they already forked, the original's node ids mean nothing in their copy, so redirect before spending tokens.
         user_copy = await get_user_copy(db, flags.project_id, user_id)
         if user_copy is not None:
@@ -94,21 +95,35 @@ async def _load_path(
     return [PathNode(id=r.id, chats=r.chats) for r in rows], flags.project_id
 
 
-async def _persist(
-    user_id: UUID, project_id: UUID, node_id: UUID, user_text: str, assistant_text: str
-) -> Optional[dict]:
-    """Append the exchange to nodes.chats. Own session: the request's may already be closed once
-    the stream ends. `||` appends atomically (no read-modify-write); seq is the new array index.
-    For a non-owner this also forks the project in the same transaction and writes into the copy;
-    returns the fork payload for the client, or None for an owner."""
-    now = datetime.now(timezone.utc).isoformat()
+_background_tasks: set = set()
+
+
+async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tuple[UUID, Optional[dict]]:
+    """Resolve where this write goes. Owner: the node itself. Sharee: fork the project first (own session,
+    committed on its own so the copy exists whatever happens to the model call) and map the node into the copy.
+    Returns (node id to write to, fork payload for the client or None)."""
     async with AsyncSessionLocal() as session, session.begin():
         await session.execute(
             text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)}
         )
         _, fork = await get_write_target(session, project_id, user_id)
-        write_node_id = fork.node_map[node_id] if fork else node_id
+        if fork is None:
+            return node_id, None
+        info = await build_fork_info(session, fork)
+        write_node_id = fork.node_map[node_id]
+        return write_node_id, {**info.model_dump(mode="json"), "node_id": str(write_node_id)}
+
+
+async def _persist(user_id: UUID, write_node_id: UUID, user_text: str, assistant_text: str) -> None:
+    """Append the exchange to nodes.chats of the node already resolved by _prepare_write. Own session: the
+    request's may already be closed once the stream ends. `||` appends atomically (no read-modify-write);
+    seq is the new array index."""
+    now = datetime.now(timezone.utc).isoformat()
+    async with AsyncSessionLocal() as session, session.begin():
         await session.execute(
+            text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)}
+        )
+        result = await session.execute(
             text("""
                 UPDATE nodes SET
                   title = COALESCE(title, left(CAST(:user_text AS text), 40)),
@@ -123,10 +138,8 @@ async def _persist(
             """),
             {"node_id": write_node_id, "user_text": user_text, "assistant_text": assistant_text, "now": now},
         )
-        if fork is None:
-            return None
-        info = await build_fork_info(session, fork)
-        return {**info.model_dump(mode="json"), "node_id": str(write_node_id)}
+        if result.rowcount != 1:
+            raise RuntimeError(f"chat save matched {result.rowcount} rows for node {write_node_id}")
 
 
 async def _create_child(
@@ -272,6 +285,25 @@ async def merge_nodes(
     return ForkNodeOut(**NodeMeta.model_validate(child).model_dump(), fork=info)
 
 
+@router.delete("/{node_id}", status_code=204)
+async def delete_node(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Delete a node and every branch under it (nodes.parent_id cascades). The root stays: a tree needs one."""
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(404, "Node not found")
+    owner_id = (await db.execute(select(Project.created_by_id).where(Project.id == node.project_id))).scalar_one()
+    if owner_id != user.id:
+        raise HTTPException(403, "Only the project owner can delete")
+    if node.parent_id is None:
+        raise HTTPException(409, "The root node can't be deleted")
+    await db.delete(node)
+    await db.commit()
+
+
 @router.post("/{node_id}/messages")
 async def send_message(
     node_id: UUID,
@@ -281,47 +313,78 @@ async def send_message(
 ):
     """Prompt a leaf node; stream the reply as SSE `token {text}`, then `done` or `error {message}`.
     The server rebuilds the history from the tree; the client sends only the new message.
-    A non-owner reads the original while streaming; the project is forked only when the reply is saved,
-    and `done` then carries `fork`. If the model fails, nothing is forked."""
+    A non-owner reads the original; before the model is called the project is forked for them (committed on
+    its own) and the reply is saved into the copy. `done` (or `error`, if the model fails after the fork) carries
+    `fork`. The pipeline runs detached from the request, so closing the tab does not lose the reply or the fork."""
     get_model_or_400(req.model)
     path, project_id = await _load_path(db, node_id, user.id)
     messages = to_provider_messages(flatten(path), req.content)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 
-    async def events():
-        reply: list[str] = []
-        done: dict = {}
-        try:
-            async for ev in stream_openrouter(messages, req.model):
-                if "error" in ev:
-                    err = ev["error"]
-                    yield _sse("error", {"message": err if isinstance(err, str) else json.dumps(err)})
-                    return
-                if "text" in ev:
-                    reply.append(ev["text"])
-                    yield _sse("token", {"text": ev["text"]})
-                else:
-                    done = ev
-        except (httpx.HTTPError, ValueError):
-            yield _sse("error", {"message": "The model provider failed; nothing was saved."})
-            return
+    def _error(payload: dict, fork: Optional[dict]) -> str:
+        return _sse("error", {**payload, "fork": fork} if fork else payload)
 
-        answer = "".join(reply)
-        if not answer:
-            yield _sse("error", {"message": "The model returned an empty reply; nothing was saved."})
-            return
+    async def run(queue: "asyncio.Queue[Optional[str]]") -> None:
+        """The whole write pipeline, detached from the HTTP request: fork (sharee) -> stream -> save.
+        It keeps going if the client disconnects, so a closed tab neither loses the reply nor the fork."""
+        fork: Optional[dict] = None
         try:
-            fork = await _persist(user_id, project_id, node_id, req.content, answer)
-        except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, dict) else {"message": exc.detail}
-            yield _sse("error", detail)
-            return
+            try:
+                write_node_id, fork = await _prepare_write(user_id, project_id, node_id)
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, dict) else {"message": exc.detail}
+                queue.put_nowait(_sse("error", detail))
+                return
+            except Exception:
+                log.exception("forking project %s for user %s failed", project_id, user_id)
+                queue.put_nowait(_sse("error", {"message": "The project could not be copied."}))
+                return
+
+            reply: list[str] = []
+            done: dict = {}
+            try:
+                async for ev in stream_openrouter(messages, req.model):
+                    if "error" in ev:
+                        err = ev["error"]
+                        queue.put_nowait(_error({"message": err if isinstance(err, str) else json.dumps(err)}, fork))
+                        return
+                    if "text" in ev:
+                        reply.append(ev["text"])
+                        queue.put_nowait(_sse("token", {"text": ev["text"]}))
+                    else:
+                        done = ev
+            except (httpx.HTTPError, ValueError):
+                queue.put_nowait(_error({"message": "The model provider failed; nothing was saved."}, fork))
+                return
+
+            answer = "".join(reply)
+            if not answer:
+                queue.put_nowait(_error({"message": "The model returned an empty reply; nothing was saved."}, fork))
+                return
+            try:
+                await _persist(user_id, write_node_id, req.content, answer)
+            except Exception:
+                log.exception("saving chat to node %s failed", write_node_id)
+                queue.put_nowait(_error({"message": "The reply could not be saved."}, fork))
+                return
+            queue.put_nowait(_sse("done", {**done, "fork": fork} if fork else done))
         except Exception:
-            log.exception("saving chat to node %s failed", node_id)
-            yield _sse("error", {"message": "The reply could not be saved."})
-            return
-        yield _sse("done", {**done, "fork": fork} if fork else done)
+            log.exception("chat pipeline for node %s crashed", node_id)
+            queue.put_nowait(_error({"message": "Something went wrong; the reply may not have been saved."}, fork))
+        finally:
+            queue.put_nowait(None)
+
+    async def events():
+        queue: asyncio.Queue = asyncio.Queue()
+        task = asyncio.create_task(run(queue))
+        _background_tasks.add(task)  # strong reference: the loop only keeps weak ones
+        task.add_done_callback(_background_tasks.discard)
+        while True:
+            item = await queue.get()
+            if item is None:
+                return
+            yield item
 
     # no-transform stops Next's /api rewrite from gzip-buffering the stream; X-Accel-Buffering does the same for nginx.
     return StreamingResponse(

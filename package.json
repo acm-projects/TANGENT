@@ -1,0 +1,11 @@
+{
+  "name": "tangent-dev",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"cd backend && python -m uvicorn app.main:app --reload --port 8000\" \"npm --prefix frontend run dev\"",
+    "postinstall": "npm --prefix frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

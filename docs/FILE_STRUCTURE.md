@@ -168,8 +168,8 @@ frontend/
             ├── login/         the /login screen
             ├── signup/        the /signup screen
             ├── invite/        the /invite/{token} screen
-            ├── dashboard/     the project grid
-            │   └── features/  projects/
+            ├── dashboard/     the board: project cards, workspace folders
+            │   └── features/  board/
             └── workspace/     the mind map + chat screen
                 └── features/  mindmap/, chat/, toolbar/ — used only by this page
 ```

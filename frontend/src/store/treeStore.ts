@@ -4,7 +4,8 @@ import type { ChatMessage, NodeMeta } from "@/api/types";
 /**
  * Two slices, on purpose:
  *  - structure: nodesById / childrenByParent / activeNodeId. Graph + breadcrumb selectors read ONLY this.
- *  - content:   chatsByNode / streaming. Token appends touch ONLY this.
+ *  - content:   chatsByNode / streaming (partial reply text per node, so nodes stream independently).
+ *               Token appends touch ONLY this.
  * A token therefore never invalidates the ReactFlow node/edge derivation.
  */
 interface StructureSlice {
@@ -16,18 +17,21 @@ interface StructureSlice {
   addNode(node: NodeMeta): void;
   /** Replace an existing node's metadata (title, tags) without touching tree shape. */
   updateNode(node: NodeMeta): void;
+  /** Drop a node and its subtree (the server cascades the same way). Selection moves to the parent. */
+  removeNode(nodeId: string): void;
   setActive(nodeId: string | null): void;
 }
 
 interface ContentSlice {
   chatsByNode: Record<string, ChatMessage[]>;
-  streaming: { nodeId: string; text: string } | null;
+  /** nodeId -> reply text so far; a key is present exactly while that node is streaming. */
+  streaming: Record<string, string>;
   setChats(nodeId: string, chats: ChatMessage[]): void;
   beginStream(nodeId: string, userMessage: ChatMessage): void;
-  appendToken(text: string): void;
+  appendToken(nodeId: string, text: string): void;
   /** Commit the streamed text as an assistant message (server persists on stream end). */
-  endStream(assistantMessage: ChatMessage): void;
-  abortStream(): void;
+  endStream(nodeId: string, assistantMessage: ChatMessage): void;
+  abortStream(nodeId: string): void;
 }
 
 export type TreeState = StructureSlice & ContentSlice;
@@ -41,7 +45,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
   childrenByParent: {},
   activeNodeId: null,
   chatsByNode: {},
-  streaming: null,
+  streaming: {},
 
   hydrateTree: (rootId, nodes) =>
     set(() => {
@@ -52,7 +56,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
         if (n.parent_id) (childrenByParent[n.parent_id] ??= []).push(n.id);
       }
       for (const k of Object.keys(childrenByParent)) childrenByParent[k]!.sort(byForkIndex(nodesById));
-      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: null };
+      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: {} };
     }),
 
   addNode: (node) =>
@@ -70,6 +74,30 @@ export const useTreeStore = create<TreeState>()((set) => ({
   updateNode: (node) =>
     set((s) => (s.nodesById[node.id] ? { nodesById: { ...s.nodesById, [node.id]: node } } : s)),
 
+  removeNode: (nodeId) =>
+    set((s) => {
+      const node = s.nodesById[nodeId];
+      if (!node) return s;
+      const gone = new Set<string>();
+      const stack = [nodeId];
+      while (stack.length) {
+        const id = stack.pop()!;
+        gone.add(id);
+        stack.push(...(s.childrenByParent[id] ?? []));
+      }
+      const keep = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.has(k)));
+      const childrenByParent = keep(s.childrenByParent);
+      if (node.parent_id && childrenByParent[node.parent_id]) {
+        childrenByParent[node.parent_id] = childrenByParent[node.parent_id]!.filter((id) => id !== nodeId);
+      }
+      return {
+        nodesById: keep(s.nodesById),
+        childrenByParent,
+        chatsByNode: keep(s.chatsByNode),
+        activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
+      };
+    }),
+
   setActive: (nodeId) => set({ activeNodeId: nodeId }),
 
   setChats: (nodeId, chats) => set((s) => ({ chatsByNode: { ...s.chatsByNode, [nodeId]: chats } })),
@@ -77,23 +105,31 @@ export const useTreeStore = create<TreeState>()((set) => ({
   beginStream: (nodeId, userMessage) =>
     set((s) => ({
       chatsByNode: { ...s.chatsByNode, [nodeId]: [...(s.chatsByNode[nodeId] ?? []), userMessage] },
-      streaming: { nodeId, text: "" },
+      streaming: { ...s.streaming, [nodeId]: "" },
     })),
 
-  appendToken: (text) =>
-    set((s) => (s.streaming ? { streaming: { ...s.streaming, text: s.streaming.text + text } } : s)),
+  // Events for a node that is no longer streaming (e.g. the tree was re-hydrated) are dropped.
+  appendToken: (nodeId, text) =>
+    set((s) => (nodeId in s.streaming ? { streaming: { ...s.streaming, [nodeId]: s.streaming[nodeId] + text } } : s)),
 
-  endStream: (assistantMessage) =>
+  endStream: (nodeId, assistantMessage) =>
     set((s) => {
-      if (!s.streaming) return s;
-      const { nodeId } = s.streaming;
+      if (!(nodeId in s.streaming)) return s;
+      const streaming = { ...s.streaming };
+      delete streaming[nodeId];
       return {
         chatsByNode: { ...s.chatsByNode, [nodeId]: [...(s.chatsByNode[nodeId] ?? []), assistantMessage] },
-        streaming: null,
+        streaming,
       };
     }),
 
-  abortStream: () => set({ streaming: null }),
+  abortStream: (nodeId) =>
+    set((s) => {
+      if (!(nodeId in s.streaming)) return s;
+      const streaming = { ...s.streaming };
+      delete streaming[nodeId];
+      return { streaming };
+    }),
 }));
 
 // ---- Pure selectors (structure only). Usage: useTreeStore((s) => selectBreadcrumb(s, id)) with useShallow. ----
