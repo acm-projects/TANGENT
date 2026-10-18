@@ -1,15 +1,32 @@
 import copy
+import json
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Set, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.branch_scope import visible_to
 from app.models import Node, NodeMergeSource, Project, Share, Tree, Workspace
+
+
+def remap_branch_sources(chats, node_map):
+    if isinstance(chats, str):
+        chats = json.loads(chats)
+    remapped = copy.deepcopy(chats or [])
+    for message in remapped:
+        source = message.get("branch_source")
+        if source:
+            try:
+                message["branch_source"] = str(node_map.get(UUID(source), source))
+            except ValueError:
+                pass
+    return remapped
 
 
 @dataclass
@@ -17,6 +34,13 @@ class ForkResult:
     project: Project
     tree_map: Dict[UUID, UUID] = field(default_factory=dict)
     node_map: Dict[UUID, UUID] = field(default_factory=dict)
+
+
+class ForkInfo(BaseModel):
+    project_id: UUID
+    workspace_slug: str
+    node_map: Dict[UUID, UUID]
+    tree_map: Dict[UUID, UUID]
 
 
 def copy_exists_error(copy_id: UUID) -> HTTPException:
@@ -59,9 +83,26 @@ async def pick_workspace_id(db: AsyncSession, user_id: UUID) -> UUID:
     return workspace_id
 
 
+async def build_fork_info(db: AsyncSession, fork: ForkResult) -> ForkInfo:
+    slug = (
+        await db.execute(select(Workspace.slug).where(Workspace.id == fork.project.workspace_id))
+    ).scalar_one()
+    return ForkInfo(
+        project_id=fork.project.id,
+        workspace_slug=slug,
+        node_map=fork.node_map,
+        tree_map=fork.tree_map,
+    )
+
+
 async def _copy_project(
-    db: AsyncSession, original: Project, new_owner_id: UUID, workspace_id: UUID
+    db: AsyncSession,
+    original: Project,
+    new_owner_id: UUID,
+    workspace_id: UUID,
+    visible: Optional[Set[UUID]] = None,
 ) -> ForkResult:
+    """`visible`: copy only these node ids (a branch sharee's path); None copies everything."""
     new_project = Project(
         id=uuid4(),
         workspace_id=workspace_id,
@@ -78,6 +119,8 @@ async def _copy_project(
     nodes = (
         await db.execute(select(Node).where(Node.project_id == original.id))
     ).scalars().all()
+    if visible is not None:
+        nodes = [n for n in nodes if n.id in visible]
 
     tree_map = {t.id: uuid4() for t in trees}
     node_map = {n.id: uuid4() for n in nodes}
@@ -115,7 +158,7 @@ async def _copy_project(
                 status=n.status,
                 title=n.title,
                 summary=n.summary,
-                chats=copy.deepcopy(n.chats),
+                chats=remap_branch_sources(n.chats, node_map),
                 created_by_id=new_owner_id,
                 created_at=n.created_at,
             )
@@ -153,6 +196,7 @@ async def duplicate_project_for_user(
     original_project_id: UUID,
     new_owner_id: UUID,
     workspace_id: Optional[UUID] = None,
+    visible: Optional[Set[UUID]] = None,
 ) -> ForkResult:
     existing = await get_user_copy(db, original_project_id, new_owner_id)
     if existing is not None:
@@ -169,7 +213,7 @@ async def duplicate_project_for_user(
 
     try:
         async with db.begin_nested():
-            return await _copy_project(db, original, new_owner_id, workspace_id)
+            return await _copy_project(db, original, new_owner_id, workspace_id, visible)
     except IntegrityError:
         existing = await get_user_copy(db, original_project_id, new_owner_id)
         if existing is not None:
@@ -203,5 +247,7 @@ async def get_write_target(
     if share_id is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found!")
 
-    result = await duplicate_project_for_user(db, project_id, user_id)
+    # A branch sharee's copy holds only what they could see, never the rest of the tree.
+    visible = await visible_to(db, project_id, user_id)
+    result = await duplicate_project_for_user(db, project_id, user_id, visible=visible)
     return result.project.id, result

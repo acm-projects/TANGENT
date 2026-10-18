@@ -140,9 +140,21 @@ def test_branch_sharee_sees_only_the_branch(sent):
         assert c.get(f"/nodes/{a1}", headers=sharee).status_code == 404
         assert c.get(f"/nodes/{b}", headers=sharee).status_code == 404
 
-        # the owner still sees everything, and the sharee still can't write
-        assert len(c.get(f"/projects/{pid}/tree", headers=owner).json()["nodes"]) == 4
-        assert c.post(f"/nodes/{a1}/fork", headers=sharee).status_code in (403, 404)
+        assert len(c.get(f"/projects/{pid}/tree", headers=owner).json()["nodes"]) == 4  # owner sees everything
+
+        # writes on hidden nodes are refused outright, before anything is copied
+        assert c.post(f"/nodes/{a1}/fork", headers=sharee).status_code == 404
+        r = c.post(f"/nodes/{b}/messages", json={"content": "x"}, headers=sharee)  # streams: refusal is an SSE error
+        assert "event: error" in r.text and "event: token" not in r.text and "fork" not in r.text
+        assert c.post("/nodes/merge", json={"source_leaf_ids": [a1, b]}, headers=sharee).status_code == 404
+
+        # a write on a visible node forks the project, but the copy holds only root -> a (+ the new child)
+        r = c.post(f"/nodes/{a}/fork", headers=sharee)
+        assert r.status_code == 200
+        fork = r.json()["fork"]
+        assert set(fork["node_map"]) == {root, a}
+        copy = c.get(f"/projects/{fork['project_id']}/tree", headers=sharee).json()
+        assert len(copy["nodes"]) == 3
 
 
 def test_whole_project_share_still_sees_everything(sent):

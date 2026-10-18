@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import defer
 
 from app.auth import get_current_user
-from app.branch_scope import branch_root, visible_ids
+from app.branch_scope import visible_to
 from app.context.schemas import NodeMeta, TreeMeta, TreeOut
 from app.database import get_db_session
 from app.models import Node, Project, Tree, User
@@ -22,10 +22,9 @@ async def _tree_out(db: AsyncSession, tree: Tree, user: User) -> TreeOut:
     ).scalars().all()
     metas = [NodeMeta.model_validate(n) for n in nodes]
 
-    shared = await branch_root(db, tree.project_id, user)
-    if shared is not None:
+    keep = await visible_to(db, tree.project_id, user.id)
+    if keep is not None:
         # A branch sharee sees the real root down to the shared node, nothing else.
-        keep = await visible_ids(db, shared)
         metas = [m for m in metas if m.id in keep]
     return TreeOut(tree=TreeMeta.model_validate(tree), nodes=metas)
 
