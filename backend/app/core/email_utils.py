@@ -1,13 +1,10 @@
 import os
-from dotenv import load_dotenv
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from jinja2 import Template
 
 from app.core.templates import INVITATION_EMAIL_HTML
-
-load_dotenv()
 
 is_production = os.getenv("IS_PRODUCTION") == "1"
 FRONTEND_URL = (
@@ -36,7 +33,8 @@ def send_invite_email(to_email: str, token: str, project_name: str, inviter_name
     html_content = template.render(
         inviter_name=inviter_name,
         project_name=project_name,
-        invite_url=invite_url
+        invite_url=invite_url,
+        logo_url=f"{frontend_url}/tangent-logo-white.png"
     )
 
     message = MIMEMultipart("alternative")
