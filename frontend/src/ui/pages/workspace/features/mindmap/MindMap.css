@@ -22,42 +22,36 @@
   opacity: 0.45;
 }
 
-/* the string: grey by default, red on the selected path. Each edge lights up
- * --depth steps after the root, so the path colours in from the top down. */
+/* the string: grey by default, red on the selected path */
 .mindmap .mindmap-edge .react-flow__edge-path {
   fill: none;
   stroke: var(--color-text-faint);
   stroke-width: 1.6;
   stroke-linecap: round;
-  transition: stroke var(--motion-base) var(--ease-out);
-  transition-delay: calc(var(--depth) * 40ms);
 }
 
 .mindmap .mindmap-edge-path .react-flow__edge-path {
   stroke: var(--color-string);
 }
 
-/* the pins where a string meets a card */
+/* the round end of a string, just short of the card */
+.mindmap .mindmap-string-end {
+  fill: var(--color-text-faint);
+}
+
+.mindmap .mindmap-edge-path .mindmap-string-end {
+  fill: var(--color-string);
+}
+
+/* Edges anchor on React Flow's handles, so they stay in the DOM, unseen. They
+ * sit on the card's unmoving wrapper, so a lifted card never drags its strings. */
 .mindmap .mindmap-handle {
-  width: 9px;
-  height: 9px;
+  width: 1px;
+  height: 1px;
   min-width: 0;
   min-height: 0;
   border: 0;
-  background: var(--color-text-faint);
-  box-shadow: 0 1px 1px rgb(0 0 0 / 0.25);
-  transition: background var(--motion-base) var(--ease-out);
-}
-
-.mindmap .mindmap-handle[data-lit] {
-  background: var(--color-string);
-}
-
-/* the delay is a stagger, not a duration, so the zeroed tokens don't cover it */
-@media (prefers-reduced-motion: reduce) {
-  .mindmap .mindmap-edge .react-flow__edge-path {
-    transition-delay: 0s;
-  }
+  opacity: 0;
 }
 
 /* ── the node ─────────────────────────────────────────────── */
@@ -81,6 +75,7 @@
 
 .mindmap-node[data-state="path"] {
   border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
   color: var(--color-text-secondary);
 }
 
@@ -90,7 +85,7 @@
 .mindmap-node[data-state="selected"] {
   border-color: var(--color-border-strong);
   color: var(--color-text);
-  box-shadow: var(--shadow-floating), 0 0 0 1px var(--color-border-strong);
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--color-border-strong);
 }
 
 /* hover: the card lifts (the motion is in MindMapNode.tsx), so its shadow grows */
@@ -125,4 +120,85 @@
   padding: var(--space-2);
   border-color: currentColor;
   color: inherit;
+}
+
+/* ── the hover actions ────────────────────────────────────── */
+
+/* The tray hides under the card. Hovering the card (or keyboard focus, but not
+ * a mouse click's focus) lets it peek out; hovering the tray itself tips the
+ * card away (MindMapNode.tsx) and nudges the buttons a little further out. */
+.mindmap-node-wrap {
+  position: relative;
+}
+
+.mindmap-node-actions {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: -1;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  opacity: 0;
+  translate: 0 -100%;
+  pointer-events: none;
+  transition:
+    translate var(--motion-base) var(--ease-out),
+    opacity var(--motion-fast) var(--ease-out);
+}
+
+.mindmap-node-wrap:is(:hover, :has(:focus-visible)) .mindmap-node-actions {
+  opacity: 1;
+  translate: 0 -55%;
+  pointer-events: auto;
+}
+
+.mindmap-node-wrap[data-peeled] .mindmap-node-actions {
+  translate: 0 -35%;
+}
+
+/* While More is open, the tray comes up over the card so its list isn't hidden behind it. */
+.mindmap-node-wrap[data-more] .mindmap-node-actions {
+  z-index: 1;
+}
+
+.mindmap-node-more {
+  position: relative;
+}
+
+/* More's options stack upward from the button, centred over it (the motion
+ * is in MindMapNode.tsx). More sits above them, so they slide out from behind it. */
+.mindmap-node-more > [data-component="button"] {
+  position: relative;
+  z-index: 1;
+}
+
+.mindmap-node-more-list {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+/* The list sits over the card, so a disabled option keeps its paper opaque
+ * and dims only its icon. */
+.mindmap-node-more-list :disabled {
+  opacity: 1;
+
+  > * {
+    opacity: 0.5;
+  }
+}
+
+.mindmap-action-error {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 5;
 }

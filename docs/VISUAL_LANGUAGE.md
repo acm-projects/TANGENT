@@ -26,7 +26,7 @@ Three materials, and nothing else:
 ### Principles
 
 1. **Motion carries the metaphor, not ornament.** A card *drops and settles* like it
-   was pinned. A branch *draws* its string. No pushpin clip-art, no tape, no wood, no
+   was pinned. Strings stay still. No pushpin clip-art, no tape, no wood, no
    torn or deckled edges. Edges stay crisp; paper reads through colour, grain and
    shadow alone.
 2. **Red means "connected", and only that.** If something is red, it is a string, a
@@ -178,12 +178,12 @@ each one maps to a spring preset (§6), so tuning happens in one file.
 | Motion | Trigger | What happens |
 |---|---|---|
 | **Pin** | node created | card drops from 104% scale with a small random tilt (±1.5°), settles with a short spring, the pin head "presses" (scale 1.2 → 1) |
-| **String draw** | branch / fork | the new edge draws from the parent pin to the child pin (`stroke-dashoffset`), then relaxes into a slight sag |
+| ~~String draw~~ | branch / fork | dropped: strings appear without animating |
 | **String tension** | dragging a card | edge control points follow the card on a lagging spring; one small wobble on release |
 | **Lift** | hover / drag | shadow grows, card rises ~2px, tilts ~1° |
 | **Ink in** | streaming tokens | each chunk fades from 0 opacity and 1px blur to sharp, like wet ink drying. No typewriter cursor |
 | **Paper slide** | chat sheet open / close | the sheet slides in from the right; the corner fold flexes on arrival |
-| **Path light-up** | select a node | strings on the selected path turn red in sequence, root to leaf, ~40ms apart |
+| ~~Path light-up~~ | select a node | dropped: the path turns red at once |
 
 Rules:
 
@@ -277,7 +277,7 @@ What to change:
   at rest, `ink` on hover, and a small red pin dot beside the active item.
 - **The chat input** is a bordered box inside a bordered sheet: a card inside a card.
   Make it a single ruled line on the sheet ("write here"), with the send control on the line.
-- **Pins on every string**, not only the active one. A pin at each end is what turns
+- **Pins on every string**, not only the active one: a round end on each, stopping just short of the card. A pin at each end is what turns
   a flowchart into a board. Unselected pins are graphite; selected-path pins are red.
 - **The cards are empty.** Define their hierarchy: Aleo title (1 line), Outfit excerpt
   (2 lines, `ink-muted`), metadata footer (model, time).

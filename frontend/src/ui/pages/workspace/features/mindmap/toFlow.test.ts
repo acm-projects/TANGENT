@@ -34,6 +34,8 @@ describe("toFlow", () => {
     expect(stateById(s)).toEqual({ r: "path", a: "default", b: "path", c: "selected" });
     const pathEdges = toFlow(s).edges.filter((e) => e.className?.includes("mindmap-edge-path")).map((e) => e.id);
     expect(pathEdges.sort()).toEqual(["b->c", "r->b"]);
+    // drawn last, so the red path paints over grey strings
+    expect(toFlow(s).edges.slice(-2).map((e) => e.id).sort()).toEqual(["b->c", "r->b"]);
   });
 
   it("labels an untitled node", () => {

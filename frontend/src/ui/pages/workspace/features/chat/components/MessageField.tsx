@@ -99,6 +99,7 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
               disabled={modelsLoading || blocker === "streaming" || models.length === 0}
+              autoComplete="off" // stops Firefox restoring the disabled state on reload, which breaks hydration
             >
               {modelsLoading && <option value="">Loading models…</option>}
               {!modelsLoading && models.length === 0 && <option value="">No models available</option>}

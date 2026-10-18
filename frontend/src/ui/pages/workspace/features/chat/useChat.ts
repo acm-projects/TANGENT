@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { api, apiClient, apiErrorMessage, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "@/store/treeStore";
+import { forkNode } from "../mindmap/nodeActions";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -167,11 +168,7 @@ export function useChat() {
   async function fork(nodeId: string) {
     setError(null);
     try {
-      const child = await api.nodes.fork(nodeId);
-      const store = useTreeStore.getState();
-      store.addNode(child);
-      store.setChats(child.id, []);
-      store.setActive(child.id);
+      await forkNode(nodeId);
     } catch (e: unknown) {
       setError(apiErrorMessage(e, "Could not create a branch."));
     }

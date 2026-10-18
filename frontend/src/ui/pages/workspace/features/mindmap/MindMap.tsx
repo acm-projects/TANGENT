@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTreeStore } from "@/store/treeStore";
 import { Frame, Text } from "@/ui/library";
-import { MindMapNode, StaggerPinIn } from "./components/MindMapNode";
+import { MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
 import { useMindMap } from "./useMindMap";
@@ -39,6 +39,7 @@ export function MindMap({ projectId, className }: MindMapProps) {
   const setActive = useTreeStore((s) => s.setActive);
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
   const [stagger, setStagger] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => {
     if (load.status !== "ready") return;
     const t = setTimeout(() => setStagger(false), 1500);
@@ -49,9 +50,11 @@ export function MindMap({ projectId, className }: MindMapProps) {
     <Frame as="section" gap="0" className={["mindmap", className].filter(Boolean).join(" ")} aria-label="Conversation map">
       {load.status === "loading" && <Text hierarchy="tertiary" className="mindmap-status" content="Loading map…" />}
       {load.status === "error" && <Text role="alert" className="mindmap-status" content={load.message} />}
+      {actionError && <Text role="alert" size="s" className="mindmap-action-error" content={actionError} />}
       {load.status === "ready" && (
         <MotionConfig reducedMotion="user">
         <StaggerPinIn value={stagger}>
+        <ReportMapError value={setActionError}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -71,9 +74,12 @@ export function MindMap({ projectId, className }: MindMapProps) {
           fitViewOptions={{ padding: { top: "20%", bottom: "20%", left: "6%", right: "52%" }, minZoom: 0.6, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={2}
+          // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
+          proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>
+        </ReportMapError>
         </StaggerPinIn>
         </MotionConfig>
       )}

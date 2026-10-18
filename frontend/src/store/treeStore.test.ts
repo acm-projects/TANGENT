@@ -97,4 +97,15 @@ describe("tree store", () => {
     after.updateNode(node("ghost", "r", 9));
     expect(useTreeStore.getState().nodesById["ghost"]).toBeUndefined();
   });
+
+  it("removeNode drops the subtree and selects the parent", () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("c1", "r", 1), node("c2", "r", 2), node("g", "c1", 1)]);
+    useTreeStore.getState().setActive("g");
+    useTreeStore.getState().removeNode("c1");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById).sort()).toEqual(["c2", "r"]);
+    expect(s.childrenByParent["r"]).toEqual(["c2"]);
+    expect(s.childrenByParent["c1"]).toBeUndefined();
+    expect(s.activeNodeId).toBe("r");
+  });
 });

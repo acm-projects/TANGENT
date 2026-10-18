@@ -64,7 +64,7 @@ grep -rn "TODO(backend)" frontend/src
 
 | Hook / file | Mock call | Real call | Endpoint exists? |
 |---|---|---|---|
-| `dashboard/features/projects/useProjects.ts` | — (wired) | `api.projects.list / create` | ✅ done. `POST /projects/` needs the workspace id, which `GET /workspaces/` now returns |
+| `dashboard/features/board/useBoard.ts` | — (wired) | `api.workspaces.list / create / rename`, `api.projects.list / create / rename / delete` | ✅ done. Workspaces are the folders along the bottom; `POST /workspaces/` returns no id, so the list is read again after it. Project icons are not built: no backend field |
 | `workspace/features/mindmap/useMindMap.ts` | — (wired) | `api.trees.forProject(projectId)` | ✅ done. `GET /projects/:id/tree`; the owner's first visit creates the tree and its empty root |
 | `workspace/features/chat/useChat.ts` (load) | — (wired) | `api.nodes.get(id)` | ✅ done |
 | `workspace/features/chat/useChat.ts` (send) | — (wired) | `streamMessage({...})` from `@/api` | ✅ done. Sends `{content, model}`; attachments are disabled until an upload endpoint exists |
@@ -113,10 +113,10 @@ These are outside the frontend's scope and were **not** changed:
 2. **`node_type` mismatch.** DB enum: `standard | temporary`. `src/api/types.ts` and ARCHITECTURE.md §3: `chat | question | poll | document`. The UI doesn't branch on it (by design), but the docs and types need to agree with the DB.
 3. **No project → tree lookup.** `ProjectDetail` has `tree_count` but no tree id.
 4. **Share.** The backend shares by email invitation, so `SharePanel.tsx` is now an email-invite form with a member list, not Figma's "Share Copy" link panel. Worth showing the designer. If a copy-link flow is wanted later it needs a new backend endpoint. The member list is a scrollable list; drag-to-reorder was not built.
-5. **Naming.** The Figma "Recent Workspaces" cards are backend *projects*. The label is kept as designed; worth settling with the designer.
+5. **Naming.** The dashboard now matches the backend: workspaces are folders, projects are cards (no longer Figma's "Recent Workspaces" label). Worth showing the designer.
 6. **CORS is now configured** in `main.py`, but ARCHITECTURE.md §6 still says the backend has no CORS. The frontend keeps using the same-origin `/api` proxy, which is still the right choice for the refresh cookie.
 7. **`email_verified` is never checked.** `verify_google_id_token` (`app/core/oauth_utils.py`) returns the ID token claims and `auth_router.py` uses only `email`. Accepting an invite trusts that the Google email equals the invited address, so an unverified email claim would pass. Normally fine for Google accounts; worth a check by whoever owns the OAuth code.
-8. **Shared projects carry the owner's workspace slug.** `ProjectSummary.workspace_slug` comes from the project's own workspace, so once `useProjects` is wired, its `p.workspace_slug === slug` filter would hide projects shared *with* the user from their dashboard (`role: "shared"`). Decide how shared projects should appear when wiring it.
+8. **Shared projects carry the owner's workspace slug.** `ProjectSummary.workspace_slug` comes from the project's own workspace, so `useBoard` files a project shared *with* the user under a folder they don't have, and it doesn't show on their dashboard (`role: "shared"`). A "Shared with me" folder would fix it.
 9. **Inviting needs SMTP.** `POST /shares/:slug/:projectId/share` and `/resend` return 500 ("Failed to dispatch email") unless `SMTP_*` is configured, and roll back the invitation.
 
 ## 5. Design gaps (`TODO(design)`)
@@ -163,7 +163,7 @@ Everything follows DESIGN.md; the §7 modularity greps pass.
 
 - `npm run typecheck`, `npm test` (14 tests), `npx oxlint src`, `npm run build`: all pass.
 - New tests:
-  - `mindmap/layout.test.ts`: tidy layout, sibling order, cycle guard.
+  - `store/layout.test.ts`: tidy layout, sibling order, cycle guard.
   - `mindmap/toFlow.test.ts`: path highlighting, edges, untitled nodes.
   - `treeStore.test.ts`: `updateNode` keeps tree shape.
 - Browser walkthrough with Playwright at 1440×1024, no console errors or warnings. Covered: dashboard → workspace → select node → send + stream → branch → Sources → Share → ⋮ → collapse / expand chat → login; plus the light theme.

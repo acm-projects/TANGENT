@@ -9,6 +9,14 @@
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* A spring in CSS, for things Motion can't animate (a width between two
+   * calc()s): settles with a ~5% overshoot, like spring.pin. Sampled from a
+   * damped spring (damping 0.7). Use with --motion-spring. */
+  --motion-spring: 600ms;
+  --ease-spring: linear(0, 0.0502, 0.1694, 0.3202, 0.4765, 0.6218, 0.7467, 0.8474, 0.9238, 0.9781, 1.0137,
+    1.0344, 1.044, 1.0459, 1.0428, 1.0369, 1.0298, 1.0227, 1.0161, 1.0106, 1.0062, 1.0029, 1.0006, 0.9991,
+    0.9983, 0.9979, 0.9979, 0.9981, 0.9984, 0.9987, 0.999, 0.9993, 1);
 }
 
 /* Reduced motion is handled by zeroing the duration tokens — tokens-only, no
@@ -22,5 +30,6 @@
     --motion-fast: 0ms;
     --motion-base: 0ms;
     --motion-slow: 0ms;
+    --motion-spring: 0ms;
   }
 }
