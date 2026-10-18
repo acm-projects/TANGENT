@@ -1,4 +1,5 @@
-import type { ModelUsage, StreamEvent } from "./types";
+import { CopyExistsError } from "./errors";
+import type { ForkInfo, ModelUsage, StreamEvent } from "./types";
 
 /** Parse an SSE byte stream into { event, data } frames. */
 export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string }> {
@@ -63,13 +64,19 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
   if (!res.ok || !res.body) {
     // FastAPI errors are { detail: "..." }; show that instead of a bare status code.
     const detail = await res.json().then((b: { detail?: unknown }) => b.detail, () => undefined);
-    throw new Error(typeof detail === "string" ? detail : `stream failed: ${res.status}`);
+    if (typeof detail === "string") throw new Error(detail);
+    const copy = detail as { message?: string; forked_project_id?: string } | undefined;
+    if (res.status === 409 && copy?.forked_project_id) throw new CopyExistsError(copy.message ?? "You already have your own copy.", copy.forked_project_id);
+    throw new Error(`stream failed: ${res.status}`);
   }
 
   for await (const { event, data } of sseFrames(res.body)) {
     if (event === "token") opts.onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
-    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string }) });
-    else if (event === "error") return void opts.onEvent({ type: "error", message: (JSON.parse(data) as { message: string }).message });
+    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo }) });
+    else if (event === "error") {
+      const { message, fork, forked_project_id } = JSON.parse(data) as { message: string; fork?: ForkInfo; forked_project_id?: string };
+      return void opts.onEvent({ type: "error", message, fork, forkedProjectId: forked_project_id });
+    }
   }
   // Stream closed with no terminal event: surface it instead of hanging the UI in "streaming".
   opts.onEvent({ type: "error", message: "stream ended unexpectedly" });

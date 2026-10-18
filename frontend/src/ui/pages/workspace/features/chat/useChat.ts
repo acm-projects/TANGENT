@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { api, apiClient, apiErrorMessage, getAccessToken, streamMessage } from "@/api";
+import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { forkNode } from "../mindmap/nodeActions";
+import { forkNode, redirectToCopy, switchToFork } from "../mindmap/nodeActions";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -32,7 +32,10 @@ export function useChat() {
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
   // The active node's partial reply, or null when it isn't streaming. Other nodes' streams don't re-render this.
   const streaming = useTreeStore((s) => (s.activeNodeId ? (s.streaming[s.activeNodeId] ?? null) : null));
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setError] = useState<string | null>(null);
+  // Survives a project switch, which remounts the page and drops local state.
+  const notice = useTreeStore((s) => s.notice);
+  const error = localError ?? notice;
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
@@ -107,6 +110,7 @@ export function useChat() {
       return;
     }
     setError(null);
+    useTreeStore.getState().setNotice(null);
     setUsage(null);
     setUsageUnavailable(false);
 
@@ -120,6 +124,13 @@ export function useChat() {
       created_at: new Date().toISOString(),
     });
 
+    // The first write by a sharee moves them into their own copy; the original's node ids are meaningless there.
+    let switched = false;
+    const toCopy = (copyId: string) => {
+      switched = true;
+      return redirectToCopy(copyId).catch((e: unknown) => setError(apiErrorMessage(e, "Could not open your copy.")));
+    };
+
     // The server saves the exchange itself once the stream ends; this client only displays it.
     try {
       await streamMessage({
@@ -132,7 +143,11 @@ export function useChat() {
         onEvent: (e) => {
           const s = useTreeStore.getState();
           if (e.type === "token") s.appendToken(nodeId, e.text);
-          else if (e.type === "done") {
+          else if (e.type === "done" && e.fork) {
+            switched = true;
+            s.abortStream(nodeId);
+            switchToFork(e.fork, e.fork.node_id ?? null);
+          } else if (e.type === "done") {
             setUsage(e.usage ?? null);
             setUsageUnavailable(!e.usage);
             s.endStream(nodeId, {
@@ -145,14 +160,22 @@ export function useChat() {
           } else {
             s.abortStream(nodeId);
             setError(e.message);
+            // The copy exists even though the model failed; go there, and keep the message across the switch.
+            if (e.fork) {
+              switched = true;
+              switchToFork(e.fork, e.fork.node_id ?? null, e.message);
+            } else if (e.forkedProjectId) void toCopy(e.forkedProjectId);
           }
         },
       });
     } catch (e: unknown) {
       useTreeStore.getState().abortStream(nodeId);
-      setError(e instanceof Error ? e.message : "The message could not be sent.");
+      const copyId = forkedProjectIdOf(e);
+      if (copyId) await toCopy(copyId);
+      else setError(e instanceof Error ? e.message : "The message could not be sent.");
       return;
     }
+    if (switched) return;
 
     // Re-read the node the server just saved: its title may have changed and its chats are the
     // persisted copy, which replaces the optimistic one built while streaming.

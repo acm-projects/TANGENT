@@ -1,10 +1,12 @@
 import copy
+import json
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -12,11 +14,32 @@ from sqlalchemy.future import select
 from app.models import Node, NodeMergeSource, Project, Share, Tree, Workspace
 
 
+def remap_branch_sources(chats, node_map):
+    if isinstance(chats, str):
+        chats = json.loads(chats)
+    remapped = copy.deepcopy(chats or [])
+    for message in remapped:
+        source = message.get("branch_source")
+        if source:
+            try:
+                message["branch_source"] = str(node_map.get(UUID(source), source))
+            except ValueError:
+                pass
+    return remapped
+
+
 @dataclass
 class ForkResult:
     project: Project
     tree_map: Dict[UUID, UUID] = field(default_factory=dict)
     node_map: Dict[UUID, UUID] = field(default_factory=dict)
+
+
+class ForkInfo(BaseModel):
+    project_id: UUID
+    workspace_slug: str
+    node_map: Dict[UUID, UUID]
+    tree_map: Dict[UUID, UUID]
 
 
 def copy_exists_error(copy_id: UUID) -> HTTPException:
@@ -57,6 +80,18 @@ async def pick_workspace_id(db: AsyncSession, user_id: UUID) -> UUID:
             "You need a workspace before you can edit a shared project.",
         )
     return workspace_id
+
+
+async def build_fork_info(db: AsyncSession, fork: ForkResult) -> ForkInfo:
+    slug = (
+        await db.execute(select(Workspace.slug).where(Workspace.id == fork.project.workspace_id))
+    ).scalar_one()
+    return ForkInfo(
+        project_id=fork.project.id,
+        workspace_slug=slug,
+        node_map=fork.node_map,
+        tree_map=fork.tree_map,
+    )
 
 
 async def _copy_project(
@@ -115,7 +150,7 @@ async def _copy_project(
                 status=n.status,
                 title=n.title,
                 summary=n.summary,
-                chats=copy.deepcopy(n.chats),
+                chats=remap_branch_sources(n.chats, node_map),
                 created_by_id=new_owner_id,
                 created_at=n.created_at,
             )
