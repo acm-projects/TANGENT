@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { describe, expect, it } from "vitest";
-import { apiErrorMessage, apiErrorStatus } from "./errors";
+import { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";
 
 const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
 const failed = (status: number, data: unknown) =>
@@ -40,5 +40,24 @@ describe("apiErrorStatus", () => {
   it("is undefined when there was no response, or the error isn't from axios", () => {
     expect(apiErrorStatus(new AxiosError("Network Error", "ERR_NETWORK"))).toBeUndefined();
     expect(apiErrorStatus(new Error("boom"))).toBeUndefined();
+  });
+});
+
+describe("copy-exists 409", () => {
+  const detail = { message: "You already have your own copy.", forked_project_id: "p2" };
+
+  it("apiErrorMessage reads detail.message", () => {
+    expect(apiErrorMessage(failed(409, { detail }), "fallback")).toBe(detail.message);
+  });
+
+  it("forkedProjectIdOf finds the copy in an axios 409 and in the stream's CopyExistsError", () => {
+    expect(forkedProjectIdOf(failed(409, { detail }))).toBe("p2");
+    expect(forkedProjectIdOf(new CopyExistsError("m", "p3"))).toBe("p3");
+  });
+
+  it("forkedProjectIdOf ignores other errors", () => {
+    expect(forkedProjectIdOf(failed(409, { detail: "Only a leaf node can be prompted" }))).toBeUndefined();
+    expect(forkedProjectIdOf(failed(404, { detail }))).toBeUndefined();
+    expect(forkedProjectIdOf(new Error("x"))).toBeUndefined();
   });
 });
