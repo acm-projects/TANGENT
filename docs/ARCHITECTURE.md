@@ -311,8 +311,9 @@ Derive node layout from the tree structure; **do not** store x/y on a node. A
 stored position is a second source of truth that drifts out of sync with the
 real tree. Keep custom node components memoised — ReactFlow already virtualises.
 
-The adapter lives in `ui/pages/workspace/features/mindmap/`: `layout.ts` (a
-pure tidy-tree layout) and `toFlow.ts` (structure slice → React Flow nodes and
+The pure tidy-tree layout is `store/layout.ts` (the dashboard's card previews
+use it too). The adapter lives in `ui/pages/workspace/features/mindmap/`:
+`toFlow.ts` (structure slice → React Flow nodes and
 edges, plus path highlighting). Both are unit-tested. Nodes aren't draggable,
 because a dragged position would have to be stored.
 

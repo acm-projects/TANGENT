@@ -74,6 +74,8 @@ export function MindMap({ projectId, className }: MindMapProps) {
           fitViewOptions={{ padding: { top: "20%", bottom: "20%", left: "6%", right: "52%" }, minZoom: 0.6, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={2}
+          // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
+          proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>

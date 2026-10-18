@@ -8,4 +8,6 @@ export const spring = {
   pin: { type: "spring", visualDuration: 0.35, bounce: 0.3 },
   lift: { type: "spring", visualDuration: 0.2, bounce: 0.1 },
   peel: { type: "spring", visualDuration: 0.3, bounce: 0.15 },
+  /** a dashboard card flying between a folder and the grid */
+  fly: { type: "spring", visualDuration: 0.55, bounce: 0.2 },
 } as const;

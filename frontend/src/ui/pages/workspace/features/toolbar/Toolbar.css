@@ -20,11 +20,10 @@
   pointer-events: auto;
 }
 
-/* Figma tile: a 48px circle */
+/* Figma tile: 48px square, with the same paper radius as every other button */
 .toolbar-tile {
   width: 3rem;
   height: 3rem;
-  border-radius: var(--radius-full);
   color: var(--color-text-secondary);
 }
 

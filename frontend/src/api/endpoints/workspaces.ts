@@ -1,10 +1,17 @@
 import type { ApiClient } from "../client";
-import type { WorkspaceSummary } from "../types";
+import type { WorkspaceCreated, WorkspaceSummary } from "../types";
 
-/** GET /workspaces/ -- the workspaces the signed-in user owns. */
+/** /workspaces/ -- the workspaces the signed-in user owns. */
 export function createWorkspacesApi({ http }: ApiClient) {
   return {
     list: () => http.get<WorkspaceSummary[]>("/workspaces/").then((r) => r.data),
+    create: (workspaceName: string) =>
+      http.post<WorkspaceCreated>("/workspaces/", { workspace_name: workspaceName }).then((r) => r.data),
+    /** Renaming also changes the slug; the new one is returned. */
+    rename: (workspaceSlug: string, newName: string) =>
+      http
+        .patch<{ workspace_slug: string }>(`/workspaces/${workspaceSlug}/name`, { new_name: newName })
+        .then((r) => r.data),
   };
 }
 

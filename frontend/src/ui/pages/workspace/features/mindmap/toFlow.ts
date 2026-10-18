@@ -2,7 +2,7 @@ import type { Edge, Node as FlowNode } from "@xyflow/react";
 import type { AttachmentKind, NodeMeta } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectBreadcrumb } from "@/store/treeStore";
-import { layoutTree } from "./layout";
+import { layoutTree } from "@/store/layout";
 
 /**
  * The ReactFlow adapter: tree structure in, React Flow nodes and edges out.

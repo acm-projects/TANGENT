@@ -127,7 +127,7 @@ frontend/src/
           projects/
       workspace/
         features/              ← features used only by this page
-          mindmap/             ← React Flow; layout.ts + toFlow.ts are pure and tested
+          mindmap/             ← React Flow; toFlow.ts is pure and tested (layout: store/layout.ts)
           chat/
           toolbar/
   mocks/                       ← TEMPORARY fake backend; see HANDOFF.md

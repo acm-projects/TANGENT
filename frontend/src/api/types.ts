@@ -102,6 +102,13 @@ export interface WorkspaceSummary {
   workspace_slug: string;
 }
 
+/** POST /workspaces/ -- app/routers/workspace_router.py create_workspace (no id: list again for it) */
+export interface WorkspaceCreated {
+  message: string;
+  workspace_name: string;
+  workspace_slug: string;
+}
+
 /** GET /projects/ -- app/routers/projects_router.py ProjectSummary */
 export interface ProjectSummary {
   id: string;
