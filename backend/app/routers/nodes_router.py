@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.auth import get_current_user
+from app.branch_scope import branch_root, visible_ids
 from app.context.flatten import flatten, to_provider_messages
 from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
@@ -97,11 +98,14 @@ async def _persist(user_id: UUID, node_id: UUID, user_text: str, assistant_text:
 async def get_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     node = await db.get(Node, node_id)  # RLS: nodes of invisible projects are simply absent
     if node is None:
         raise HTTPException(404, "Node not found")
+    shared = await branch_root(db, node.project_id, user)
+    if shared is not None and node_id not in await visible_ids(db, shared):
+        raise HTTPException(404, "Node not found")  # outside the shared branch: same as absent
     return node
 
 

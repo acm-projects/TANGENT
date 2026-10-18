@@ -17,7 +17,7 @@ type WorkspaceProps = { slug: string; projectId: string };
 export function Workspace({ slug, projectId }: WorkspaceProps) {
   return (
     <Frame as="main" gap="0" className="workspace">
-      <MindMap projectId={projectId} className="workspace-map" />
+      <MindMap slug={slug} projectId={projectId}className="workspace-map" />
       <Toolbar slug={slug} projectId={projectId} className="workspace-toolbar" />
       <Chat className="workspace-chat" />
     </Frame>

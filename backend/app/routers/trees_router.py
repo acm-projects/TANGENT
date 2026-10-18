@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import defer
 
 from app.auth import get_current_user
+from app.branch_scope import branch_root, visible_ids
 from app.context.schemas import NodeMeta, TreeMeta, TreeOut
 from app.database import get_db_session
 from app.models import Node, Project, Tree, User
@@ -13,24 +14,32 @@ from app.models import Node, Project, Tree, User
 router = APIRouter(tags=["Trees"], dependencies=[Depends(get_current_user)])
 
 
-async def _tree_out(db: AsyncSession, tree: Tree) -> TreeOut:
+async def _tree_out(db: AsyncSession, tree: Tree, user: User) -> TreeOut:
     nodes = (
         await db.execute(
             select(Node).where(Node.tree_id == tree.id).order_by(Node.created_at).options(defer(Node.chats))
         )
     ).scalars().all()
-    return TreeOut(
-        tree=TreeMeta.model_validate(tree),
-        nodes=[NodeMeta.model_validate(n) for n in nodes],
-    )
+    metas = [NodeMeta.model_validate(n) for n in nodes]
+
+    shared = await branch_root(db, tree.project_id, user)
+    if shared is not None:
+        # A branch sharee sees the real root down to the shared node, nothing else.
+        keep = await visible_ids(db, shared)
+        metas = [m for m in metas if m.id in keep]
+    return TreeOut(tree=TreeMeta.model_validate(tree), nodes=metas)
 
 
 @router.get("/trees/{tree_id}", response_model=TreeOut)
-async def get_tree(tree_id: UUID, db: AsyncSession = Depends(get_db_session)):
+async def get_tree(
+    tree_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
     tree = await db.get(Tree, tree_id)  # RLS hides trees of projects the caller can't see
     if tree is None:
         raise HTTPException(404, "Tree not found")
-    return await _tree_out(db, tree)
+    return await _tree_out(db, tree, user)
 
 
 @router.get("/projects/{project_id}/tree", response_model=TreeOut)
@@ -65,4 +74,4 @@ async def get_project_tree(
         await db.commit()
         await db.refresh(tree)
 
-    return await _tree_out(db, tree)
+    return await _tree_out(db, tree, user)

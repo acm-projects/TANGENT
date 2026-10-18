@@ -11,7 +11,7 @@ from uuid import UUID
 from app.database import get_db_session
 from app.auth import get_current_user
 from app.core.email_utils import send_invite_email
-from app.models import User, Project, Workspace, Share, Invitation
+from app.models import User, Project, Workspace, Share, Invitation, Node
 
 router = APIRouter(
     prefix="/shares",
@@ -32,6 +32,17 @@ def _hash_token(raw_token: str) -> str:
 
 class ShareCreateRequest(BaseModel):
     email: EmailStr
+    branch_node_id: UUID | None = None  # set: share only this node and what is under it
+
+
+def _branch_is(column, branch_node_id: UUID | None):
+    return column.is_(None) if branch_node_id is None else column == branch_node_id
+
+
+def _blocking_shares(branch_node_id: UUID | None):
+    """Conditions for 'already has access': a whole-project invite is blocked only by a whole-project
+    share, a branch invite by any share (branch shares are one per user, and a full share covers it)."""
+    return [] if branch_node_id is not None else [Share.branch_node_id.is_(None)]
 
 
 async def get_owned_project(
@@ -72,6 +83,14 @@ async def create_share_invitation(
     if invitee_email == current_user.email.lower():
         raise HTTPException(status_code=400, detail="You cannot share a project with yourself.")
 
+    branch_node_id = request.branch_node_id
+    if branch_node_id is not None:
+        in_project = await db.execute(
+            select(Node.id).where(Node.id == branch_node_id, Node.project_id == project.id)
+        )
+        if in_project.scalar_one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Branch not found.")
+
     existing_share = await db.execute(
         select(Share)
         .join(User, User.id == Share.shared_with_id)
@@ -79,6 +98,7 @@ async def create_share_invitation(
             Share.project_id == project.id,
             Share.revoked_at.is_(None),
             func.lower(User.email) == invitee_email,
+            *_blocking_shares(branch_node_id),
         )
     )
     if existing_share.scalars().first():
@@ -90,6 +110,7 @@ async def create_share_invitation(
                 Invitation.project_id == project.id,
                 Invitation.email == invitee_email,
                 Invitation.status == PENDING,
+                _branch_is(Invitation.branch_node_id, branch_node_id),
             )
         )
     ).scalars().first()
@@ -111,6 +132,7 @@ async def create_share_invitation(
         token_hash=_hash_token(secure_token),
         inviter_name=current_user.name,
         invited_by_id=current_user.id,
+        branch_node_id=branch_node_id,
         status=PENDING,
         expires_at=expiration_date
     )
@@ -141,10 +163,11 @@ async def create_share_invitation(
 async def list_project_shares(
     workspace_slug: str,
     project_id: UUID,
+    branch_node_id: UUID | None = None,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Owner-only: pending invites and active shares for a project."""
+    """Owner-only: pending invites and active shares for a project, or for one branch of it."""
     project = await get_owned_project(db, workspace_slug, project_id, current_user)
 
     now = datetime.now(timezone.utc)
@@ -153,7 +176,11 @@ async def list_project_shares(
         await db.execute(
             select(Share, User.email, User.name)
             .join(User, User.id == Share.shared_with_id)
-            .where(Share.project_id == project.id, Share.revoked_at.is_(None))
+            .where(
+                Share.project_id == project.id,
+                Share.revoked_at.is_(None),
+                _branch_is(Share.branch_node_id, branch_node_id),
+            )
         )
     ).all()
 
@@ -164,6 +191,7 @@ async def list_project_shares(
             .where(
                 Invitation.project_id == project.id,
                 Invitation.status.in_([PENDING, EXPIRED]),
+                _branch_is(Invitation.branch_node_id, branch_node_id),
             )
             .order_by(Invitation.expires_at.desc())
         )
@@ -293,6 +321,7 @@ async def resend_invitation(
                 Invitation.status == PENDING,
                 Invitation.expires_at > datetime.now(timezone.utc),
                 Invitation.id != invite.id,
+                _branch_is(Invitation.branch_node_id, invite.branch_node_id),
             )
         )
     ).scalars().first()
@@ -307,6 +336,7 @@ async def resend_invitation(
                 Share.project_id == project.id,
                 Share.revoked_at.is_(None),
                 func.lower(User.email) == invite.email.lower(),
+                *_blocking_shares(invite.branch_node_id),
             )
         )
     ).scalars().first()
@@ -396,6 +426,7 @@ async def accept_share_invitation(
                 Share.project_id == invite.project_id,
                 Share.shared_with_id == current_user.id,
                 Share.revoked_at.is_(None),
+                *_blocking_shares(invite.branch_node_id),
             )
         )
     ).scalars().first()
@@ -406,6 +437,7 @@ async def accept_share_invitation(
         project_id=invite.project_id,
         shared_by_id=invite.invited_by_id,
         shared_with_id=current_user.id,
+        branch_node_id=invite.branch_node_id,
         permission="view"
     ))
     await db.flush()

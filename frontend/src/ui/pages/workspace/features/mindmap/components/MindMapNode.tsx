@@ -1,10 +1,11 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
-import { createContext, memo, useContext, useState, type MouseEvent } from "react";
+import { createContext, memo, useContext, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Button, Frame, HoldButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
+import { SharePanel } from "../../toolbar/components/SharePanel";
 import { deleteNode, forkNode } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 
@@ -28,12 +29,36 @@ export const StaggerPinIn = createContext(true);
 /** Where a failed node action reports its message (MindMap shows it). */
 export const ReportMapError = createContext<(message: string | null) => void>(() => {});
 
+/** The project this map belongs to, for Share branch (MindMap provides it). */
+export const MapProject = createContext<{ slug: string; projectId: string } | null>(null);
+
 export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsoluteY }: NodeProps<MindMapFlowNode>) {
   const stagger = useContext(StaggerPinIn);
   const report = useContext(ReportMapError);
+  const project = useContext(MapProject);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [peeled, setPeeled] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Right-click pins the tray out: it stays until Escape or a click elsewhere, not just while hovered.
+  const [pinned, setPinned] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const release = () => {
+    setPinned(false);
+    setPeeled(false);
+    setMoreOpen(false);
+  };
+  useEffect(() => {
+    if (!pinned) return;
+    const away = (e: PointerEvent) => wrapRef.current?.contains(e.target as Node) || release();
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && release();
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [pinned]);
   // the selected context path sits a little off the board, so it reads as one thread
   const onPath = data.state !== "default";
   // Each card tilts its own way, fixed by its id (uuid: the last hex digit is effectively random).
@@ -58,14 +83,36 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     setConfirmingDelete(true);
   };
 
-  // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
+  const openShare = (e: MouseEvent) => {
+    e.stopPropagation();
+    release();
+    setSharing(true);
+  };
+
+  // Listed bottom-up. Merge is interface only: the merge logic isn't built yet.
   const moreOptions = [
-    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: confirmDelete }] : []),
-    { icon: "ios_share", label: "Share branch (not available yet)", disabled: true, onClick: undefined },
+    ...(data.hasParent
+      ? [
+          { icon: "delete", label: "Delete branch", disabled: busy, onClick: confirmDelete },
+          // TODO: merge logic
+          { icon: "merge", label: "Merge branch", disabled: busy, onClick: (e: MouseEvent) => e.stopPropagation() },
+        ]
+      : []),
+    { icon: "ios_share", label: "Share branch", disabled: !project, onClick: openShare },
   ];
 
   return (
-    <div className="mindmap-node-wrap" data-peeled={peeled || undefined} data-more={moreOpen || undefined}>
+    <div
+      ref={wrapRef}
+      className="mindmap-node-wrap"
+      data-peeled={peeled || undefined}
+      data-more={moreOpen || undefined}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setPinned(true);
+        setPeeled(true);
+      }}
+    >
       {data.hasParent && (
         <Handle
           type="target"
@@ -121,12 +168,13 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         aria-label={`Actions for ${data.title}`}
         onPointerEnter={() => setPeeled(true)}
         onPointerLeave={() => {
+          if (pinned) return;
           setPeeled(false);
           setMoreOpen(false);
         }}
         onFocus={() => setPeeled(true)}
         onBlur={(e) => {
-          if (e.currentTarget.contains(e.relatedTarget)) return;
+          if (pinned || e.currentTarget.contains(e.relatedTarget)) return;
           setPeeled(false);
           setMoreOpen(false);
         }}
@@ -202,7 +250,11 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         </div>
       </div>
       {/* Outside the tray: the tray and its menu close when the pointer leaves, the popup must not. */}
-      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this node?">
+      <Popup open={sharing} onClose={() => setSharing(false)} title={`"${data.title}"`}>
+        {/* Mounted only while open: the panel loads this branch's shares when it mounts. */}
+        {sharing && project && <SharePanel {...project} branchNodeId={id} onClose={() => setSharing(false)} />}
+      </Popup>
+      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this branch?">
         <Text
           content={`"${data.title}"${data.hasChildren ? " and every branch under it" : ""} will be deleted. This can't be undone.`}
         />

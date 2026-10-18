@@ -5,12 +5,13 @@ import { useShares } from "../useShares";
 
 /* The share popover (Figma Toolbar "State=Share"): invite someone by email,
  * then manage who has access. Accepted members read bold, invitations that
- * haven't been accepted are faint and can be resent. Owner-only (backend). */
+ * haven't been accepted are faint and can be resent. Owner-only (backend).
+ * With `branchNodeId` it shares and lists just that branch (a node's tray opens it). */
 
-type SharePanelProps = { slug: string; projectId: string; onClose(): void };
+type SharePanelProps = { slug: string; projectId: string; branchNodeId?: string; onClose(): void };
 
-export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
-  const shares = useShares(slug, projectId);
+export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePanelProps) {
+  const shares = useShares(slug, projectId, branchNodeId);
   const [email, setEmail] = useState("");
   const { state, busyId, actionError } = shares;
 
@@ -23,7 +24,7 @@ export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
     <Panel as="section" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
       <Frame gap="3">
         <Frame direction="row" justify="between" align="center">
-          <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Share" />
+          <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content={branchNodeId ? "Share branch" : "Share"} />
           <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 

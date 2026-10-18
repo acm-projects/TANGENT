@@ -12,16 +12,17 @@ export type SharesState =
   | { status: "error"; message: string }
   | { status: "ready"; items: ShareItem[] };
 
-async function load(slug: string, projectId: string): Promise<SharesState> {
+async function load(slug: string, projectId: string, branchNodeId?: string): Promise<SharesState> {
   try {
-    return { status: "ready", items: sortShares(await api.shares.list(slug, projectId)) };
+    return { status: "ready", items: sortShares(await api.shares.list(slug, projectId, branchNodeId)) };
   } catch (e) {
     if (apiErrorStatus(e) === 403) return { status: "forbidden" };
     return { status: "error", message: apiErrorMessage(e, "Couldn't load sharing.") };
   }
 }
 
-export function useShares(slug: string, projectId: string) {
+/** `branchNodeId`: manage the shares of that one branch instead of the whole project's. */
+export function useShares(slug: string, projectId: string, branchNodeId?: string) {
   const [state, setState] = useState<SharesState>({ status: "loading" });
   /** The row being acted on, or "invite" while inviting. Disables its buttons. */
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -31,13 +32,13 @@ export function useShares(slug: string, projectId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    load(slug, projectId).then((next) => {
+    load(slug, projectId, branchNodeId).then((next) => {
       if (!cancelled) setState(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [slug, projectId]);
+  }, [slug, projectId, branchNodeId]);
 
   /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed. */
   async function run(id: string, action: () => Promise<unknown>, fallback: string): Promise<boolean> {
@@ -52,7 +53,7 @@ export function useShares(slug: string, projectId: string) {
       ok = false;
       setActionError(apiErrorMessage(e, fallback));
     }
-    setState(await load(slug, projectId));
+    setState(await load(slug, projectId, branchNodeId));
     busy.current = false;
     setBusyId(null);
     return ok;
@@ -64,7 +65,7 @@ export function useShares(slug: string, projectId: string) {
     actionError,
     /** True if the invitation was sent. */
     invite: (email: string) =>
-      run("invite", () => api.shares.invite(slug, projectId, email), "Couldn't send the invitation. Check the email address."),
+      run("invite", () => api.shares.invite(slug, projectId, email, branchNodeId), "Couldn't send the invitation. Check the email address."),
     revoke: (item: ShareItem) =>
       run(
         item.id,
