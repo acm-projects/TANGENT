@@ -23,5 +23,6 @@ export { Button } from "./components/Button/Button";
 export { InkText } from "./components/InkText/InkText";
 export { Popup } from "./components/Popup/Popup";
 export { DangerButton } from "./components/DangerButton/DangerButton";
+export { Loading } from "./components/Loading/Loading";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";

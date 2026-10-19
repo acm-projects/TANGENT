@@ -1,5 +1,6 @@
 import { api, forkedProjectIdOf } from "@/api";
 import type { ForkInfo } from "@/api";
+import type { NodeMeta } from "@/api/types";
 import { useTreeStore } from "@/store/treeStore";
 
 /* The map's per-node actions, shared with the chat's "branch" button.
@@ -18,8 +19,12 @@ export async function redirectToCopy(copyId: string) {
 
 const PENDING = "pending:";
 
-/** A fork the server hasn't confirmed yet: it can't be sent to, forked or deleted until it has a real id. */
+/** A fork the server hasn't confirmed yet: it can't be sent to or forked until it has a real id.
+ * Deleting it is queued instead (deleteNode). */
 export const isPending = (nodeId: string | null) => Boolean(nodeId?.startsWith(PENDING));
+
+/** Placeholders deleted before the server answered: each waits for the real node (or null if none was made). */
+const queuedDeletes = new Map<string, (node: NodeMeta | null) => void>();
 
 /** Real ids that replaced a pending fork. Their card is already on the map, so it doesn't pin in again. */
 export const confirmedForks = new Set<string>();
@@ -56,11 +61,20 @@ export async function forkNode(nodeId: string) {
     if (wasActive) s.setActive(previous);
   };
 
+  // the placeholder was deleted meanwhile: hand the outcome to that delete instead of showing it
+  const takeQueued = () => {
+    const waiting = queuedDeletes.get(tempId);
+    queuedDeletes.delete(tempId);
+    return waiting;
+  };
+
   let res;
   try {
     res = await api.nodes.fork(nodeId);
   } catch (e) {
+    const waiting = takeQueued();
     drop();
+    if (waiting) return waiting(null); // nothing was made, so nothing to delete
     const copyId = forkedProjectIdOf(e);
     if (copyId) return redirectToCopy(copyId);
     throw e;
@@ -68,9 +82,12 @@ export async function forkNode(nodeId: string) {
   const { fork, ...child } = res;
   // The new node already lives in the copy; the switch loads that tree and opens it.
   if (fork) {
+    takeQueued()?.(null); // shortcut: a fork that landed in a copy stays there; the switch shows it
     drop();
     return switchToFork(fork, child.id);
   }
+  const waiting = takeQueued();
+  if (waiting) return waiting(child);
   const s = useTreeStore.getState();
   if (!parent) {
     // the parent isn't in the store, so there was no placeholder: just add the node
@@ -85,7 +102,8 @@ export async function forkNode(nodeId: string) {
 }
 
 /** Delete a node and everything branching from it. Optimistic: the branch goes at once and is put
- * back (with its chats, and the selection if it was inside) if the server refuses. */
+ * back (with its chats, and the selection if it was inside) if the server refuses.
+ * A placeholder fork goes at once too; its delete is sent as soon as the server confirms the real node. */
 export async function deleteNode(nodeId: string) {
   const store = useTreeStore.getState();
   // parents before children, so each restored node has its parent back already
@@ -93,8 +111,18 @@ export async function deleteNode(nodeId: string) {
   for (let i = 0; i < ids.length; i++) ids.push(...(store.childrenByParent[ids[i]!] ?? []));
   const nodes = ids.flatMap((id) => store.nodesById[id] ?? []);
   const chats = ids.flatMap((id) => (store.chatsByNode[id] ? [[id, store.chatsByNode[id]] as const] : []));
-  const previous = store.activeNodeId;
+  let previous = store.activeNodeId;
   store.removeNode(nodeId);
+  if (isPending(nodeId)) {
+    const real = await new Promise<NodeMeta | null>((res) => queuedDeletes.set(nodeId, res));
+    if (!real) return;
+    // a placeholder has no children: restoring means putting the real node back where it was
+    nodes.splice(0, 1, real);
+    if (chats.length) chats.splice(0, 1, [real.id, chats[0]![1]]);
+    ids.splice(0, 1, real.id);
+    if (previous === nodeId) previous = real.id;
+    nodeId = real.id;
+  }
   try {
     await api.nodes.delete(nodeId);
   } catch (e) {

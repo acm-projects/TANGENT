@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeMeta } from "@/api/types";
-import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "./treeStore";
+import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "./treeStore";
 
 const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
@@ -119,5 +119,16 @@ describe("tree store", () => {
     expect(s.childrenByParent["r"]).toEqual(["c2"]);
     expect(s.childrenByParent["c1"]).toBeUndefined();
     expect(s.activeNodeId).toBe("r");
+  });
+});
+
+describe("selectExhibits", () => {
+  it("numbers the tree like an outline, by sibling order", () => {
+    const childrenByParent = { r: ["a", "b"], b: ["c"] };
+    expect(selectExhibits({ rootId: "r", childrenByParent })).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
+  });
+
+  it("is empty with no tree", () => {
+    expect(selectExhibits({ rootId: null, childrenByParent: {} })).toEqual({});
   });
 });

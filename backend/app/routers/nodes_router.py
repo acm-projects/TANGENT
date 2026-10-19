@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -47,6 +48,8 @@ _PATH_SQL = text("""
 class MessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=20_000)
     model: str = DEFAULT_MODEL_ID
+    # Regenerate the node's last reply: its last question is asked again and the new exchange replaces the old one.
+    retry: bool = False
 
 
 class MergeRequest(BaseModel):
@@ -55,6 +58,11 @@ class MergeRequest(BaseModel):
 
 class ForkNodeOut(NodeMeta):
     fork: Optional[ForkInfo] = None
+
+
+# Replies a user can stop, by (user id, prompted node id). Set by POST .../messages/stop, watched by send_message.
+# shortcut: in-process only, so a stop must reach the worker that runs the stream; move to Redis pub/sub when scaling out.
+_stops: dict[tuple[UUID, UUID], asyncio.Event] = {}
 
 
 def _sse(event: str, data: dict) -> str:
@@ -114,27 +122,32 @@ async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tupl
         return write_node_id, {**info.model_dump(mode="json"), "node_id": str(write_node_id)}
 
 
-async def _persist(user_id: UUID, write_node_id: UUID, user_text: str, assistant_text: str) -> None:
+async def _persist(
+    user_id: UUID, write_node_id: UUID, user_text: str, assistant_text: str, replace_last: bool = False
+) -> None:
     """Append the exchange to nodes.chats of the node already resolved by _prepare_write. Own session: the
     request's may already be closed once the stream ends. `||` appends atomically (no read-modify-write);
-    seq is the new array index."""
+    seq is the new array index. `replace_last` (a retry) first drops the last exchange, `- -1` twice."""
+    base = "((chats - -1) - -1)" if replace_last else "chats"
+    # a retry must still find the reply it replaces; if it's gone, the save fails rather than eat a question
+    guard = "AND jsonb_array_length(chats) >= 2 AND chats->-1->>'role' = 'assistant'" if replace_last else ""
     now = datetime.now(timezone.utc).isoformat()
     async with AsyncSessionLocal() as session, session.begin():
         await session.execute(
             text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)}
         )
         result = await session.execute(
-            text("""
+            text(f"""
                 UPDATE nodes SET
                   title = COALESCE(title, left(CAST(:user_text AS text), 40)),
-                  chats = chats
+                  chats = {base}
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'user', 'content', CAST(:user_text AS text),
-                         'seq', jsonb_array_length(chats), 'branch_source', NULL, 'created_at', CAST(:now AS text)))
+                         'seq', jsonb_array_length({base}), 'branch_source', NULL, 'created_at', CAST(:now AS text)))
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'assistant', 'content', CAST(:assistant_text AS text),
-                         'seq', jsonb_array_length(chats) + 1, 'branch_source', NULL, 'created_at', CAST(:now AS text)))
-                WHERE id = :node_id
+                         'seq', jsonb_array_length({base}) + 1, 'branch_source', NULL, 'created_at', CAST(:now AS text)))
+                WHERE id = :node_id {guard}
             """),
             {"node_id": write_node_id, "user_text": user_text, "assistant_text": assistant_text, "now": now},
         )
@@ -285,6 +298,15 @@ async def merge_nodes(
     return ForkNodeOut(**NodeMeta.model_validate(child).model_dump(), fork=info)
 
 
+@router.post("/{node_id}/messages/stop", status_code=204)
+async def stop_message(node_id: UUID, user: User = Depends(get_current_user)):
+    """Stop the caller's reply streaming on this node. What arrived so far is saved, and the stream ends with
+    `done {stopped: true}`. A no-op when nothing is streaming (it already finished, or never started)."""
+    stop = _stops.get((user.id, node_id))
+    if stop is not None:
+        stop.set()
+
+
 @router.delete("/{node_id}", status_code=204)
 async def delete_node(
     node_id: UUID,
@@ -318,7 +340,15 @@ async def send_message(
     `fork`. The pipeline runs detached from the request, so closing the tab does not lose the reply or the fork."""
     get_model_or_400(req.model)
     path, project_id = await _load_path(db, node_id, user.id)
-    messages = to_provider_messages(flatten(path), req.content)
+    prompt = req.content
+    if req.retry:
+        chats = path[-1].chats
+        if len(chats) < 2 or chats[-2].role != "user" or chats[-1].role != "assistant":
+            raise HTTPException(409, "There's no reply on this node to retry")
+        # the stored question, not the client's copy: a retry re-asks exactly what was asked
+        prompt = chats[-2].content
+        path[-1] = path[-1].model_copy(update={"chats": chats[:-2]})
+    messages = to_provider_messages(flatten(path), prompt)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 
@@ -329,6 +359,9 @@ async def send_message(
         """The whole write pipeline, detached from the HTTP request: fork (sharee) -> stream -> save.
         It keeps going if the client disconnects, so a closed tab neither loses the reply nor the fork."""
         fork: Optional[dict] = None
+        # registered first, so a stop sent while the project is still being copied isn't lost
+        key = (user_id, node_id)
+        stop = _stops[key] = asyncio.Event()
         try:
             try:
                 write_node_id, fork = await _prepare_write(user_id, project_id, node_id)
@@ -343,27 +376,53 @@ async def send_message(
 
             reply: list[str] = []
             done: dict = {}
-            try:
+
+            async def pump() -> Optional[str]:
+                """Relay the provider's tokens; returns its error message, or None once it finishes."""
                 async for ev in stream_openrouter(messages, req.model):
                     if "error" in ev:
                         err = ev["error"]
-                        queue.put_nowait(_error({"message": err if isinstance(err, str) else json.dumps(err)}, fork))
-                        return
+                        return err if isinstance(err, str) else json.dumps(err)
                     if "text" in ev:
                         reply.append(ev["text"])
                         queue.put_nowait(_sse("token", {"text": ev["text"]}))
                     else:
-                        done = ev
-            except (httpx.HTTPError, ValueError):
-                queue.put_nowait(_error({"message": "The model provider failed; nothing was saved."}, fork))
-                return
+                        done.update(ev)
+                return None
+
+            # Race the provider against a stop: stopping cancels it at once, even before its first token.
+            pumping = asyncio.create_task(pump())
+            stopping = asyncio.create_task(stop.wait())
+            try:
+                await asyncio.wait({pumping, stopping}, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                stopping.cancel()
+            stopped = not pumping.done()
+            if stopped:
+                pumping.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await pumping
+                done = {"stopped": True}
+            else:
+                try:
+                    err = pumping.result()
+                except (httpx.HTTPError, ValueError):
+                    queue.put_nowait(_error({"message": "The model provider failed; nothing was saved."}, fork))
+                    return
+                if err is not None:
+                    queue.put_nowait(_error({"message": err}, fork))
+                    return
 
             answer = "".join(reply)
+            if not answer and stopped:
+                # stopped before the first token: nothing to keep, and the prompt goes unsaved with it
+                queue.put_nowait(_sse("done", {**done, "fork": fork} if fork else done))
+                return
             if not answer:
                 queue.put_nowait(_error({"message": "The model returned an empty reply; nothing was saved."}, fork))
                 return
             try:
-                await _persist(user_id, write_node_id, req.content, answer)
+                await _persist(user_id, write_node_id, prompt, answer, replace_last=req.retry)
             except Exception:
                 log.exception("saving chat to node %s failed", write_node_id)
                 queue.put_nowait(_error({"message": "The reply could not be saved."}, fork))
@@ -373,6 +432,8 @@ async def send_message(
             log.exception("chat pipeline for node %s crashed", node_id)
             queue.put_nowait(_error({"message": "Something went wrong; the reply may not have been saved."}, fork))
         finally:
+            if _stops.get(key) is stop:
+                del _stops[key]
             queue.put_nowait(None)
 
     async def events():

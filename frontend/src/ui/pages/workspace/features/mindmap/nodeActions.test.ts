@@ -63,3 +63,48 @@ describe("deleteNode (optimistic)", () => {
     expect(s.activeNodeId).toBe("g");
   });
 });
+
+describe("deleting a placeholder fork", () => {
+  beforeEach(() => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
+    remove.mockReset();
+  });
+
+  it("removes it at once and deletes the real node once the server confirms it", async () => {
+    let answer!: (n: NodeMeta & { fork: null }) => void;
+    fork.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const forked = forkNode("r");
+    const temp = useTreeStore.getState().activeNodeId!;
+    const deleted = deleteNode(temp);
+    expect(useTreeStore.getState().childrenByParent["r"] ?? []).toEqual([]);
+    expect(remove).not.toHaveBeenCalled();
+    remove.mockResolvedValueOnce(undefined);
+    answer({ ...node("b", "r", 1), fork: null });
+    await Promise.all([forked, deleted]);
+    expect(remove).toHaveBeenCalledWith("b");
+    expect(useTreeStore.getState().nodesById["b"]).toBeUndefined();
+  });
+
+  it("puts the real node back if that delete is refused", async () => {
+    let answer!: (n: NodeMeta & { fork: null }) => void;
+    fork.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const forked = forkNode("r");
+    const deleted = deleteNode(useTreeStore.getState().activeNodeId!);
+    remove.mockRejectedValueOnce(new Error("nope"));
+    answer({ ...node("b", "r", 1), fork: null });
+    await forked;
+    await expect(deleted).rejects.toThrow("nope");
+    const s = useTreeStore.getState();
+    expect(s.childrenByParent["r"]).toEqual(["b"]);
+    expect(s.activeNodeId).toBe("b");
+  });
+
+  it("sends nothing if the fork itself fails", async () => {
+    fork.mockRejectedValueOnce(new Error("nope"));
+    const forked = forkNode("r");
+    const deleted = deleteNode(useTreeStore.getState().activeNodeId!);
+    await Promise.all([forked, deleted]);
+    expect(remove).not.toHaveBeenCalled();
+    expect(useTreeStore.getState().childrenByParent["r"] ?? []).toEqual([]);
+  });
+});

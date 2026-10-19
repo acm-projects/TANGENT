@@ -33,6 +33,10 @@
   --ink-faint-light: #8f8a84;
   --ink-faint-dark: #6e6a65;
 
+  /* folder card stock: the one warm-leaning neutral, still short of cream */
+  --manila-light: #d3cbbd;
+  --manila-dark: #47413a;
+
   --rule-light: #cfcbc4;
   --rule-dark: #46423e;
 
@@ -48,6 +52,15 @@
   --color-surface: light-dark(var(--paper-light), var(--paper-dark));
   --color-surface-raised: light-dark(var(--paper-raised-light), var(--paper-raised-dark));
   --color-board: light-dark(var(--board-light), var(--board-dark));
+  /* The desk lamp over the board: a warm pool of light, and the dimmer edges
+   * it doesn't reach. Layer over --color-board with --texture-grain. */
+  --light-lamp: radial-gradient(ellipse 60% 70% at 32% 42%,
+      light-dark(rgb(255 252 246 / 0.55), rgb(255 236 210 / 0.1)), transparent 70%);
+  --light-vignette: radial-gradient(ellipse 120% 100% at 40% 45%,
+      transparent 55%, light-dark(rgb(60 45 30 / 0.1), rgb(0 0 0 / 0.45)));
+
+  /* manila: case folders, and the band that heads a panel holding a case's files */
+  --color-folder: light-dark(var(--manila-light), var(--manila-dark));
 
   /* Four text emphases, strongest first:
    *   text            selected node, chat messages
@@ -74,6 +87,14 @@
    * danger colour: a red delete button would read as a link. */
   --color-string: var(--red-flag);
   --color-danger: light-dark(var(--red-oxblood-light), var(--red-oxblood-dark));
+
+  /* what string and pins cast on the board, and the light caught on a pin head */
+  --color-string-shadow: light-dark(rgb(40 30 20 / 0.28), rgb(0 0 0 / 0.6));
+  --color-pin-shine: light-dark(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.55));
+  /* that light as a layer for a domed pin head: `background: var(--texture-pin), var(--color-string)` */
+  --texture-pin: radial-gradient(circle at 32% 30%, var(--color-pin-shine) 0 18%, transparent 46%);
+
+  --color-selection: light-dark(rgb(42 40 38 / 0.16), rgb(236 233 228 / 0.2));
 
   --color-focus-ring: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
 

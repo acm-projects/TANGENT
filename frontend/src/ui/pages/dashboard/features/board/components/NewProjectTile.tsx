@@ -32,11 +32,12 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
       <motion.div layoutId="new-project" className="case-slot" transition={spring.pin}>
         <Button
           hierarchy="tertiary"
-          size="display"
+          size={names.length === 0 ? "xl" : "display"}
           icon="add"
-          label="New project"
+          label={names.length === 0 ? "Pin your first case" : "New project"}
           showIcon
-          showLabel={false}
+          // alone on the board, the tile says what it does
+          showLabel={names.length === 0}
           className="case-new"
           onClick={() => {
             setError(null);

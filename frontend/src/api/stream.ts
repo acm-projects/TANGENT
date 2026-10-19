@@ -35,6 +35,8 @@ export interface StreamOptions {
   content: string;
   /** A model id from GET /models; the server picks its default when omitted. */
   model?: string;
+  /** Regenerate the node's last reply: the server re-asks its last question and replaces that exchange. */
+  retry?: boolean;
   getAccessToken(): string | null;
   refresh(): Promise<string>;
   onEvent(e: StreamEvent): void;
@@ -55,7 +57,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content: opts.content, model: opts.model }),
+      body: JSON.stringify({ content: opts.content, model: opts.model, retry: opts.retry }),
       signal: opts.signal,
     });
 
@@ -72,7 +74,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
 
   for await (const { event, data } of sseFrames(res.body)) {
     if (event === "token") opts.onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
-    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo }) });
+    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean }) });
     else if (event === "error") {
       const { message, fork, forked_project_id } = JSON.parse(data) as { message: string; fork?: ForkInfo; forked_project_id?: string };
       return void opts.onEvent({ type: "error", message, fork, forkedProjectId: forked_project_id });

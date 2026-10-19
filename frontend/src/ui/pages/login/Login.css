@@ -6,6 +6,7 @@
   padding: var(--space-4);
   /* the board, with the map's dot grid, so the paper card stands off it */
   background:
+    var(--light-vignette),
     radial-gradient(color-mix(in srgb, var(--color-text-faint) 45%, transparent) 0.75px, transparent 1px) 0 0 / 16px 16px,
     var(--texture-grain),
     var(--color-board);

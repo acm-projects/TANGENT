@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import type { ProjectSummary } from "@/api/types";
 import { Link } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
-import { tiltOf } from "../sketch";
+import { leanOf, tiltOf } from "../sketch";
 import { CardFace } from "./CardFace";
 import { ProjectSettings } from "./ProjectSettings";
 
@@ -26,13 +26,16 @@ type ProjectCardProps = {
 
 export function ProjectCard({ project, index, dropIn, slug, onRename, onDelete }: ProjectCardProps) {
   const tilt = tiltOf(project.id);
+  const lean = leanOf(project.id);
   return (
     <motion.div
       layoutId={`card-${project.id}`}
       className="case-slot"
       initial={dropIn ? { opacity: 0, y: 40 } : false}
-      animate={{ opacity: 1, y: 0, rotate: 0 }}
-      whileHover={{ y: -8, rotate: 2.5 * tilt, transition: spring.lift }}
+      animate={{ opacity: 1, y: lean.y, rotate: lean.rotate }}
+      whileHover={{ y: lean.y - 10, rotate: lean.rotate + 2.5 * tilt, transition: spring.lift }}
+      // pressed flat against the board as it's taken down to open
+      whileTap={{ y: lean.y, rotate: 0, scale: 0.96, transition: spring.lift }}
       transition={{ ...spring.fly, delay: index * 0.035 }}
     >
       <Link href={`/${slug}/${project.id}`} aria-label={`Open ${project.project_name}`} className="case-link">

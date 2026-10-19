@@ -49,7 +49,18 @@ export function sketchTree({ tree, nodes }: TreeResponse): SketchPin[] {
 
 /** 1 or -1, fixed per id: which way a card tilts. */
 export function tiltOf(id: string) {
+  return hashOf(id) & 1 ? 1 : -1;
+}
+
+/** How a card hangs on the board, fixed by its id: tipped its tilt's way by
+ * 0.6–2°, and pinned up to 4px off the row. */
+export function leanOf(id: string) {
+  const h = hashOf(id);
+  return { rotate: tiltOf(id) * (0.6 + (((h >>> 1) & 7) / 7) * 1.4), y: ((h >>> 4) & 7) - 4 };
+}
+
+function hashOf(id: string) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return h & 1 ? 1 : -1;
+  return h;
 }

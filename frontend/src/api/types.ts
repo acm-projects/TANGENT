@@ -84,7 +84,8 @@ export interface TreeResponse {
 /** SSE events emitted by POST /nodes/:id/messages */
 export type StreamEvent =
   | { type: "token"; text: string }
-  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo }
+  // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
+  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean }
   // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).
   | { type: "error"; message: string; fork?: ForkInfo; forkedProjectId?: string };
 

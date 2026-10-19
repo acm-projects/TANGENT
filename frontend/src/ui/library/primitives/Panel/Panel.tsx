@@ -21,7 +21,9 @@ export function Panel<T extends PanelTag = "div">({
   ...rest
 }: PanelProps<T>) {
   const Tag = (as ?? "div") as ElementType;
+  // A button gets autoComplete="off": Firefox otherwise restores its disabled state on reload, before
+  // hydration, and the HTML no longer matches (see TextArea). React's button types omit it; browsers don't.
   /* data-ui goes after the spread so it can't be overwritten. A component
    * built on a Panel marks its root with data-component instead (§4). */
-  return <Tag {...rest} data-ui="panel" data-hierarchy={hierarchy} data-elevation={elevation} />;
+  return <Tag {...(as === "button" && { autoComplete: "off" })} {...rest} data-ui="panel" data-hierarchy={hierarchy} data-elevation={elevation} />;
 }

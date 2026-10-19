@@ -38,35 +38,6 @@
   font-size: var(--font-size-display);
 }
 
-/* While the board loads, a red pin beside "Loading…" breathes: an
- * in-progress state, the one kind of loop allowed (VISUAL_LANGUAGE §5). */
-.board-loading {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.board-loading::before {
-  content: "";
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: var(--radius-full);
-  background: var(--color-string);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .board-loading::before {
-    animation: board-pin-breathe var(--motion-spring) var(--ease-in-out) infinite alternate;
-  }
-}
-
-@keyframes board-pin-breathe {
-  to {
-    scale: 0.6;
-    opacity: 0.5;
-  }
-}
-
 /* ── the grid ──────────────────────────────────────────────── */
 
 .board-grid {
@@ -187,12 +158,14 @@
 }
 
 /* a rubber stamp across the photo's corner, in the oxblood ink */
+/* Stamped low on the photo, clear of the ⋯ button, and slammed down on arrival. */
 .case-card-stamp {
   position: absolute;
-  top: 1.6em;
+  bottom: 6em;
   right: 0.9em;
   padding: 0.1em 0.45em;
-  rotate: -12deg;
+  rotate: -9deg;
+  animation: stamp-slam var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
   border: 0.14em solid var(--color-danger);
   border-radius: var(--radius-sm);
   color: var(--color-danger);
@@ -201,6 +174,14 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.85;
+}
+
+@keyframes stamp-slam {
+  from {
+    opacity: 0;
+    scale: 2.4;
+    rotate: -24deg;
+  }
 }
 
 /* ── settings ──────────────────────────────────────────────── */
@@ -226,7 +207,8 @@
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
-  width: 16rem;
+  /* a grid card is at least 13rem: at 14rem the sheet stays inside the board's padding, even on the first card */
+  width: 14rem;
   transform-origin: top right;
 }
 
@@ -254,6 +236,20 @@
   transition:
     border-color var(--motion-fast) var(--ease-out),
     color var(--motion-fast) var(--ease-out);
+}
+
+/* With a label (an empty board) the icon sits over it, and the tile beckons once. */
+[data-ui="panel"][data-component="button"].case-new:not([data-icon-only]) {
+  flex-direction: column;
+  animation: case-new-beckon var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+}
+
+@keyframes case-new-beckon {
+  from {
+    opacity: 0;
+    scale: 0.85;
+    rotate: -3deg;
+  }
 }
 
 [data-ui="panel"][data-component="button"].case-new:hover {
@@ -298,7 +294,6 @@
 }
 
 .folder {
-  --kraft: color-mix(in oklab, var(--color-surface-raised) 72%, var(--color-text-secondary));
   position: relative;
   flex: 0 1 10rem;
   min-width: 6.5rem;
@@ -312,7 +307,7 @@
   position: absolute;
   inset: 1.4rem 0 0;
   border-radius: 0 var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--kraft);
+  background: var(--texture-grain), var(--color-folder);
   box-shadow: var(--shadow-floating);
 }
 
@@ -327,7 +322,7 @@
   height: 1.5rem;
   padding: 0 var(--space-3);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--kraft);
+  background: var(--texture-grain), var(--color-folder);
   color: var(--color-text-secondary);
 }
 
@@ -392,7 +387,7 @@
   background:
     radial-gradient(ellipse 1.4rem 0.6rem at 50% 0, rgb(0 0 0 / 0.08), transparent 70%),
     var(--texture-grain),
-    color-mix(in oklab, var(--kraft) 45%, var(--color-surface));
+    color-mix(in oklab, var(--color-folder) 45%, var(--color-surface));
   box-shadow:
     0 -1px 0 var(--color-border),
     0 -0.25rem 0.6rem rgb(0 0 0 / 0.08);

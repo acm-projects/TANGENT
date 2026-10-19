@@ -1,0 +1,96 @@
+/* CaseBoard — see CaseBoard.tsx. Unlayered feature CSS (DESIGN.md §2).
+ *
+ * Every position is a percent of the screen, and the strings are drawn in a
+ * 0–100 box stretched over the screen (preserveAspectRatio="none", strokes
+ * that don't scale), so a string always lands on its card's pin. A card's
+ * pin is its left edge + 7vw (half its 14vw width), at its top edge.
+ * The strings are masks filled with token colours, so they re-theme. */
+
+.case-board {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.case-board-card {
+  position: absolute;
+  width: 14vw;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  /* out of focus: the board is behind the card you are reading */
+  filter: blur(1.2px);
+  opacity: 0.8;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(var(--motion-base) + sibling-index() * var(--motion-fast));
+  --pop-scale: 1.15;
+}
+
+.case-board-card:nth-child(1) { left: 8%;  top: 12%; rotate: -4deg;  --pop-from: -4rem -3rem; }
+.case-board-card:nth-child(2) { left: 74%; top: 9%;  rotate: 3deg;   --pop-from: 4rem -3rem; }
+.case-board-card:nth-child(3) { left: 12%; top: 66%; rotate: 2.5deg; --pop-from: -4rem 3rem; }
+.case-board-card:nth-child(4) { left: 77%; top: 62%; rotate: -3deg;  --pop-from: 4rem 3rem; }
+
+/* each card's pin: red for the one strung in red, graphite for the rest */
+.case-board-card::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background:
+    var(--texture-pin),
+    var(--color-text-faint);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+}
+
+.case-board-card:nth-child(1)::before {
+  background-color: var(--color-string);
+}
+
+.case-board-exhibit {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* the strings, over the cards and under the auth card */
+.case-board-strings {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  filter: drop-shadow(0 2px 1.5px var(--color-string-shadow));
+  animation: case-board-strings var(--motion-slow) var(--ease-out) calc(var(--motion-spring) + var(--motion-base)) backwards;
+}
+
+.case-board-strings::before,
+.case-board-strings::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  mask-size: 100% 100%;
+}
+
+.case-board-strings::before {
+  background: var(--color-text-faint);
+  mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M81 9 Q67 38 50 50" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M19 66 Q33 70 50 50" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M84 62 Q68 66 50 50" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>');
+}
+
+.case-board-strings::after {
+  background: var(--color-string);
+  mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M15 12 Q31 40 50 50" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>');
+}
+
+@keyframes case-board-strings {
+  from {
+    opacity: 0;
+  }
+}
+
+/* too narrow: the cards would crowd the auth card */
+@media (max-width: 60rem) {
+  .case-board {
+    display: none;
+  }
+}

@@ -41,4 +41,9 @@ describe("toFlow", () => {
   it("labels an untitled node", () => {
     expect(toFlow(slice(null)).nodes.find((n) => n.id === "c")?.data.title).toBe(UNTITLED);
   });
+
+  it("numbers nodes like an outline, by sibling order", () => {
+    const labels = Object.fromEntries(toFlow(slice(null)).nodes.map((n) => [n.id, n.data.exhibit]));
+    expect(labels).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
+  });
 });

@@ -1,4 +1,5 @@
 import { Frame } from "@/ui/library";
+import { CaseBoard } from "@/ui/features/auth/CaseBoard";
 import { InviteCard } from "@/ui/features/auth/InviteCard";
 import "../login/Login.css";
 
@@ -6,6 +7,7 @@ import "../login/Login.css";
 export function Invite({ token }: { token: string }) {
   return (
     <Frame as="main" align="center" className="login">
+      <CaseBoard />
       <InviteCard token={token} />
     </Frame>
   );

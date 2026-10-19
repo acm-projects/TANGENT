@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -9,24 +9,32 @@ import { Button, Frame, Icon, Panel, Text } from "@/ui/library";
 /* One message (Figma "ChatBubble", 16:219).
  *   User:      a filled bubble on the right, with "Uploaded x" lines above it.
  *   Assistant: plain text on the left, with "Viewed x" / "Thought for 1m 4s"
- *              lines above it and Copy + Branch actions below.
- * Styles live in ../Chat.css. */
+ *              lines above it and Copy + Branch (+ Retry, on the newest) actions below.
+ * Styles live in ../Chat.css.
+ *
+ * Memoised, with props that stay the same between renders (onBranch takes the node id rather than closing
+ * over it): a long thread is hundreds of these, and switching cards or streaming a token re-renders the
+ * history, which would otherwise re-parse every message's markdown and maths. */
 
 type MessageBubbleProps = {
   message: ChatMessage;
-  /** Branch from the node this message belongs to. Omitted while streaming. */
-  onBranch?: () => void;
+  /** The node this message belongs to, which Branch forks from. */
+  nodeId?: string;
+  /** Branch from `nodeId`. Omitted while streaming. */
+  onBranch?: (nodeId: string) => void;
+  /** Ask the question again for a new reply in this one's place. Only the newest reply on the selected leaf has it. */
+  onRetry?: () => void;
   /** true for the reply that is still arriving */
   streaming?: boolean;
 };
 
-export function MessageBubble({ message, onBranch, streaming = false }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false }: MessageBubbleProps) {
   return message.role === "user" ? (
     <UserMessage message={message} />
   ) : (
-    <AssistantMessage message={message} onBranch={onBranch} streaming={streaming} />
+    <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} />
   );
-}
+});
 
 function UserMessage({ message }: { message: ChatMessage }) {
   return (
@@ -43,7 +51,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
   );
 }
 
-function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
+function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -63,14 +71,19 @@ function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubblePr
       {message.thought_seconds !== undefined && (
         <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
       )}
-      <div className="message-text message-markdown" data-streaming={streaming || undefined}>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
-        >
-          {message.content || "…"}
-        </ReactMarkdown>
-      </div>
+      {streaming && !message.content ? (
+        // before the first token: a pin reeling out string (Chat.css)
+        <Text role="status" size="s" hierarchy="tertiary" className="message-thinking" content="Pulling the thread" />
+      ) : (
+        <div className="message-text message-markdown" data-streaming={streaming || undefined}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+          >
+            {message.content || "…"}
+          </ReactMarkdown>
+        </div>
+      )}
       {!streaming && (
         <Frame direction="row" gap="1" className="message-actions">
           <Button
@@ -85,15 +98,28 @@ function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubblePr
             showLabel={false}
             onClick={copy}
           />
-          {onBranch && (
+          {onRetry && (
+            <Button
+              hierarchy="tertiary"
+              size="s"
+              label="Retry"
+              icon="refresh"
+              showIcon
+              showLabel={false}
+              className="message-retry"
+              onClick={onRetry}
+            />
+          )}
+          {onBranch && nodeId && (
             <Button
               hierarchy="tertiary"
               size="s"
               label="Branch from here"
               icon="call_split"
               showIcon
-              showLabel={false}
-              onClick={onBranch}
+              // the core action of the app, so it is spelled out, not a bare icon
+              className="message-branch"
+              onClick={() => onBranch(nodeId)}
             />
           )}
         </Frame>

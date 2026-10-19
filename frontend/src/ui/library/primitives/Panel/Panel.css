@@ -9,7 +9,7 @@
   [data-ui="panel"] {
     padding: var(--space-4);
     border: 1px solid transparent;
-    border-radius: var(--radius-xxl);
+    border-radius: var(--radius-lg);
     background: var(--texture-grain), var(--color-surface);
     color: var(--color-text);
   }

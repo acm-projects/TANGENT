@@ -22,10 +22,14 @@ type MessageFieldProps = {
   modelsLoading: boolean;
   onModelChange(modelId: string): void;
   className?: string;
+  /** The card being written on: names it in the empty field ("Ask about …"). */
+  about?: string | null;
   onSend(content: string, files: File[]): void;
+  /** Stop the reply that's streaming: Send turns into Stop while one is. */
+  onStop(): void;
 };
 
-export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, className }: MessageFieldProps) {
+export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -85,7 +89,7 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
 
         <TextArea
           aria-label="Message"
-          placeholder={PLACEHOLDER[blocker ?? "ready"]}
+          placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
           value={text}
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
@@ -101,7 +105,6 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
               disabled={modelsLoading || blocker === "streaming" || models.length === 0}
-              autoComplete="off" // stops Firefox restoring the disabled state on reload, which breaks hydration
               options={
                 modelsLoading
                   ? [{ value: "", label: "Loading models…" }]
@@ -129,16 +132,32 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               onClick={() => imageInput.current?.click()}
             />
           </Frame>
-          <Button
-            hierarchy="primary"
-            label="Send"
-            icon="arrow_upward"
-            showIcon
-            showLabel={false}
-            disabled={!canSend}
-            onClick={submit}
-            className="message-field-send"
-          />
+          {/* keyed, so swapping Send for Stop stamps the new one in */}
+          {blocker === "streaming" ? (
+            <Button
+              key="stop"
+              hierarchy="primary"
+              label="Stop"
+              icon="stop"
+              showIcon
+              showLabel={false}
+              onClick={onStop}
+              className="message-field-send"
+              data-stop
+            />
+          ) : (
+            <Button
+              key="send"
+              hierarchy="primary"
+              label="Send"
+              icon="arrow_upward"
+              showIcon
+              showLabel={false}
+              disabled={!canSend}
+              onClick={submit}
+              className="message-field-send"
+            />
+          )}
         </Frame>
       </Frame>
 

@@ -1,4 +1,5 @@
 import { Frame } from "@/ui/library";
+import { CaseBoard } from "@/ui/features/auth/CaseBoard";
 import { Auth } from "@/ui/features/auth/Auth";
 import "./Login.css";
 
@@ -6,6 +7,7 @@ import "./Login.css";
 export function Login({ next }: { next?: string }) {
   return (
     <Frame as="main" align="center" className="login">
+      <CaseBoard />
       <Auth mode="login" next={next} />
     </Frame>
   );

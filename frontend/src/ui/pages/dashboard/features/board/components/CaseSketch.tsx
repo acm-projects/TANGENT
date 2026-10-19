@@ -1,5 +1,4 @@
 import { SKETCH_H, SKETCH_W, type SketchPin } from "../sketch";
-import { useTreePreview } from "../useTreePreview";
 
 /* A project card's preview picture: its tree in miniature (../sketch.ts),
  * pins on faint string, the latest path strung in red. Decorative. */
@@ -26,10 +25,4 @@ export function CaseSketch({ pins }: { pins: SketchPin[] }) {
       ))}
     </svg>
   );
-}
-
-/** A project's tree, once it has loaded. */
-export function ProjectSketch({ projectId }: { projectId: string }) {
-  const pins = useTreePreview(projectId);
-  return pins ? <CaseSketch pins={pins} /> : null;
 }
