@@ -14,6 +14,26 @@
 
 .toolbar-rail {
   pointer-events: none;
+  /* slides in from off the left edge when the workspace opens */
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: -5rem 0;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* the panel's wrapper, which Motion swings out from the rail */
+.toolbar-slot {
+  display: flex;
+  transform-origin: left center;
+}
+
+/* Share: a small card level with the Share tile */
+.toolbar-slot[data-panel="share"] {
+  align-self: end;
 }
 
 .toolbar-rail > * {
@@ -126,9 +146,7 @@
   opacity: 1;
 }
 
-/* Share: a small card level with the Share tile */
 .share {
-  align-self: end;
   width: 20rem;
   padding: var(--space-4);
   border-radius: var(--radius-xl);
@@ -163,4 +181,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Source cards and members deal in one after another as the panel opens.
+ * sibling-index() staggers them where supported; elsewhere they land together. */
+.sources li,
+.share-list > li {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -1.5rem 0;
+  --pop-rotate: 0deg;
 }

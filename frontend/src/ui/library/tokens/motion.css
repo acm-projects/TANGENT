@@ -19,6 +19,25 @@
     0.9983, 0.9979, 0.9979, 0.9981, 0.9984, 0.9987, 0.999, 0.9993, 1);
 }
 
+/* Entrances for things that appear, shared app-wide: a pinned sheet dropping
+ * onto the board with a bounce. Set --pop-from (a translate) to say where it
+ * comes from (--pop-rotate and --pop-scale tune the rest). Durations are the tokens, so
+ * reduced motion zeroes them and the element just shows. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: var(--pop-scale, 0.82);
+    translate: var(--pop-from, 0 0.75rem);
+    rotate: var(--pop-rotate, -2deg);
+  }
+}
+
+@keyframes draw-in {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
 /* Reduced motion is handled by zeroing the duration tokens — tokens-only, no
  * blanket `*` rule. This covers every animation that USES the tokens.
  *

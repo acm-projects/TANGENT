@@ -34,3 +34,31 @@
 .auth-switch {
   text-align: center;
 }
+
+/* The card drops onto the board with a tilt and settles; its contents deal in
+ * after it, top to bottom, and the wordmark breathes out to its spacing. */
+.auth {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 -3rem;
+  --pop-rotate: -5deg;
+  --pop-scale: 0.9;
+}
+
+.auth > * > * {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(var(--motion-fast) + sibling-index() * var(--motion-fast) / 2);
+  --pop-from: 0 1rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 0.96;
+}
+
+.auth-wordmark {
+  animation: wordmark-in var(--motion-slow) var(--ease-out) var(--motion-fast) backwards;
+}
+
+@keyframes wordmark-in {
+  from {
+    letter-spacing: 0.8em;
+    opacity: 0;
+  }
+}

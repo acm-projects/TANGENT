@@ -422,3 +422,14 @@
   padding-top: var(--space-1);
   color: var(--color-danger);
 }
+
+/* Switching folders remounts the title (keyed by it): the new name swings in
+ * on its pin, the kicker and count a beat behind. */
+.board-head > * {
+  transform-origin: left center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -2rem 0;
+  --pop-rotate: -4deg;
+  --pop-scale: 0.9;
+}

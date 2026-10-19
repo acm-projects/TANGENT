@@ -16,8 +16,8 @@ import "./Chat.css";
  *   expanded   full screen (the top-left button)
  *   collapsed  just a button to bring it back (the top-right chevron)
  *
- * The history scrolls in one container (.chat-scroll); the message box is a
- * sticky child at its bottom, a ruled line on the sheet.
+ * Only the history scrolls (.chat-scroll); the error, token usage and the
+ * message box sit fixed below it, the box a ruled line on the sheet.
  */
 
 type Layout = "docked" | "expanded" | "collapsed";
@@ -119,6 +119,7 @@ export function Chat({ className }: ChatProps) {
             showIcon
             showLabel={false}
             onClick={() => setLayout(layout === "expanded" ? "docked" : "expanded")}
+            className="chat-fold-button"
           />
           <Button
             hierarchy="tertiary"
@@ -179,33 +180,33 @@ export function Chat({ className }: ChatProps) {
               )}
             </Frame>
           )}
-
-          {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
-
-          {chat.usage && (
-            <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
-              <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
-              <Frame direction="row" gap="3" className="chat-token-counts">
-                <Text size="xs" content={`Prompt: ${chat.usage.prompt_tokens.toLocaleString()}`} />
-                <Text size="xs" content={`Completion: ${chat.usage.completion_tokens.toLocaleString()}`} />
-                <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
-              </Frame>
-            </Frame>
-          )}
-          {chat.usageUnavailable && (
-            <Text size="xs" hierarchy="tertiary" className="chat-token-usage" content="Token usage was not included in the provider stream." />
-          )}
-
-          <MessageField
-            blocker={chat.blocker}
-            models={chat.models}
-            selectedModel={chat.selectedModel}
-            modelsLoading={chat.modelsLoading}
-            onModelChange={chat.setSelectedModel}
-            onSend={chat.send}
-            className="chat-field"
-          />
         </Frame>
+
+        {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
+
+        {chat.usage && (
+          <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
+            <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
+            <Frame direction="row" gap="3" className="chat-token-counts">
+              <Text size="xs" content={`Prompt: ${chat.usage.prompt_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Completion: ${chat.usage.completion_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
+            </Frame>
+          </Frame>
+        )}
+        {chat.usageUnavailable && (
+          <Text size="xs" hierarchy="tertiary" className="chat-token-usage" content="Token usage was not included in the provider stream." />
+        )}
+
+        <MessageField
+          blocker={chat.blocker}
+          models={chat.models}
+          selectedModel={chat.selectedModel}
+          modelsLoading={chat.modelsLoading}
+          onModelChange={chat.setSelectedModel}
+          onSend={chat.send}
+          className="chat-field"
+        />
       </Frame>
     </Panel>
   );
