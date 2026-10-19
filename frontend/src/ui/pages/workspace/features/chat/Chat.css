@@ -4,8 +4,17 @@
 
 /* ── the panel ─────────────────────────────────────────────── */
 
+/* registered so the fold can animate (the corner unfolding) */
+@property --fold {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 .chat {
-  --fold: 1.75rem;
+  /* the folded corner covers the full-screen button until it is hovered */
+  --fold-rest: 3.5rem;
+  --fold: var(--fold-rest);
   /* Room left for the toolbar: its column (16px gap, 3rem tile, 16px gap) plus
    * this sheet's own margin, so full screen sits as far from the tiles as they
    * sit from the screen edge. */
@@ -20,7 +29,24 @@
   transition:
     translate var(--motion-slow) var(--ease-out),
     opacity var(--motion-slow) var(--ease-out),
-    width var(--motion-spring) var(--ease-spring);
+    width var(--motion-spring) var(--ease-spring),
+    --fold var(--motion-spring) var(--ease-spring);
+}
+
+/* the sheet swings in from the right edge when it opens */
+.chat:not([data-layout="collapsed"]) {
+  transform-origin: right center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 8rem 0;
+  --pop-rotate: 2deg;
+  --pop-scale: 0.94;
+}
+
+.chat[data-layout="collapsed"] > * {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 2rem 0;
+  --pop-rotate: 20deg;
+  --pop-scale: 0.4;
 }
 
 /* while dragging, the sheet follows the pointer exactly */
@@ -32,7 +58,7 @@
  * A short grip line shows on hover, focus and drag. */
 .chat-resize {
   position: absolute;
-  inset-block: calc(var(--fold) + var(--space-4)) var(--space-4);
+  inset-block: calc(var(--fold-rest) + var(--space-4)) var(--space-4);
   left: -0.375rem;
   width: 0.75rem;
   cursor: ew-resize;
@@ -73,17 +99,42 @@
 /* The sheet is a ::before layer so its top-left corner can be cut off at an
  * angle; a clip-path on the panel itself would clip the shadow too. The shadow
  * is a drop-shadow filter on the panel, which follows the cut. The cut-off half
- * of the corner square is see-through; the other half is the folded flap, a
- * solid fill with a 1px outline. */
+ * of the corner square is see-through; the other half is the folded flap
+ * (::after, below). */
 .chat:not([data-layout="collapsed"]) {
   border: 0;
   background: none;
   filter: var(--filter-floating);
 }
 
-/* the header's first button sits clear of the folded corner */
-.chat-inner > header {
-  padding-inline-start: calc(var(--fold) - var(--space-2));
+/* The full-screen button sits under the folded corner, hidden. Hovering or
+ * focusing it unfolds the corner flat and the button shows. */
+.chat:has(.chat-fold-button:is(:hover, :focus-visible)) {
+  --fold: 0px;
+}
+
+.chat-fold-button:not(:hover, :focus-visible) {
+  opacity: 0;
+}
+
+/* the flap: the corner folded over onto the sheet, drawn above the content
+ * so it covers the button; clicks pass through it to the button */
+.chat:not([data-layout="collapsed"])::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: max(0px, var(--fold));
+  height: max(0px, var(--fold));
+  pointer-events: none;
+  background:
+    /* the flap's two straight edges */
+    linear-gradient(var(--color-border), var(--color-border)) right / 1px 100% no-repeat,
+    linear-gradient(var(--color-border), var(--color-border)) bottom / 100% 1px no-repeat,
+    /* outline on the crease, solid fill behind it */
+    linear-gradient(135deg, transparent 50%, var(--color-border) 50% calc(50% + 1px), var(--color-surface-raised) 0);
+  filter: drop-shadow(1px 1px 1px rgb(0 0 0 / 0.12));
 }
 
 .chat:not([data-layout="collapsed"])::before {
@@ -92,20 +143,10 @@
   inset: 0;
   z-index: -1;
   border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  background:
-    /* the flap's two straight edges */
-    linear-gradient(var(--color-border), var(--color-border))
-      calc(var(--fold) - 1px) 0 / 1px var(--fold) no-repeat,
-    linear-gradient(var(--color-border), var(--color-border))
-      0 calc(var(--fold) - 1px) / var(--fold) 1px no-repeat,
-    /* the flap: outline on the cut, solid fill behind it */
-    linear-gradient(135deg, transparent 50%, var(--color-border) 50% calc(50% + 1px), var(--color-surface-raised) 0)
-      top left / var(--fold) var(--fold) no-repeat,
-    var(--texture-grain),
-    var(--color-surface);
+  background: var(--texture-grain), var(--color-surface);
   /* the panel's old 1px edge, drawn inside the clipped sheet so the cut keeps it */
   box-shadow: inset 0 0 0 1px var(--color-border);
-  clip-path: polygon(var(--fold) 0, 100% 0, 100% 100%, 0 100%, 0 var(--fold));
+  clip-path: polygon(max(0px, var(--fold)) 0, 100% 0, 100% 100%, 0 100%, 0 max(0px, var(--fold)));
 }
 
 .chat[data-layout="expanded"] {
@@ -132,16 +173,13 @@
   min-height: 0;
 }
 
-/* The one scroll container. Two children, top to bottom:
- *   .chat-history    the messages
- *   .chat-field      sticky; the message box, on paper so messages scroll under it */
+/* The one scroll container: just the history. The message box and anything
+ * else below it stay put. */
 .chat-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* keep keyboard-focused messages clear of the message box */
-  scroll-padding-block-end: var(--space-8);
 }
 
 .chat-empty {
@@ -157,10 +195,9 @@
   padding: var(--space-4) var(--space-2);
 }
 
-.chat-field {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
+.chat-field,
+.chat-error,
+.chat-token-usage {
   flex: none;
 }
 
@@ -178,6 +215,35 @@
 
 .message {
   padding-bottom: var(--space-6);
+}
+
+/* A sent message pops out of the field below it; a reply unfolds from the left.
+ * The finished reply replaces the streaming one under a new key, so only the
+ * streaming one animates, or it would pop twice. */
+.message-user,
+.message-assistant[data-streaming],
+.chat-hint {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+}
+
+.message-user {
+  transform-origin: bottom right;
+  --pop-from: 1rem 1.5rem;
+  --pop-rotate: 3deg;
+  --pop-scale: 0.6;
+}
+
+.message-assistant[data-streaming] {
+  transform-origin: top left;
+  --pop-from: -1rem 0.5rem;
+}
+
+/* history appearing for a node rises in as one sheet */
+.chat-history {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 2rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 0.97;
 }
 
 .message-text {
@@ -292,8 +358,10 @@
 .message-user-bubble {
   max-width: min(32rem, 85%);
   padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  background: var(--color-surface-raised);
+  /* surface-raised barely shows on the sheet, so a wash of ink stands it apart */
+  background: color-mix(in srgb, var(--color-text) 7%, var(--color-surface));
 }
 
 .message-meta {
@@ -307,6 +375,32 @@
 .branch-divider {
   padding-block: var(--space-4);
   color: var(--color-text-muted);
+}
+
+/* the rules stretch out from the branch icon, which spins in between them */
+.branch-divider > [data-ui="divider"] {
+  animation: branch-rule var(--motion-spring) var(--ease-spring) backwards;
+}
+
+.branch-divider > :first-child {
+  transform-origin: right;
+}
+
+.branch-divider > :last-child {
+  transform-origin: left;
+}
+
+.branch-divider > [data-ui="icon"] {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 0;
+  --pop-rotate: -180deg;
+  --pop-scale: 0.2;
+}
+
+@keyframes branch-rule {
+  from {
+    scale: 0 1;
+  }
 }
 
 /* ── message field ─────────────────────────────────────────── */

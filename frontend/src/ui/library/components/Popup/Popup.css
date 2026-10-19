@@ -13,12 +13,14 @@
     color: inherit;
     overflow: visible;
     opacity: 0;
-    scale: 0.94;
-    translate: 0 0.75rem;
+    scale: 0.8;
+    translate: 0 2rem;
+    rotate: -3deg;
     transition:
       opacity var(--motion-base) var(--ease-out),
       scale var(--motion-spring) var(--ease-spring),
       translate var(--motion-spring) var(--ease-spring),
+      rotate var(--motion-spring) var(--ease-spring),
       overlay var(--motion-base) allow-discrete,
       display var(--motion-base) allow-discrete;
   }
@@ -27,6 +29,7 @@
     opacity: 1;
     scale: 1;
     translate: 0 0;
+    rotate: 0deg;
   }
 
   [data-ui="popup"] > [data-ui="panel"] {
@@ -49,8 +52,9 @@
   @starting-style {
     [data-ui="popup"][open] {
       opacity: 0;
-      scale: 0.94;
-      translate: 0 0.75rem;
+      scale: 0.8;
+      translate: 0 2rem;
+      rotate: -3deg;
     }
 
     [data-ui="popup"][open]::backdrop {

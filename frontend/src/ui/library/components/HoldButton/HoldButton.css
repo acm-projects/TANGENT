@@ -35,6 +35,24 @@
     animation: ui-hold-fill var(--hold-duration) linear forwards;
   }
 
+  /* and it trembles while held, like something about to give.
+   * Its own media query, not a token: a 0ms infinite animation ends at once,
+   * and any animationend on the button fires onHold. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-ui="panel"][data-component="button"][data-hold="holding"] {
+      animation: ui-hold-tremble 90ms linear infinite alternate;
+    }
+  }
+
+  @keyframes ui-hold-tremble {
+    from {
+      rotate: -1.5deg;
+    }
+    to {
+      rotate: 1.5deg;
+    }
+  }
+
   @keyframes ui-hold-fill {
     to {
       scale: 1 1;

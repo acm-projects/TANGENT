@@ -28,15 +28,31 @@
   stroke: var(--color-text-faint);
   stroke-width: 1.6;
   stroke-linecap: round;
+  stroke-dasharray: 1;
+  transition: stroke var(--motion-base) var(--ease-out);
 }
 
 .mindmap .mindmap-edge-path .react-flow__edge-path {
   stroke: var(--color-string);
 }
 
+/* drawn in while the map first lands (StringEdge) */
+.mindmap .mindmap-edge .react-flow__edge-path[data-landing] {
+  animation: draw-in var(--motion-slow) var(--ease-out) var(--string-delay) backwards;
+}
+
+.mindmap .mindmap-string-end[data-landing] {
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--string-delay) backwards;
+}
+
 /* the round end of a string, just short of the card */
 .mindmap .mindmap-string-end {
   fill: var(--color-text-faint);
+  transform-box: fill-box;
+  transform-origin: center;
+  --pop-from: 0 0;
+  --pop-scale: 0;
+  transition: fill var(--motion-base) var(--ease-out);
 }
 
 .mindmap .mindmap-edge-path .mindmap-string-end {
