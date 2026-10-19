@@ -1,12 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, memo, useContext, useState, type MouseEvent } from "react";
-import { Button, Frame, HoldButton, Icon, Panel, Popup, Text } from "@/ui/library";
+import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
 import { deleteNode, forkNode } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
+import { useDragAction } from "./DragAction";
 
 /* One node on the map (Figma "Node": Default / Path / Selected / Hover, with
  * optional PDF and image tags): a card pinned to the board. A real <button>, so
@@ -17,7 +18,8 @@ import type { MindMapFlowNode } from "../toFlow";
  * The card drops in when it appears (rows land top-down) and lifts on hover;
  * the springs are in tokens/motion.ts. Hovering a card makes its actions (new
  * tangent; delete for any non-root) peek out from underneath. Hovering or
- * tabbing into them tips the card up and away so they can be clicked. Memoised: React Flow re-renders a node
+ * tabbing into them tips the card up and away so they can be clicked. Dragging
+ * a card down starts a tangent; up, deletes it (DragAction.tsx). Memoised: React Flow re-renders a node
  * only when its data changes. Styles live in ../MindMap.css. */
 
 const TAG_ICON: Record<string, string> = { pdf: "picture_as_pdf", image: "image" };
@@ -52,11 +54,19 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       setBusy(false);
     }
   };
+  const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const confirmDelete = (e: MouseEvent) => {
     e.stopPropagation();
     setConfirmingDelete(true);
   };
+  // Deleting by drag still asks first, like the tray's Delete.
+  const drag = useDragAction({
+    onBranch: () => {
+      if (!busy) void fork();
+    },
+    onDelete: data.hasParent && !busy ? () => setConfirmingDelete(true) : undefined,
+  });
 
   // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
   const moreOptions = [
@@ -99,10 +109,14 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           as="button"
           type="button"
           elevation="floating"
-          className="mindmap-node"
+          className="mindmap-node nopan"
           data-state={data.state}
+          data-dragging={drag.dragging || undefined}
+          data-drag-action={drag.action ?? undefined}
+          {...drag.handlers}
           aria-current={data.state === "selected" ? "true" : undefined}
-          title={data.title}
+          // the native tooltip would pop up over a drag in progress
+          title={drag.dragging ? undefined : data.title}
         >
           <Frame direction="row" gap="2" align="center">
             <Icon icon="chat_bubble" size="l" />
@@ -141,7 +155,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           icon="call_split"
           label="New tangent"
           disabled={busy}
-          onClick={act(() => forkNode(id), "Could not create a branch.")}
+          onClick={fork}
         />
         {/* Not built yet (no debate mode on the backend), so disabled like the toolbar's. */}
         <Button
@@ -201,6 +215,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           />
         </div>
       </div>
+      {drag.overlay}
       {/* Outside the tray: the tray and its menu close when the pointer leaves, the popup must not. */}
       <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this node?">
         <Text
@@ -208,9 +223,11 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         />
         <Frame direction="row" gap="2" justify="end">
           <Button label="Cancel" onClick={() => setConfirmingDelete(false)} />
-          <HoldButton
+          <DangerButton
+            data-primary
             label="Hold to delete"
             icon="delete"
+            commitTime={800}
             showIcon
             disabled={busy}
             onHold={() => {

@@ -21,6 +21,6 @@ export { Divider } from "./primitives/Divider/Divider";
 export { Button } from "./components/Button/Button";
 export { InkText } from "./components/InkText/InkText";
 export { Popup } from "./components/Popup/Popup";
-export { HoldButton } from "./components/HoldButton/HoldButton";
+export { DangerButton } from "./components/DangerButton/DangerButton";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";

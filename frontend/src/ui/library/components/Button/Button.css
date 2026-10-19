@@ -24,7 +24,7 @@
       background var(--motion-fast) var(--ease-out),
       border-color var(--motion-fast) var(--ease-out),
       opacity var(--motion-fast) var(--ease-out),
-      translate var(--motion-fast) var(--ease-out),
+      translate var(--motion-spring) var(--ease-spring),
       scale var(--motion-spring) var(--ease-spring);
   }
 
@@ -35,16 +35,9 @@
     transition-duration: var(--motion-fast);
   }
 
-  /* the icon perks up on hover, with a little wobble */
-  [data-ui="panel"][data-component="button"] > [data-ui="icon"] {
-    transition:
-      scale var(--motion-spring) var(--ease-spring),
-      rotate var(--motion-spring) var(--ease-spring);
-  }
-
-  [data-ui="panel"][data-component="button"]:hover:not(:disabled) > [data-ui="icon"] {
-    scale: 1.18;
-    rotate: -8deg;
+  /* an icon button lifts off the board on hover, straight up */
+  [data-ui="panel"][data-component="button"][data-icon-only]:hover:not(:disabled, :active) {
+    translate: 0 -3px;
   }
 
   /* sizes — padding follows the TextSize handed to Text and Icon */

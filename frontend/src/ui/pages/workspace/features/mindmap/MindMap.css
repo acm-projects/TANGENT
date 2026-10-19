@@ -218,3 +218,106 @@
   left: var(--space-4);
   z-index: 5;
 }
+
+/* ── drag a card to branch or delete it (DragAction.tsx) ───────── */
+
+/* The card being dragged from: a dotted outline springs out around it. Its
+ * colour, and the string's, says what letting go does: red string for a new
+ * tangent (a connection), oxblood for delete. */
+.mindmap-node[data-dragging] {
+  --drag-ink: var(--color-border-emphasis);
+  cursor: grabbing;
+  outline: 2px dashed var(--drag-ink);
+  /* DragAction.tsx's OUTLINE starts the string on this line: keep them in step */
+  outline-offset: 6px;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    outline-color var(--motion-fast) var(--ease-out),
+    outline-offset var(--motion-spring) var(--ease-spring);
+}
+
+@starting-style {
+  .mindmap-node[data-dragging] {
+    outline-offset: 0;
+  }
+}
+
+.mindmap-node[data-drag-action="branch"],
+.drag-action[data-action="branch"] {
+  --drag-ink: var(--color-string);
+}
+
+.mindmap-node[data-drag-action="delete"],
+.drag-action[data-action="delete"] {
+  --drag-ink: var(--color-danger);
+}
+
+/* the string to the pointer and the tip beside it, over everything */
+.drag-action {
+  --drag-ink: var(--color-border-emphasis);
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.drag-action-line {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.drag-action-line path {
+  fill: none;
+  stroke: var(--drag-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 6;
+  transition: stroke var(--motion-fast) var(--ease-out);
+}
+
+.drag-action-line circle {
+  fill: var(--drag-ink);
+  transition: fill var(--motion-fast) var(--ease-out);
+}
+
+/* the dots march toward the pointer. A hand-written loop, so it honours
+ * reduced motion itself (motion.css). */
+@media (prefers-reduced-motion: no-preference) {
+  .drag-action-line path {
+    animation: drag-action-march 0.5s linear infinite;
+  }
+}
+
+@keyframes drag-action-march {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+.drag-action-tip {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* centred just under the pointer */
+  translate: -50% 1.25rem;
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  transform-origin: top center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: -50% 0.5rem;
+  --pop-scale: 0.6;
+}
+
+.drag-action[data-action] .drag-action-tip {
+  border-color: var(--drag-ink);
+  color: var(--color-text);
+}
+
+.drag-action[data-action="delete"] .drag-action-tip {
+  color: var(--color-danger);
+}

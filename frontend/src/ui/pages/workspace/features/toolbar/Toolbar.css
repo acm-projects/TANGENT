@@ -19,12 +19,6 @@
   --pop-from: -5rem 0;
 }
 
-.toolbar-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 /* the panel's wrapper, which Motion swings out from the rail */
 .toolbar-slot {
   display: flex;
