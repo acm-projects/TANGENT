@@ -5,7 +5,8 @@ import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/libr
 import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
-import { deleteNode, forkNode } from "../nodeActions";
+import { useTreeStore } from "@/store/treeStore";
+import { confirmedForks, deleteNode, forkNode, isPending } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 import { useDragAction } from "./DragAction";
 
@@ -33,7 +34,8 @@ export const ReportMapError = createContext<(message: string | null) => void>(()
 export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsoluteY }: NodeProps<MindMapFlowNode>) {
   const stagger = useContext(StaggerPinIn);
   const report = useContext(ReportMapError);
-  const [busy, setBusy] = useState(false);
+  // a fork the server hasn't confirmed has nothing to fork from or delete yet
+  const busy = isPending(id);
   const [peeled, setPeeled] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   // the selected context path sits a little off the board, so it reads as one thread
@@ -41,36 +43,35 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // Each card tilts its own way, fixed by its id (uuid: the last hex digit is effectively random).
   const tilt = parseInt(id.slice(-1), 16) % 2 ? 1 : -1;
 
+  // Node actions are optimistic (nodeActions.ts): the map changes at once, and a failure is undone there and reported here.
   // The tray sits inside the React Flow node, so a click must not also select the card.
-  const act = (action: () => Promise<void>, fallback: string) => async (e?: MouseEvent) => {
+  const act = (action: () => Promise<void>, fallback: string) => (e?: MouseEvent) => {
     e?.stopPropagation();
-    setBusy(true);
     report(null);
-    try {
-      await action();
-    } catch (err: unknown) {
-      report(apiErrorMessage(err, fallback));
-    } finally {
-      setBusy(false);
-    }
+    action().catch((err: unknown) => report(apiErrorMessage(err, fallback)));
   };
   const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const confirmDelete = (e: MouseEvent) => {
-    e.stopPropagation();
-    setConfirmingDelete(true);
+  // An empty branch (no messages, nothing under it) has nothing to lose, so it goes without asking.
+  // shortcut: chats never loaded (never opened this visit) count as not empty, so those still ask.
+  const empty = useTreeStore((s) => !data.hasChildren && s.chatsByNode[id]?.length === 0 && !(id in s.streaming));
+  const remove = act(() => deleteNode(id), "Could not delete the node.");
+  const requestDelete = (e?: MouseEvent) => {
+    e?.stopPropagation();
+    if (empty) remove();
+    else setConfirmingDelete(true);
   };
-  // Deleting by drag still asks first, like the tray's Delete.
+  // Deleting by drag asks first like the tray's Delete (unless the branch is empty).
   const drag = useDragAction({
     onBranch: () => {
-      if (!busy) void fork();
+      if (!busy) fork();
     },
-    onDelete: data.hasParent && !busy ? () => setConfirmingDelete(true) : undefined,
+    onDelete: data.hasParent && !busy ? requestDelete : undefined,
   });
 
   // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
   const moreOptions = [
-    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: confirmDelete }] : []),
+    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: requestDelete }] : []),
     { icon: "ios_share", label: "Share branch (not available yet)", disabled: true, onClick: undefined },
   ];
 
@@ -93,7 +94,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         />
       )}
       <motion.div
-        initial={{ y: -10, scale: 1.04, opacity: 0 }}
+        // a confirmed fork replaces its placeholder card, which already pinned in
+        initial={confirmedForks.has(id) ? false : { y: -10, scale: 1.04, opacity: 0 }}
         // Peeled: the hover lift, exaggerated, so the card tips up and away from the tray.
         animate={{
           y: peeled ? -24 : onPath ? -3 : 0,
@@ -232,7 +234,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             disabled={busy}
             onHold={() => {
               setConfirmingDelete(false);
-              void act(() => deleteNode(id), "Could not delete the node.")();
+              remove();
             }}
           />
         </Frame>

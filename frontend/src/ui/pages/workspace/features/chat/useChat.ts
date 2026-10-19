@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { forkNode, redirectToCopy, switchToFork } from "../mindmap/nodeActions";
+import { forkNode, isPending, redirectToCopy, switchToFork } from "../mindmap/nodeActions";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -23,7 +23,7 @@ export interface HistorySection {
 }
 
 /** Why the message box is disabled, or null when the user can send. */
-export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | null;
+export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | "pending" | null;
 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
@@ -88,7 +88,9 @@ export function useChat() {
 
   const blocker: SendBlocker = !activeNodeId
     ? "no-selection"
-    : streaming !== null
+    : isPending(activeNodeId)
+      ? "pending"
+      : streaming !== null
       ? "streaming"
       : // A UI hint only. The server is what actually enforces it (ARCHITECTURE.md §8).
         !isLeaf
