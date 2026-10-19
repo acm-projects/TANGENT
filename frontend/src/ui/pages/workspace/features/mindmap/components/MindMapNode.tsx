@@ -5,6 +5,7 @@ import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/libr
 import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
+import { useTreeStore } from "@/store/treeStore";
 import { confirmedForks, deleteNode, forkNode, isPending } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 import { useDragAction } from "./DragAction";
@@ -51,21 +52,26 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   };
   const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const confirmDelete = (e: MouseEvent) => {
-    e.stopPropagation();
-    setConfirmingDelete(true);
+  // An empty branch (no messages, nothing under it) has nothing to lose, so it goes without asking.
+  // shortcut: chats never loaded (never opened this visit) count as not empty, so those still ask.
+  const empty = useTreeStore((s) => !data.hasChildren && s.chatsByNode[id]?.length === 0 && !(id in s.streaming));
+  const remove = act(() => deleteNode(id), "Could not delete the node.");
+  const requestDelete = (e?: MouseEvent) => {
+    e?.stopPropagation();
+    if (empty) remove();
+    else setConfirmingDelete(true);
   };
-  // Deleting by drag still asks first, like the tray's Delete.
+  // Deleting by drag asks first like the tray's Delete (unless the branch is empty).
   const drag = useDragAction({
     onBranch: () => {
       if (!busy) fork();
     },
-    onDelete: data.hasParent && !busy ? () => setConfirmingDelete(true) : undefined,
+    onDelete: data.hasParent && !busy ? requestDelete : undefined,
   });
 
   // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
   const moreOptions = [
-    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: confirmDelete }] : []),
+    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: requestDelete }] : []),
     { icon: "ios_share", label: "Share branch (not available yet)", disabled: true, onClick: undefined },
   ];
 
@@ -228,7 +234,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             disabled={busy}
             onHold={() => {
               setConfirmingDelete(false);
-              act(() => deleteNode(id), "Could not delete the node.")();
+              remove();
             }}
           />
         </Frame>
