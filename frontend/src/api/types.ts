@@ -95,6 +95,7 @@ export interface AvailableModel {
   name: string;
   description: string;
   supports_images: boolean;
+  context_length: number;
 }
 
 /** Token counts the provider reports; arrives on the `done` event when available. */

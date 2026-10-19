@@ -45,6 +45,8 @@ export function useChat() {
   const [modelsLoading, setModelsLoading] = useState(true);
   const [usage, setUsage] = useState<ModelUsage | null>(null);
   const [usageUnavailable, setUsageUnavailable] = useState(false);
+  const [usageModel, setUsageModel] = useState<string | null>(null);
+  const usageContextLength = models.find((model) => model.id === usageModel)?.context_length ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +145,7 @@ export function useChat() {
     useTreeStore.getState().setNotice(null);
     setUsage(null);
     setUsageUnavailable(false);
+    setUsageModel(null);
 
     const store = useTreeStore.getState();
     const seq = store.chatsByNode[nodeId]?.length ?? 0;
@@ -185,6 +188,7 @@ export function useChat() {
             saved = true;
             setUsage(e.usage ?? null);
             setUsageUnavailable(!e.usage);
+            setUsageModel(e.model ?? selectedModel);
             s.endStream(nodeId, {
               role: "assistant",
               content: s.streaming[nodeId] ?? "",
@@ -251,6 +255,7 @@ export function useChat() {
     setSelectedModel,
     usage,
     usageUnavailable,
+    usageContextLength,
     send,
     stop,
     canRetry,
