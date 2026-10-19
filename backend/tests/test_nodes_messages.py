@@ -1,4 +1,5 @@
 """POST /nodes/:id/messages with the provider and the database faked (runs in CI, no secrets)."""
+import asyncio
 import json
 import os
 import uuid
@@ -79,8 +80,8 @@ def client(monkeypatch):
             raise prepare["error"]
         return prepare["result"] or (node_id, None)
 
-    async def fake_persist(user_id, write_node_id, user_text, assistant_text):
-        persisted.append((user_id, write_node_id, user_text, assistant_text))
+    async def fake_persist(user_id, write_node_id, user_text, assistant_text, replace_last=False):
+        persisted.append((user_id, write_node_id, user_text, assistant_text) + (("replace",) if replace_last else ()))
 
     async def fake_path(db, node_id, user_id):
         return [PathNode(id="root", chats=[
@@ -264,3 +265,60 @@ async def test_load_path_sharee_with_a_copy_gets_409_pointing_at_it():
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+def test_stop_saves_what_arrived_and_ends_with_done_stopped(client, monkeypatch):
+    async def slow(msgs, model):
+        yield {"text": "Hel"}
+        nodes_router._stops[(USER.id, NODE)].set()  # the user presses Stop mid-reply
+        await asyncio.sleep(10)
+        yield {"text": "never"}
+
+    monkeypatch.setattr(nodes_router, "stream_openrouter", slow)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert events(r) == [("token", {"text": "Hel"}), ("done", {"stopped": True})]
+    assert client.persisted == [(USER.id, NODE, "hi", "Hel")]
+    assert (USER.id, NODE) not in nodes_router._stops
+
+
+def test_stop_before_any_token_saves_nothing(client, monkeypatch):
+    async def silent(msgs, model):
+        nodes_router._stops[(USER.id, NODE)].set()
+        await asyncio.sleep(10)
+        yield {"text": "never"}
+
+    monkeypatch.setattr(nodes_router, "stream_openrouter", silent)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert events(r) == [("done", {"stopped": True})]
+    assert client.persisted == []
+
+
+def test_stop_endpoint_is_a_no_op_when_nothing_streams(client):
+    assert client.post(f"/nodes/{NODE}/messages/stop").status_code == 204
+
+
+def test_retry_reasks_the_last_question_without_the_old_reply_and_replaces_it(client, monkeypatch):
+    transport, seen = provider([chunk("Again"), "data: [DONE]"])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "ignored", "retry": True})
+
+    assert events(r) == [("token", {"text": "Again"}), ("done", {})]
+    # the stored question is re-asked, and the reply being replaced isn't in the context
+    assert [m["content"] for m in seen["body"]["messages"]] == ["earlier q"]
+    assert client.persisted == [(USER.id, NODE, "earlier q", "Again", "replace")]
+
+
+def test_retry_with_no_reply_to_replace_is_refused(client, monkeypatch):
+    async def bare_path(db, node_id, user_id):
+        return [nodes_router.PathNode(id="root", chats=[])], PROJECT
+
+    monkeypatch.setattr(nodes_router, "_load_path", bare_path)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "x", "retry": True})
+
+    assert r.status_code == 409
+    assert client.persisted == []

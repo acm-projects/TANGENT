@@ -1,9 +1,37 @@
 /* Auth — the feature's own layout and one-offs, unlayered (DESIGN.md §2, Rule 6). */
 
 .auth {
+  position: relative;
+  /* above the case board's strings, which run in to its pin */
+  z-index: 2;
   width: 100%;
   max-width: 24rem;
   padding: var(--space-6);
+}
+
+/* the red pin every string on the board runs to */
+.auth::before {
+  content: "";
+  position: absolute;
+  top: -0.4rem;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background:
+    var(--texture-pin),
+    var(--color-string);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  animation: auth-pin var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+}
+
+@keyframes auth-pin {
+  from {
+    opacity: 0;
+    scale: 2.5;
+    translate: -50% -1rem;
+  }
 }
 
 .auth-header {

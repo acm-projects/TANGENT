@@ -288,8 +288,9 @@ What to change:
 ## 8. Implementation order
 
 Each step leaves the app working. Steps 1–7 are built (tokens, `motion.ts`, paper in `Panel`,
-the map card and `StringEdge`, the chat sheet, `InkText`). Open: the Mascot, Leva tuning, and
-the extra red-pin and rail-icon critiques in §7.
+the map card and `StringEdge`, the chat sheet, `InkText`), and so are the §7 pins (every card hangs
+from a pin its string is wound round; the open toolbar tool gets a red pin
+dot). Open: the Mascot and Leva tuning.
 
 1. **Tokens.** `colors.css`: new palette, semantics written with `light-dark()`, the
    `[data-theme]` block removed, danger split from red. `layout.tsx`: drop `data-theme`.

@@ -1,4 +1,5 @@
 import { Frame } from "@/ui/library";
+import { CaseBoard } from "@/ui/features/auth/CaseBoard";
 import { OnboardingForm } from "@/ui/features/auth/OnboardingForm";
 import "../login/Login.css";
 
@@ -6,6 +7,7 @@ import "../login/Login.css";
 export function Onboarding({ next }: { next?: string }) {
   return (
     <Frame as="main" align="center" className="login">
+      <CaseBoard />
       <OnboardingForm next={next} />
     </Frame>
   );

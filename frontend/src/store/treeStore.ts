@@ -191,3 +191,16 @@ export function selectBreadcrumb(s: Pick<TreeState, "nodesById">, id: string): N
   }
   return out.reverse();
 }
+
+/** Outline numbers, like a case file's exhibits: the root is "1", its children
+ * "1.1", "1.2", theirs "1.2.1". By sibling order, so they stay gapless after a delete. */
+export function selectExhibits(s: Pick<TreeState, "rootId" | "childrenByParent">): Record<string, string> {
+  const out: Record<string, string> = {};
+  const number = (id: string, label: string) => {
+    if (id in out) return; // corrupt data: a cycle
+    out[id] = label;
+    s.childrenByParent[id]?.forEach((child, i) => number(child, `${label}.${i + 1}`));
+  };
+  if (s.rootId) number(s.rootId, "1");
+  return out;
+}

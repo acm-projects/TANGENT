@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Button, Frame, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
@@ -51,11 +51,28 @@ export function Chat({ className }: ChatProps) {
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSection = chat.history.at(-1);
-  // `layout` is in the key because reopening a collapsed panel remounts the list.
-  const scrollKey = `${layout}:${chat.activeNodeId}:${lastSection?.messages?.length ?? 0}:${chat.streaming?.length ?? 0}`;
+  // `layout` is in the key because reopening a collapsed panel remounts the list. Every section's count, since
+  // an ancestor's (often long) history can load after the selected card's.
+  const loaded = chat.history.reduce((n, section) => n + (section.messages?.length ?? 0), 0);
+  const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming?.length ?? 0}`;
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    // Messages settle to their real height after this (maths and fonts load late), so stay pinned to the
+    // bottom as the list grows, until the user scrolls up to read.
+    let pinned = true;
+    const onScroll = () => (pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 8);
+    const list = el.firstElementChild;
+    const grow = new ResizeObserver(() => {
+      if (pinned) el.scrollTop = el.scrollHeight;
+    });
+    if (list) grow.observe(list);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      grow.disconnect();
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [scrollKey]);
 
   if (layout === "collapsed") {
@@ -121,6 +138,18 @@ export function Chat({ className }: ChatProps) {
             onClick={() => setLayout(layout === "expanded" ? "docked" : "expanded")}
             className="chat-fold-button"
           />
+          {lastSection && (
+            // keyed, so picking another card swaps the heading in
+            <Frame key={lastSection.node.id} gap="0" align="center" className="chat-title">
+              <Text
+                as="span"
+                size="xxs"
+                className="chat-title-kicker"
+                content={`Case notes · Exhibit ${lastSection.exhibit}`}
+              />
+              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={lastSection.node.title ?? "Untitled card"} />
+            </Frame>
+          )}
           <Button
             hierarchy="tertiary"
             size="l"
@@ -135,8 +164,10 @@ export function Chat({ className }: ChatProps) {
         <Frame ref={scrollRef} gap="0" className="chat-scroll">
 
           {chat.history.length === 0 ? (
-            <Frame justify="center" align="center" className="chat-empty">
-              <Text content="Select a node to start chatting." />
+            <Frame justify="center" align="center" gap="3" className="chat-empty">
+              <Icon icon="west" size="xxl" className="chat-empty-arrow" />
+              <Text as="h2" size="xl" hierarchy="primary" content="Pick a card off the board" />
+              <Text hierarchy="tertiary" content="Select a node on the map to read its thread here." />
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
@@ -144,22 +175,26 @@ export function Chat({ className }: ChatProps) {
                 <Fragment key={section.node.id}>
                   {i > 0 && (
                     <Frame as="li">
-                      <BranchDivider />
+                      <BranchDivider exhibit={section.exhibit} title={section.node.title} />
                     </Frame>
                   )}
                   {section.messages === undefined && (
                     <Frame as="li">
-                      <Text hierarchy="tertiary" size="s" content="Loading…" />
+                      <Loading />
                     </Frame>
                   )}
-                  {section.messages?.map((m) => (
+                  {section.messages?.map((m, j, all) => (
                     <MessageBubble
                       key={`${section.node.id}-${m.seq}-${m.role}`}
                       message={m}
-                      onBranch={() => chat.fork(section.node.id)}
+                      nodeId={section.node.id}
+                      onBranch={chat.fork}
+                      // only the newest reply on the card being written on can be asked again
+                      onRetry={chat.canRetry && i === chat.history.length - 1 && j === all.length - 1 ? chat.retry : undefined}
                     />
                   ))}
-                  {section.messages?.length === 0 && chat.streaming === null && (
+                  {/* only the card being written on needs the hint; an empty card above it is just its divider */}
+                  {section.messages?.length === 0 && chat.streaming === null && i === chat.history.length - 1 && (
                     <Frame as="li" className="chat-hint">
                       <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
                     </Frame>
@@ -200,11 +235,13 @@ export function Chat({ className }: ChatProps) {
 
         <MessageField
           blocker={chat.blocker}
+          onStop={chat.stop}
           models={chat.models}
           selectedModel={chat.selectedModel}
           modelsLoading={chat.modelsLoading}
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}
+          about={lastSection?.node.title}
           className="chat-field"
         />
       </Frame>

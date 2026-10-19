@@ -4,7 +4,7 @@ import { LayoutGroup, motion, MotionConfig } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiErrorMessage } from "@/api";
-import { Button, Frame, Input, Panel, Text } from "@/ui/library";
+import { Button, Frame, Input, Loading, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { FOLDER_CARDS, FolderDrawer } from "./components/FolderDrawer";
 import { NewProjectTile } from "./components/NewProjectTile";
@@ -44,7 +44,7 @@ export function Board({ slug }: BoardProps) {
             <BoardTitle key={title} title={title} count={projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
 
             {board.actionError && <Text role="alert" size="s" content={board.actionError} />}
-            {board.state.status === "loading" && <Text hierarchy="tertiary" className="board-loading" content="Loading…" />}
+            {board.state.status === "loading" && <Loading size="base" />}
             {board.state.status === "error" && <Text role="alert" content={board.state.message} />}
             {ready && (
               <Frame as="ol" className="board-grid" aria-label={`Projects in ${title}`}>
@@ -145,7 +145,7 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
         </Frame>
       )}
       {error && <Text role="alert" size="s" content={error} />}
-      <Text size="s" hierarchy="tertiary" content={`${count} ${count === 1 ? "tree" : "trees"} on the board`} />
+      <Text size="s" hierarchy="tertiary" content={count === 0 ? "Nothing pinned yet. Start a tree with your first question." : `${count} ${count === 1 ? "tree" : "trees"} on the board`} />
     </Frame>
   );
 }

@@ -34,7 +34,7 @@ export const ReportMapError = createContext<(message: string | null) => void>(()
 export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsoluteY }: NodeProps<MindMapFlowNode>) {
   const stagger = useContext(StaggerPinIn);
   const report = useContext(ReportMapError);
-  // a fork the server hasn't confirmed has nothing to fork from or delete yet
+  // a fork the server hasn't confirmed has nothing to fork from yet (deleting it is queued: nodeActions.ts)
   const busy = isPending(id);
   const [peeled, setPeeled] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -42,6 +42,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const onPath = data.state !== "default";
   // Each card tilts its own way, fixed by its id (uuid: the last hex digit is effectively random).
   const tilt = parseInt(id.slice(-1), 16) % 2 ? 1 : -1;
+  // ...and hangs a little crooked on its pin (±0.4–1.6°), as a hand pins it. Picked up to read (selected), it straightens.
+  const lean = tilt * (0.4 + (parseInt(id.slice(-3, -1), 16) / 255) * 1.2);
+  const rest = data.state === "selected" ? 0 : lean;
 
   // Node actions are optimistic (nodeActions.ts): the map changes at once, and a failure is undone there and reported here.
   // The tray sits inside the React Flow node, so a click must not also select the card.
@@ -56,6 +59,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // shortcut: chats never loaded (never opened this visit) count as not empty, so those still ask.
   const empty = useTreeStore((s) => !data.hasChildren && s.chatsByNode[id]?.length === 0 && !(id in s.streaming));
   const remove = act(() => deleteNode(id), "Could not delete the node.");
+  // while its reply is arriving, the card's pin pulses (MindMap.css)
+  const thinking = useTreeStore((s) => id in s.streaming);
   const requestDelete = (e?: MouseEvent) => {
     e?.stopPropagation();
     if (empty) remove();
@@ -66,12 +71,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     onBranch: () => {
       if (!busy) fork();
     },
-    onDelete: data.hasParent && !busy ? requestDelete : undefined,
+    onDelete: data.hasParent ? requestDelete : undefined,
   });
 
   // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
   const moreOptions = [
-    ...(data.hasParent ? [{ icon: "delete", label: "Delete", disabled: busy, onClick: requestDelete }] : []),
+    ...(data.hasParent ? [{ icon: "delete", label: "Delete", onClick: requestDelete }] : []),
     { icon: "ios_share", label: "Share branch (not available yet)", disabled: true, onClick: undefined },
   ];
 
@@ -95,16 +100,18 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       )}
       <motion.div
         // a confirmed fork replaces its placeholder card, which already pinned in
-        initial={confirmedForks.has(id) ? false : { y: -10, scale: 1.04, opacity: 0 }}
+        initial={confirmedForks.has(id) ? false : { y: -10, scale: 1.04, rotate: lean * 3, opacity: 0 }}
         // Peeled: the hover lift, exaggerated, so the card tips up and away from the tray.
         animate={{
-          y: peeled ? -24 : onPath ? -3 : 0,
-          rotate: peeled ? 6 * tilt : 0,
-          scale: 1,
+          y: peeled ? -24 : data.state === "selected" ? -6 : onPath ? -3 : 0,
+          rotate: peeled ? 6 * tilt : rest,
+          scale: data.state === "selected" ? 1.04 : 1,
           opacity: 1,
           transition: peeled ? spring.peel : undefined,
         }}
-        whileHover={{ y: onPath ? -5 : -2, rotate: tilt, transition: spring.lift }}
+        whileHover={{ y: onPath ? -8 : -4, rotate: rest + tilt * 1.5, transition: spring.lift }}
+        // pressed onto its pin as it's picked
+        whileTap={{ y: 0, scale: 0.97, rotate: 0, transition: spring.lift }}
         transition={{ ...spring.pin, delay: stagger ? Math.max(0, positionAbsoluteY / ROW_HEIGHT) * 0.12 : 0 }}
       >
         <Panel
@@ -113,6 +120,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           elevation="floating"
           className="mindmap-node nopan"
           data-state={data.state}
+          data-root={!data.hasParent || undefined}
+          data-thinking={thinking || undefined}
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
           {...drag.handlers}
@@ -120,12 +129,13 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           // the native tooltip would pop up over a drag in progress
           title={drag.dragging ? undefined : data.title}
         >
+          {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
           <Frame direction="row" gap="2" align="center">
-            <Icon icon="chat_bubble" size="l" />
-            <Text as="span" content={data.title} className="mindmap-node-title" />
+            <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
+            <Text as="span" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
             {data.tags.map((tag) => (
               <Panel key={tag} elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
-                <Icon icon={TAG_ICON[tag] ?? "draft"} size="l" />
+                <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />
               </Panel>
             ))}
           </Frame>
@@ -234,7 +244,6 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             icon="delete"
             commitTime={800}
             showIcon
-            disabled={busy}
             onHold={() => {
               setConfirmingDelete(false);
               remove();

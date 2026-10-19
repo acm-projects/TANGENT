@@ -25,6 +25,7 @@
       border-color var(--motion-fast) var(--ease-out),
       opacity var(--motion-fast) var(--ease-out),
       translate var(--motion-spring) var(--ease-spring),
+      rotate var(--motion-spring) var(--ease-spring),
       scale var(--motion-spring) var(--ease-spring);
   }
 
