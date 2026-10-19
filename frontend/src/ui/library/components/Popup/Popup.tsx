@@ -13,7 +13,11 @@ import "./Popup.css";
  *
  * Controlled: `open` shows it, and onClose reports every way it closed (Escape,
  * backdrop) so the owner can set `open` back to false. Children are the body
- * and actions, under the title. Styles in Popup.css. */
+ * and actions, under the title. Styles in Popup.css.
+ *
+ * Mark the primary action with `data-primary`: it takes focus when the popup
+ * opens, so Enter presses it (and holding Enter holds a DangerButton). Without
+ * one the browser focuses the first button, which is usually Cancel. */
 
 type PopupProps = {
   open: boolean;
@@ -28,7 +32,10 @@ export function Popup({ open, onClose, title, children }: PopupProps) {
 
   useEffect(() => {
     const dialog = ref.current;
-    if (open && !dialog?.open) dialog?.showModal();
+    if (open && !dialog?.open) {
+      dialog?.showModal();
+      dialog?.querySelector<HTMLElement>("[data-primary]")?.focus();
+    }
     if (!open && dialog?.open) dialog.close();
   }, [open]);
 

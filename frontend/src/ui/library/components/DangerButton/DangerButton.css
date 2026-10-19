@@ -1,4 +1,4 @@
-/* HoldButton — see HoldButton.tsx. Danger red: outline, label and the fill.
+/* DangerButton — see DangerButton.tsx. Danger red: outline, label and the fill.
  * Red here is --color-danger (oxblood), not the string red, which means
  * "connected" (colors.css). */
 
@@ -30,9 +30,9 @@
     scale: 0 1;
   }
 
-  /* Not a motion token: the duration is the hold time, so reduced motion keeps it. */
+  /* Not a motion token: the duration is the commit time, so reduced motion keeps it. */
   [data-ui="panel"][data-component="button"][data-hold="holding"]::before {
-    animation: ui-hold-fill var(--hold-duration) linear forwards;
+    animation: ui-hold-fill var(--commit-time) linear forwards;
   }
 
   /* and it trembles while held, like something about to give.

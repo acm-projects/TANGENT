@@ -4,7 +4,7 @@ import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { apiErrorMessage } from "@/api";
 import type { ProjectSummary } from "@/api/types";
-import { Button, Divider, Frame, HoldButton, Input, Panel, Text } from "@/ui/library";
+import { Button, Divider, Frame, DangerButton, Input, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 
 /* A card's settings: the ⋯ button, and the small sheet that unfolds out of it.
@@ -130,7 +130,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
                   <Divider />
                 </motion.div>
                 <motion.div variants={row}>
-                  <HoldButton
+                  <DangerButton
                     size="s"
                     icon="delete"
                     label="Hold to delete"

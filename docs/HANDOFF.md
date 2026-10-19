@@ -41,7 +41,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 |---|---|---|
 | Mind map | `workspace/features/mindmap/` | Loads the tree; derived tidy layout (no stored x/y); click a node to select it; the selected node's ancestors and edges highlight as the "path"; click empty canvas to deselect; pan / zoom; attachment tags on nodes; keyboard: Tab + Enter |
 | Chat | `workspace/features/chat/` | Shows the selected node's full root→leaf history with branch dividers; lazy-loads each node's chats once (cached); send with Enter (Shift+Enter = newline); streamed reply; Copy and **Branch from here** on every reply (creates a child node and selects it); attach files / images; "Uploaded / Viewed / Thought for…" lines; only leaves accept prompts; full-screen and collapse |
-| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (invite by email, member list with Resend / Revoke, owner-only); ⋮ expands to History / Settings. Escape closes panels |
+| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (invite by email, member list with Resend / Revoke, owner-only); Settings (disabled). Escape closes panels |
 
 ## 2. How the seam works
 
@@ -123,7 +123,7 @@ These are outside the frontend's scope and were **not** changed:
 
 | What | Where | Current behaviour |
 |---|---|---|
-| Toolbar **Add**, **History**, **Settings** | `toolbar/Toolbar.tsx` | Rendered as in Figma, do nothing |
+| Toolbar **Search**, **Settings** | `toolbar/Toolbar.tsx` | Rendered as in Figma, do nothing |
 | Clicking a **source card** / its "Used N times" | `toolbar/components/SourcesPanel.tsx` | Hover states match Figma; no action |
 | Toolbar `State=Hidden` variant | — | Not built; unclear from the frame |
 | `Popup` component (empty frame) | — | Not built; nothing uses it yet |
