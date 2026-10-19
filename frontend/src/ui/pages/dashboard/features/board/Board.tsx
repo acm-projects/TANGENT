@@ -43,6 +43,7 @@ export function Board({ slug }: BoardProps) {
           <Frame gap="6" className="board">
             <BoardTitle key={title} title={title} count={projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
 
+            {board.actionError && <Text role="alert" size="s" content={board.actionError} />}
             {board.state.status === "loading" && <Text hierarchy="tertiary" content="Loading…" />}
             {board.state.status === "error" && <Text role="alert" content={board.state.message} />}
             {ready && (

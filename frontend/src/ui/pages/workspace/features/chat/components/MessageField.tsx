@@ -12,6 +12,7 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   "no-selection": "Select a node on the map to write here.",
   "not-leaf": "This node has branches. Use Branch on a reply to continue from it.",
   streaming: "Waiting for the reply…",
+  pending: "Message…",
 };
 
 type MessageFieldProps = {
@@ -30,8 +31,9 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
-  const disabled = blocker !== null;
-  const canSend = !disabled && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
+  // a fork still being confirmed only holds Send back for a moment; typing can start straight away
+  const disabled = blocker !== null && blocker !== "pending";
+  const canSend = blocker === null && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
 
   function submit() {
     if (!canSend) return;

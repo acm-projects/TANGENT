@@ -36,6 +36,7 @@ const TIP = {
   branch: { icon: "call_split", label: "New tangent" },
   delete: { icon: "delete", label: "Delete" },
   cancel: { icon: "close", label: "Cancel" },
+  root: { icon: "block", label: "Cannot delete root node" },
 };
 
 /** What letting go at screen height `y` does, for a card spanning `card`. */
@@ -52,6 +53,8 @@ type Drag = {
   to: Point;
   action: DragAction;
   inside: boolean;
+  /** Above a card that can't be deleted (the root): still a cancel, but the tip says why. */
+  root: boolean;
 };
 
 const OPPOSITE = {
@@ -116,6 +119,7 @@ export function useDragAction({ onBranch, onDelete }: { onBranch(): void; onDele
         to,
         inside: to.x >= box.left && to.x <= box.right && to.y >= box.top && to.y <= box.bottom,
         action: dragAction(box, e.clientY, Boolean(onDelete)),
+        root: !onDelete && e.clientY < box.top,
       });
     },
     onPointerUp(e: PointerEvent<HTMLElement>) {
@@ -133,7 +137,8 @@ export function useDragAction({ onBranch, onDelete }: { onBranch(): void; onDele
     },
   };
 
-  const tip = TIP[drag?.action ?? "cancel"];
+  const tipKey = drag?.action ?? (drag?.root ? "root" : "cancel");
+  const tip = TIP[tipKey];
   const overlay =
     drag &&
     createPortal(
@@ -161,7 +166,7 @@ export function useDragAction({ onBranch, onDelete }: { onBranch(): void; onDele
           </svg>
         )}
         {/* keyed by the action, so the tip pops again when it changes */}
-        <Panel key={drag.action ?? "cancel"} elevation="floating" className="drag-action-tip" style={{ left: drag.to.x, top: drag.to.y }}>
+        <Panel key={tipKey} elevation="floating" className="drag-action-tip" style={{ left: drag.to.x, top: drag.to.y }}>
           <Icon icon={tip.icon} size="s" />
           <Text as="span" size="s" content={tip.label} />
         </Panel>

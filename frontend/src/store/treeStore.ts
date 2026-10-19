@@ -19,6 +19,8 @@ interface StructureSlice {
   updateNode(node: NodeMeta): void;
   /** Drop a node and its subtree (the server cascades the same way). Selection moves to the parent. */
   removeNode(nodeId: string): void;
+  /** Swap a childless node for another in the same place (an optimistic fork, once the server answers). */
+  replaceNode(oldId: string, node: NodeMeta): void;
   setActive(nodeId: string | null): void;
 }
 
@@ -120,6 +122,22 @@ export const useTreeStore = create<TreeState>()((set) => ({
         chatsByNode: keep(s.chatsByNode),
         activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
       };
+    }),
+
+  replaceNode: (oldId, node) =>
+    set((s) => {
+      if (!s.nodesById[oldId]) return s;
+      const nodesById = { ...s.nodesById, [node.id]: node };
+      delete nodesById[oldId];
+      const childrenByParent = { ...s.childrenByParent };
+      if (node.parent_id) {
+        childrenByParent[node.parent_id] = (childrenByParent[node.parent_id] ?? [])
+          .map((id) => (id === oldId ? node.id : id))
+          .sort(byForkIndex(nodesById));
+      }
+      const chatsByNode = { ...s.chatsByNode, [node.id]: s.chatsByNode[oldId] ?? [] };
+      delete chatsByNode[oldId];
+      return { nodesById, childrenByParent, chatsByNode, activeNodeId: s.activeNodeId === oldId ? node.id : s.activeNodeId };
     }),
 
   setActive: (nodeId) => set({ activeNodeId: nodeId }),
