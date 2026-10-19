@@ -17,6 +17,11 @@
   --ease-spring: linear(0, 0.0502, 0.1694, 0.3202, 0.4765, 0.6218, 0.7467, 0.8474, 0.9238, 0.9781, 1.0137,
     1.0344, 1.044, 1.0459, 1.0428, 1.0369, 1.0298, 1.0227, 1.0161, 1.0106, 1.0062, 1.0029, 1.0006, 0.9991,
     0.9983, 0.9979, 0.9979, 0.9981, 0.9984, 0.9987, 0.999, 0.9993, 1);
+
+  /* pop-in's starting pose (below). Defined here, so the keyframes need no fallback. */
+  --pop-from: 0 0.75rem;
+  --pop-rotate: -2deg;
+  --pop-scale: 0.82;
 }
 
 /* Entrances for things that appear, shared app-wide: a pinned sheet dropping
@@ -26,9 +31,9 @@
 @keyframes pop-in {
   from {
     opacity: 0;
-    scale: var(--pop-scale, 0.82);
-    translate: var(--pop-from, 0 0.75rem);
-    rotate: var(--pop-rotate, -2deg);
+    scale: var(--pop-scale);
+    translate: var(--pop-from);
+    rotate: var(--pop-rotate);
   }
 }
 

@@ -33,8 +33,7 @@ export function OnboardingForm({ next }: { next?: string }) {
 
   return (
     <Panel as="section" hierarchy="secondary" elevation="floating" className="auth">
-      <form onSubmit={submit}>
-      <Frame gap="6">
+      <Frame as="form" gap="6" onSubmit={submit}>
         <Frame as="header" gap="2" align="center" className="auth-header">
           <Text as="span" size="s" hierarchy="primary" content="TANGENT" className="auth-wordmark" />
           <Text as="h1" size="xl" content="Name your workspace" />
@@ -63,7 +62,6 @@ export function OnboardingForm({ next }: { next?: string }) {
           className="auth-google"
         />
       </Frame>
-      </form>
     </Panel>
   );
 }

@@ -38,12 +38,33 @@
   font-size: var(--font-size-display);
 }
 
-.board-title-field:focus-within,
-.case-settings-field:focus-within,
-.case-draft-field:focus-within,
-.folder-new-field:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+/* While the board loads, a red pin beside "Loading…" breathes: an
+ * in-progress state, the one kind of loop allowed (VISUAL_LANGUAGE §5). */
+.board-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.board-loading::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--color-string);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .board-loading::before {
+    animation: board-pin-breathe var(--motion-spring) var(--ease-in-out) infinite alternate;
+  }
+}
+
+@keyframes board-pin-breathe {
+  to {
+    scale: 0.6;
+    opacity: 0.5;
+  }
 }
 
 /* ── the grid ──────────────────────────────────────────────── */
@@ -324,6 +345,11 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   text-align: center;
+  /* swells and settles when the count changes */
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 -0.2rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 1.8;
 }
 
 .folder-tab-pin {

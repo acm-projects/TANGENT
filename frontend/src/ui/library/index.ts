@@ -17,6 +17,7 @@ export { Link } from "./primitives/Link/Link";
 export { Image } from "./primitives/Image/Image";
 export { Input } from "./primitives/Input/Input";
 export { TextArea } from "./primitives/TextArea/TextArea";
+export { Select } from "./primitives/Select/Select";
 export { Divider } from "./primitives/Divider/Divider";
 export { Button } from "./components/Button/Button";
 export { InkText } from "./components/InkText/InkText";

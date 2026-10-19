@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { apiErrorMessage } from "@/api";
 import type { ProjectSummary, WorkspaceSummary } from "@/api/types";
-import { Icon, Input, Panel, Text } from "@/ui/library";
+import { Frame, Icon, Input, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { CardFace } from "./CardFace";
 
@@ -36,8 +36,8 @@ type FolderDrawerProps = {
 
 export function FolderDrawer({ workspaces, projectsBySlug, openSlug, onOpen, onCreate }: FolderDrawerProps) {
   return (
-    <nav className="drawer" aria-label="Workspaces">
-      <ol className="drawer-row">
+    <Frame as="nav" gap="0" className="drawer" aria-label="Workspaces">
+      <Frame as="ol" direction="row" align="end" gap="6" className="drawer-row">
         {workspaces.map((w) => (
           <Folder
             key={w.workspace_id}
@@ -48,8 +48,8 @@ export function FolderDrawer({ workspaces, projectsBySlug, openSlug, onOpen, onC
           />
         ))}
         <NewFolder onCreate={onCreate} />
-      </ol>
-    </nav>
+      </Frame>
+    </Frame>
   );
 }
 
@@ -78,7 +78,8 @@ function Folder({ workspace, projects, open, onOpen }: FolderProps) {
         <span className="folder-tab">
           {open && <span className="folder-tab-pin" />}
           <Text as="span" size="s" className="folder-tab-name" content={workspace.workspace_name} />
-          <Text as="span" size="xxs" className="folder-tab-count" content={String(count)} />
+          {/* keyed, so a new or deleted project bumps the count */}
+          <Text key={count} as="span" size="xxs" className="folder-tab-count" content={String(count)} />
         </span>
       </span>
       <span className="folder-stack" aria-hidden="true">
@@ -143,7 +144,7 @@ function NewFolder({ onCreate }: { onCreate(name: string): Promise<void> }) {
     >
       <span className="folder-back" aria-hidden="true" />
       {naming ? (
-        <form className="folder-new-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setNaming(false)}>
+        <Frame as="form" gap="0" className="folder-new-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setNaming(false)}>
           <Panel className="folder-new-field">
             <Input
               aria-label="New workspace name"
@@ -157,7 +158,7 @@ function NewFolder({ onCreate }: { onCreate(name: string): Promise<void> }) {
             />
           </Panel>
           {error && <Text role="alert" size="xxs" className="folder-new-error" content={error} />}
-        </form>
+        </Frame>
       ) : (
         <button type="button" className="folder-hit" aria-label="New workspace" onClick={() => setNaming(true)}>
           <Icon icon="create_new_folder" size="xl" className="folder-new-icon" />

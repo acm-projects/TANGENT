@@ -156,10 +156,6 @@
   color: var(--color-text-secondary);
 }
 
-.share-invite:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 
 /* Long member lists scroll inside the card instead of growing it. */
 .share-list {
