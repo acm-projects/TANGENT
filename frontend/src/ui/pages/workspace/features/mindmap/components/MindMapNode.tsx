@@ -76,7 +76,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   ];
 
   return (
-    <div className="mindmap-node-wrap" data-peeled={peeled || undefined} data-more={moreOpen || undefined}>
+    <Frame gap="0" className="mindmap-node-wrap" data-peeled={peeled || undefined} data-more={moreOpen || undefined}>
       {data.hasParent && (
         <Handle
           type="target"
@@ -131,7 +131,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           </Frame>
         </Panel>
       </motion.div>
-      <div
+      <Frame
+        direction="row"
+        gap="2"
+        justify="center"
         className="mindmap-node-actions nopan"
         role="group"
         aria-label={`Actions for ${data.title}`}
@@ -170,10 +173,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           label="Debate mode (not available yet)"
           disabled
         />
-        <div className="mindmap-node-more">
+        <Frame gap="0" align="center" className="mindmap-node-more">
           {/* Listed bottom-up: the first option sits just above More. Each slides up out from
               behind More, one after another, and tucks back in when the menu closes. */}
-          <div className="mindmap-node-more-list" role="group" aria-label="More actions">
+          <Frame gap="2" align="center" className="mindmap-node-more-list" role="group" aria-label="More actions">
             <AnimatePresence>
               {moreOpen &&
                 moreOptions.map((option, i) => {
@@ -200,7 +203,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
                   );
                 })}
             </AnimatePresence>
-          </div>
+          </Frame>
           <Button
             size="l"
             title="More"
@@ -215,8 +218,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               setMoreOpen((open) => !open);
             }}
           />
-        </div>
-      </div>
+        </Frame>
+      </Frame>
       {drag.overlay}
       {/* Outside the tray: the tray and its menu close when the pointer leaves, the popup must not. */}
       <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this node?">
@@ -239,6 +242,6 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           />
         </Frame>
       </Popup>
-    </div>
+    </Frame>
   );
 });

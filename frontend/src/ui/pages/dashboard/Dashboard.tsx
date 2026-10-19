@@ -1,3 +1,4 @@
+import { Frame } from "@/ui/library";
 import { Board } from "./features/board/Board";
 import "./Dashboard.css";
 
@@ -9,8 +10,8 @@ type DashboardProps = { slug: string };
 
 export function Dashboard({ slug }: DashboardProps) {
   return (
-    <main className="dashboard">
+    <Frame as="main" gap="0" className="dashboard">
       <Board slug={slug} />
-    </main>
+    </Frame>
   );
 }

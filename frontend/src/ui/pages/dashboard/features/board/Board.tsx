@@ -44,10 +44,10 @@ export function Board({ slug }: BoardProps) {
             <BoardTitle key={title} title={title} count={projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
 
             {board.actionError && <Text role="alert" size="s" content={board.actionError} />}
-            {board.state.status === "loading" && <Text hierarchy="tertiary" content="Loading…" />}
+            {board.state.status === "loading" && <Text hierarchy="tertiary" className="board-loading" content="Loading…" />}
             {board.state.status === "error" && <Text role="alert" content={board.state.message} />}
             {ready && (
-              <ol className="board-grid" aria-label={`Projects in ${title}`}>
+              <Frame as="ol" className="board-grid" aria-label={`Projects in ${title}`}>
                 {landed &&
                   projects.map((p, i) => (
                     <motion.li key={p.id} layout="position" transition={spring.fly}>
@@ -68,7 +68,7 @@ export function Board({ slug }: BoardProps) {
                     onCreated={(id) => router.push(`/${board.activeSlug}/${id}`)}
                   />
                 </motion.li>
-              </ol>
+              </Frame>
             )}
           </Frame>
 
@@ -129,7 +129,7 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
           )}
         </Frame>
       ) : (
-        <form onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setName(null)}>
+        <Frame as="form" gap="0" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setName(null)}>
           <Panel className="board-title-field">
             <Input
               aria-label="Workspace name"
@@ -142,7 +142,7 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
               onBlur={() => !busy && setName(null)}
             />
           </Panel>
-        </form>
+        </Frame>
       )}
       {error && <Text role="alert" size="s" content={error} />}
       <Text size="s" hierarchy="tertiary" content={`${count} ${count === 1 ? "tree" : "trees"} on the board`} />

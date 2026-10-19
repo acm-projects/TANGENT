@@ -372,6 +372,14 @@
   color: var(--color-text-muted);
 }
 
+/* Copy and Copied spin in over each other, like a stamp coming down. */
+.message-copy {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 0;
+  --pop-rotate: -30deg;
+  --pop-scale: 0.4;
+}
+
 .branch-divider {
   padding-block: var(--space-4);
   color: var(--color-text-muted);
@@ -434,24 +442,6 @@
 /* the model picker: a quiet control in the action row, outlined only on hover */
 .message-field-model {
   max-width: 14rem;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--font-size-s);
-  cursor: pointer;
-  transition: border-color var(--motion-fast) var(--ease-out);
-}
-
-.message-field-model:hover:not(:disabled) {
-  border-color: var(--color-border);
-}
-
-.message-field-model:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 .chat-token-usage {

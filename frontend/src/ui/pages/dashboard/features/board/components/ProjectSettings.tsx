@@ -70,7 +70,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
   }
 
   return (
-    <div ref={ref} className="case-settings" data-open={open || undefined}>
+    <Frame ref={ref} gap="0" className="case-settings" data-open={open || undefined}>
       <Button
         elevation="floating"
         size="s"
@@ -151,6 +151,6 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </Frame>
   );
 }

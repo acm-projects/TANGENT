@@ -34,6 +34,15 @@
   /* An error message. Informational notices use role="status" instead. */
   [data-ui="text"][role="alert"] {
     color: var(--color-danger);
+    /* it arrives with a small shake of the head; reduced motion zeroes the token */
+    animation: ui-alert-shake var(--motion-slow) var(--ease-out);
+  }
+
+  @keyframes ui-alert-shake {
+    0% { opacity: 0; translate: -0.4rem 0; }
+    25% { opacity: 1; translate: 0.3rem 0; }
+    50% { translate: -0.2rem 0; }
+    75% { translate: 0.1rem 0; }
   }
 
   /* sizes — one per TextSize */

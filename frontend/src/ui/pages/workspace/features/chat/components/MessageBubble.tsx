@@ -76,6 +76,9 @@ function AssistantMessage({ message, onBranch, streaming }: Omit<MessageBubblePr
           <Button
             hierarchy="tertiary"
             size="s"
+            // keyed, so the swap to the check (and back) remounts and pops
+            key={String(copied)}
+            className="message-copy"
             label={copied ? "Copied" : "Copy"}
             icon={copied ? "check" : "content_copy"}
             showIcon
