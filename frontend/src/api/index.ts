@@ -32,6 +32,6 @@ export type Api = typeof api;
 
 // Streaming is not request/response, so it is not part of `api`.
 export { streamMessage } from "./stream";
-export { apiErrorMessage, apiErrorStatus } from "./errors";
+export { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";
 export { apiClient, getAccessToken, setAccessToken, takeTokenFromUrl } from "./session";
 export type * from "./types";

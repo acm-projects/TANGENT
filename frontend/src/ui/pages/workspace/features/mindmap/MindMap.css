@@ -15,6 +15,13 @@
   margin: auto;
 }
 
+/* the docked chat covers the right half, so status sits where the tree will (fitViewOptions in MindMap.tsx) */
+@media (min-width: 48rem) {
+  .mindmap-status {
+    translate: -25vw 0;
+  }
+}
+
 /* the dot grid (Figma "BG-Grid-Dot") */
 .mindmap-dots {
   /* keep in step with the dot grid in Login.css */
@@ -22,49 +29,90 @@
   opacity: 0.45;
 }
 
-/* the string: grey by default, red on the selected path. Each edge lights up
- * --depth steps after the root, so the path colours in from the top down. */
+/* the string: grey by default, red on the selected path */
+/* Real string has weight: it throws a soft shadow on the board below it. */
 .mindmap .mindmap-edge .react-flow__edge-path {
   fill: none;
   stroke: var(--color-text-faint);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
   stroke-linecap: round;
-  transition: stroke var(--motion-base) var(--ease-out);
-  transition-delay: calc(var(--depth) * 40ms);
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 2px 1.5px var(--color-string-shadow));
+  transition:
+    stroke var(--motion-base) var(--ease-out),
+    stroke-width var(--motion-base) var(--ease-out);
 }
 
+/* the selected path: pulled taut in red, a little thicker */
 .mindmap .mindmap-edge-path .react-flow__edge-path {
   stroke: var(--color-string);
+  stroke-width: 2.6;
 }
 
-/* the pins where a string meets a card */
+/* drawn in while the map first lands (StringEdge) */
+.mindmap .mindmap-edge .react-flow__edge-path[data-landing] {
+  animation: draw-in var(--motion-slow) var(--ease-out) var(--string-delay) backwards;
+}
+
+.mindmap .mindmap-string-end[data-landing] {
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--string-delay) backwards;
+}
+
+/* the round end of a string, just short of the card */
+.mindmap .mindmap-string-end {
+  fill: var(--color-text-faint);
+  transform-box: fill-box;
+  transform-origin: center;
+  --pop-from: 0 0;
+  --pop-scale: 0;
+  transition: fill var(--motion-base) var(--ease-out);
+}
+
+.mindmap .mindmap-edge-path .mindmap-string-end {
+  fill: var(--color-string);
+}
+
+/* Edges anchor on React Flow's handles, so they stay in the DOM, unseen. They
+ * sit on the card's unmoving wrapper, so a lifted card never drags its strings. */
 .mindmap .mindmap-handle {
-  width: 9px;
-  height: 9px;
+  width: 1px;
+  height: 1px;
   min-width: 0;
   min-height: 0;
   border: 0;
-  background: var(--color-text-faint);
-  box-shadow: 0 1px 1px rgb(0 0 0 / 0.25);
-  transition: background var(--motion-base) var(--ease-out);
+  opacity: 0;
 }
 
-.mindmap .mindmap-handle[data-lit] {
-  background: var(--color-string);
+/* Focus: with a card picked, the cards off its thread lie flat on the board
+ * (no lift, a fainter edge) and their strings fade, so the red path reads as
+ * the line of inquiry. Titles keep their contrast; hovering brings a card back. */
+.mindmap[data-focused] .mindmap-node[data-state="default"]:not(:hover, :focus-visible) {
+  border-color: var(--color-border);
+  box-shadow: none;
+  background: var(--texture-grain), color-mix(in srgb, var(--color-surface) 70%, var(--color-board));
 }
 
-/* the delay is a stagger, not a duration, so the zeroed tokens don't cover it */
-@media (prefers-reduced-motion: reduce) {
-  .mindmap .mindmap-edge .react-flow__edge-path {
-    transition-delay: 0s;
-  }
+.mindmap[data-focused] .mindmap-edge:not(.mindmap-edge-path) {
+  opacity: 0.6;
+}
+
+.mindmap .mindmap-edge {
+  transition: opacity var(--motion-base) var(--ease-out);
 }
 
 /* ── the node ─────────────────────────────────────────────── */
 
+/* React Flow positions nodes absolutely, so they shrink-wrap to their narrowest
+ * and a wrapping title would break at every word. Size to the unwrapped title
+ * instead; the card's max-width then decides where it wraps. */
+.mindmap .react-flow__node-tangent {
+  width: max-content;
+}
+
 .mindmap-node {
-  padding: var(--space-2) var(--space-6);
-  min-height: 4rem;
+  position: relative;
+  padding: var(--space-3) var(--space-6) var(--space-2);
+  min-height: 4.5rem;
   border-radius: var(--radius-md);
   /* one leaf column is 300px wide (layout.ts), so a card never reaches its neighbour */
   max-width: 17rem;
@@ -76,11 +124,13 @@
   transition:
     border-color var(--motion-fast) var(--ease-out),
     box-shadow var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out);
+    color var(--motion-fast) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
 }
 
 .mindmap-node[data-state="path"] {
   border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
   color: var(--color-text-secondary);
 }
 
@@ -90,7 +140,7 @@
 .mindmap-node[data-state="selected"] {
   border-color: var(--color-border-strong);
   color: var(--color-text);
-  box-shadow: var(--shadow-floating), 0 0 0 1px var(--color-border-strong);
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--color-border-strong);
 }
 
 /* hover: the card lifts (the motion is in MindMapNode.tsx), so its shadow grows */
@@ -110,19 +160,383 @@
 }
 
 /* Titles are the heading face, with a hair of ink bleed so they read as pen on paper. */
+/* The root is the case itself: labelled, a size up, and ruled twice round
+ * like the cover of a file. */
+.mindmap-node[data-root] {
+  max-width: 20rem;
+  border-width: 3px;
+  border-style: double;
+  border-color: var(--color-border-strong);
+}
+
+.mindmap-node-kicker {
+  display: block;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The card's outline number, typed in the margin like an exhibit mark. */
+.mindmap-node-exhibit {
+  flex: none;
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  padding-right: var(--space-2);
+  border-right: 1px solid var(--color-border);
+  font-family: var(--font-heading);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* Up to two lines, like a title written on a card; longer ones end in "…". */
 .mindmap-node-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  padding-block: var(--space-2);
+  white-space: normal;
+  text-align: left;
+  line-height: var(--line-height-tight);
+  /* margin, not padding: padding would show the clamped third line */
+  margin-block: var(--space-2);
   font-family: var(--font-heading);
   text-shadow: 0 0 0.25px currentColor;
 }
 
-/* an attachment tag: a small paper chip at the end of the node */
+/* The pin each card hangs from, where its string is wound. A domed head: a
+ * highlight up-left, a shadow cast down-right onto the card. Graphite at rest;
+ * red on the selected path, since red means connected. */
+.mindmap-node::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  width: 0.9rem;
+  height: 0.9rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background:
+    var(--texture-pin),
+    var(--color-text-faint);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  transition: background-color var(--motion-base) var(--ease-out);
+}
+
+.mindmap-node:is([data-state="path"], [data-state="selected"])::before {
+  background-color: var(--color-string);
+}
+
+/* the selected card's pin is pressed in again as it is picked */
+.mindmap-node[data-state="selected"]::before {
+  animation: pin-press var(--motion-spring) var(--ease-spring);
+}
+
+/* Thinking: while a reply streams in, the pin sends out slow red rings, the
+ * one loop the board allows (an in-progress state). Its own media query, since
+ * a loop at a zeroed duration would still run. */
+@media (prefers-reduced-motion: no-preference) {
+  .mindmap-node[data-thinking]::before {
+    animation: pin-think var(--motion-spring) var(--ease-out) infinite;
+    animation-duration: calc(var(--motion-spring) * 2);
+  }
+}
+
+@keyframes pin-think {
+  from {
+    box-shadow: 1px 2px 2px var(--color-string-shadow), 0 0 0 0 color-mix(in srgb, var(--color-string) 60%, transparent);
+  }
+  to {
+    box-shadow: 1px 2px 2px var(--color-string-shadow), 0 0 0 0.9rem transparent;
+  }
+}
+
+@keyframes pin-press {
+  from {
+    scale: 1.5;
+  }
+}
+
+/* An attachment tag: a small slip clipped over the card's top-right corner,
+ * off the title's line. Tags after the first tuck in beside it. */
 .mindmap-node-tag {
-  flex: none;
-  padding: var(--space-2);
-  border-color: currentColor;
-  color: inherit;
+  position: absolute;
+  top: -0.7rem;
+  right: 0.6rem;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  rotate: 7deg;
+}
+
+.mindmap-node-tag + .mindmap-node-tag {
+  right: 2.6rem;
+  rotate: -5deg;
+}
+
+/* ── the hover actions ────────────────────────────────────── */
+
+/* The tray hides under the card. Hovering the card (or keyboard focus, but not
+ * a mouse click's focus) lets it peek out; hovering the tray itself tips the
+ * card away (MindMapNode.tsx) and nudges the buttons a little further out. */
+.mindmap-node-wrap {
+  position: relative;
+}
+
+.mindmap-node-actions {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: -1;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  opacity: 0;
+  translate: 0 -100%;
+  pointer-events: none;
+  transition:
+    translate var(--motion-spring) var(--ease-spring),
+    opacity var(--motion-fast) var(--ease-out);
+}
+
+.mindmap-node-wrap:is(:hover, :has(:focus-visible)) .mindmap-node-actions {
+  opacity: 1;
+  translate: 0 -25%;
+  pointer-events: auto;
+}
+
+.mindmap-node-wrap[data-peeled] .mindmap-node-actions {
+  translate: 0 -5%;
+}
+
+/* While More is open, the tray comes up over the card so its list isn't hidden behind it. */
+.mindmap-node-wrap[data-more] .mindmap-node-actions {
+  z-index: 1;
+}
+
+.mindmap-node-more {
+  position: relative;
+}
+
+/* More's options stack upward from the button, centred over it (the motion
+ * is in MindMapNode.tsx). More sits above them, so they slide out from behind it. */
+.mindmap-node-more > [data-component="button"] {
+  position: relative;
+  z-index: 1;
+}
+
+.mindmap-node-more-list {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+/* The list sits over the card, so a disabled option keeps its paper opaque
+ * and dims only its icon. */
+.mindmap-node-more-list :disabled {
+  opacity: 1;
+
+  > * {
+    opacity: 0.5;
+  }
+}
+
+/* The case's label: a slip pinned in the board's top corner, clear of the
+ * toolbar, a little crooked. It drops in after the cards. */
+.mindmap-case-label {
+  position: absolute;
+  /* low enough that its pin hides under an open toolbar panel too */
+  top: var(--space-8);
+  left: 6rem;
+  /* over the map, under the toolbar's panels (Workspace.css stacks the toolbar at 2) */
+  z-index: 1;
+  max-width: min(22rem, 30vw);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  rotate: -1.5deg;
+  pointer-events: none;
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  --pop-from: 0 -2rem;
+  --pop-rotate: -8deg;
+  --pop-scale: 1.1;
+}
+
+.mindmap-case-label::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background:
+    var(--texture-pin),
+    var(--color-text-faint);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+}
+
+.mindmap-case-kicker {
+  display: block;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.mindmap-case-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 0.25px currentColor;
+}
+
+/* too narrow: the chat takes the screen and the label would crowd the toolbar */
+@media (max-width: 48rem) {
+  .mindmap-case-label {
+    display: none;
+  }
+}
+
+.mindmap-action-error {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 5;
+}
+
+/* ── drag a card to branch or delete it (DragAction.tsx) ───────── */
+
+/* The card being dragged from: a dotted outline springs out around it. Its
+ * colour, and the string's, says what letting go does: red string for a new
+ * tangent (a connection), oxblood for delete. */
+.mindmap-node[data-dragging] {
+  --drag-ink: var(--color-border-emphasis);
+  cursor: grabbing;
+  outline: 2px dashed var(--drag-ink);
+  /* DragAction.tsx's OUTLINE starts the string on this line: keep them in step */
+  outline-offset: 6px;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    outline-color var(--motion-fast) var(--ease-out),
+    outline-offset var(--motion-spring) var(--ease-spring);
+}
+
+@starting-style {
+  .mindmap-node[data-dragging] {
+    outline-offset: 0;
+  }
+}
+
+.mindmap-node[data-drag-action="branch"],
+.drag-action[data-action="branch"] {
+  --drag-ink: var(--color-string);
+}
+
+.mindmap-node[data-drag-action="delete"],
+.drag-action[data-action="delete"] {
+  --drag-ink: var(--color-danger);
+}
+
+/* the string to the pointer and the tip beside it, over everything */
+.drag-action {
+  --drag-ink: var(--color-border-emphasis);
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.drag-action-line {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.drag-action-line path {
+  fill: none;
+  stroke: var(--drag-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 6;
+  transition: stroke var(--motion-fast) var(--ease-out);
+}
+
+.drag-action-line circle {
+  fill: var(--drag-ink);
+  transition: fill var(--motion-fast) var(--ease-out);
+}
+
+/* the dots march toward the pointer. A hand-written loop, so it honours
+ * reduced motion itself (motion.css). */
+@media (prefers-reduced-motion: no-preference) {
+  .drag-action-line path {
+    animation: drag-action-march var(--motion-slow) linear infinite;
+  }
+}
+
+@keyframes drag-action-march {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+.drag-action-tip {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* centred just under the pointer */
+  translate: -50% 1.25rem;
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  transform-origin: top center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: -50% 0.5rem;
+  --pop-scale: 0.6;
+}
+
+.drag-action[data-action] .drag-action-tip {
+  border-color: var(--drag-ink);
+  color: var(--color-text);
+}
+
+.drag-action[data-action="delete"] .drag-action-tip {
+  color: var(--color-danger);
+}
+
+/* Branching: the tip is the ghost of the card about to be pinned, hanging from
+ * the string by its pin at the pointer, a little crooked like a new card. */
+.drag-action[data-action="branch"] .drag-action-tip {
+  translate: -50% -0.25rem;
+  padding: var(--space-4) var(--space-6) var(--space-3);
+  border-style: dashed;
+  border-radius: var(--radius-md);
+  rotate: -2deg;
+  transform-origin: top center;
+}
+
+.drag-action[data-action="branch"] .drag-action-tip::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background:
+    var(--texture-pin),
+    var(--color-string);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
 }

@@ -17,8 +17,8 @@
     color: var(--color-text-muted);
   }
 
-  /* Like TextArea: the surrounding Panel shows focus (the consumer's
-   * :focus-within), so a ring here would draw a box inside a box. */
+  /* The surrounding Panel shows focus (Panel.css), so a ring here would draw
+   * a box inside a box. */
   [data-ui="input"]:focus-visible {
     outline: none;
   }

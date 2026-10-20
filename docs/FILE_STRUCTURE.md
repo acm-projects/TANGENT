@@ -160,7 +160,7 @@ frontend/
         │   ├── tokens/        design decisions as CSS custom properties
         │   ├── types/         shared prop vocabularies (TextSize, Hierarchy, Elevation)
         │   ├── primitives/    wrap one native tag each (Text/, Panel/, Icon/, Frame/, Link/,
-        │   │                  Image/, Input/, TextArea/, Divider/)
+        │   │                  Image/, Input/, TextArea/, Select/, Divider/)
         │   ├── components/    built from primitives and other components (Button/)
         │   └── index.ts       the barrel features and pages import from
         ├── features/          features used by TWO OR MORE pages, or planned to be (auth/)
@@ -168,8 +168,8 @@ frontend/
             ├── login/         the /login screen
             ├── signup/        the /signup screen
             ├── invite/        the /invite/{token} screen
-            ├── dashboard/     the project grid
-            │   └── features/  projects/
+            ├── dashboard/     the board: project cards, workspace folders
+            │   └── features/  board/
             └── workspace/     the mind map + chat screen
                 └── features/  mindmap/, chat/, toolbar/ — used only by this page
 ```

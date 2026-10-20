@@ -26,7 +26,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   seq: number;
-  branch_source: "a" | "b" | null;
+  /** Merged nodes tag each message with its source leaf's node id; null elsewhere. */
+  branch_source: string | null;
   created_at: string;
   /** [proposed] Files the user attached to this message. */
   attachments?: Attachment[];
@@ -51,6 +52,19 @@ export interface NodeMeta {
   attachment_kinds?: AttachmentKind[];
 }
 
+/** Returned when a write created the sharee's own copy of a shared project. */
+export interface ForkInfo {
+  project_id: string;
+  workspace_slug: string;
+  node_map: Record<string, string>;
+  tree_map: Record<string, string>;
+  /** The copy's id of the node written to. Message stream only. */
+  node_id?: string;
+}
+
+/** POST /nodes/:id/fork and POST /nodes/merge: the new node, plus `fork` when it landed in a fresh copy. */
+export type ForkedNode = NodeMeta & { fork: ForkInfo | null };
+
 export interface Node extends NodeMeta {
   chats: ChatMessage[];
 }
@@ -70,8 +84,10 @@ export interface TreeResponse {
 /** SSE events emitted by POST /nodes/:id/messages */
 export type StreamEvent =
   | { type: "token"; text: string }
-  | { type: "done"; usage?: ModelUsage; model?: string }
-  | { type: "error"; message: string };
+  // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
+  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean }
+  // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).
+  | { type: "error"; message: string; fork?: ForkInfo; forkedProjectId?: string };
 
 /** GET /models */
 export interface AvailableModel {
@@ -79,6 +95,7 @@ export interface AvailableModel {
   name: string;
   description: string;
   supports_images: boolean;
+  context_length: number;
 }
 
 /** Token counts the provider reports; arrives on the `done` event when available. */
@@ -102,6 +119,13 @@ export interface WorkspaceSummary {
   workspace_slug: string;
 }
 
+/** POST /workspaces/ -- app/routers/workspace_router.py create_workspace (no id: list again for it) */
+export interface WorkspaceCreated {
+  message: string;
+  workspace_name: string;
+  workspace_slug: string;
+}
+
 /** GET /projects/ -- app/routers/projects_router.py ProjectSummary */
 export interface ProjectSummary {
   id: string;
@@ -113,6 +137,9 @@ export interface ProjectSummary {
   forked_from_project_id: string | null;
   forked_project_id: string | null;
 }
+
+/** GET /projects/:id */
+export type ProjectDetail = ProjectSummary & { tree_count: number };
 
 /** [proposed] A file in a project's Sources panel (Figma "Workspace Source"). No backend table yet. */
 export interface Source {

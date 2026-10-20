@@ -6,8 +6,8 @@ import { MotionConfig } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTreeStore } from "@/store/treeStore";
-import { Frame, Text } from "@/ui/library";
-import { MindMapNode, StaggerPinIn } from "./components/MindMapNode";
+import { Frame, Loading, Panel, Text } from "@/ui/library";
+import { MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
 import { useMindMap } from "./useMindMap";
@@ -37,8 +37,10 @@ export function MindMap({ projectId, className }: MindMapProps) {
     })),
   );
   const setActive = useTreeStore((s) => s.setActive);
+  const projectName = useTreeStore((s) => s.project?.project_name);
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
   const [stagger, setStagger] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => {
     if (load.status !== "ready") return;
     const t = setTimeout(() => setStagger(false), 1500);
@@ -46,12 +48,25 @@ export function MindMap({ projectId, className }: MindMapProps) {
   }, [load.status]);
 
   return (
-    <Frame as="section" gap="0" className={["mindmap", className].filter(Boolean).join(" ")} aria-label="Conversation map">
-      {load.status === "loading" && <Text hierarchy="tertiary" className="mindmap-status" content="Loading map…" />}
+    <Frame as="section" gap="0" className={["mindmap", className].filter(Boolean).join(" ")}
+      // with a card picked, everything off its thread recedes (MindMap.css)
+      data-focused={structure.activeNodeId ? true : undefined}
+      aria-label="Conversation map"
+    >
+      {load.status === "loading" && <Loading size="base" label="Loading map…" className="mindmap-status" />}
       {load.status === "error" && <Text role="alert" className="mindmap-status" content={load.message} />}
+      {actionError && <Text role="alert" size="s" className="mindmap-action-error" content={actionError} />}
+      {load.status === "ready" && projectName && (
+        // the case's label, pinned to the board's corner
+        <Panel elevation="floating" className="mindmap-case-label">
+          <Text as="span" size="xxs" className="mindmap-case-kicker" content="Case file" />
+          <Text as="h1" size="l" hierarchy="primary" className="mindmap-case-name" content={projectName} />
+        </Panel>
+      )}
       {load.status === "ready" && (
         <MotionConfig reducedMotion="user">
         <StaggerPinIn value={stagger}>
+        <ReportMapError value={setActionError}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -68,12 +83,15 @@ export function MindMap({ projectId, className }: MindMapProps) {
           onPaneClick={() => setActive(null)}
           fitView
           // The chat panel covers the right half, so centre the tree in the left half.
-          fitViewOptions={{ padding: { top: "20%", bottom: "20%", left: "6%", right: "52%" }, minZoom: 0.6, maxZoom: 1 }}
+          fitViewOptions={{ padding: { top: "20%", bottom: "20%", left: "8%", right: "52%" }, minZoom: 0.45, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={2}
+          // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
+          proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>
+        </ReportMapError>
         </StaggerPinIn>
         </MotionConfig>
       )}

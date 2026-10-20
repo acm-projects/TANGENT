@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Button, Frame, Icon, Input, Panel, Text, TextArea } from "@/ui/library";
+import { Button, Frame, Icon, Input, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { AvailableModel } from "@/api/types";
 import type { SendBlocker } from "../useChat";
 
@@ -12,6 +12,7 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   "no-selection": "Select a node on the map to write here.",
   "not-leaf": "This node has branches. Use Branch on a reply to continue from it.",
   streaming: "Waiting for the reply…",
+  pending: "Message…",
 };
 
 type MessageFieldProps = {
@@ -21,17 +22,22 @@ type MessageFieldProps = {
   modelsLoading: boolean;
   onModelChange(modelId: string): void;
   className?: string;
+  /** The card being written on: names it in the empty field ("Ask about …"). */
+  about?: string | null;
   onSend(content: string, files: File[]): void;
+  /** Stop the reply that's streaming: Send turns into Stop while one is. */
+  onStop(): void;
 };
 
-export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, className }: MessageFieldProps) {
+export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
-  const disabled = blocker !== null;
-  const canSend = !disabled && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
+  // a fork still being confirmed only holds Send back for a moment; typing can start straight away
+  const disabled = blocker !== null && blocker !== "pending";
+  const canSend = blocker === null && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
 
   function submit() {
     if (!canSend) return;
@@ -83,7 +89,7 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
 
         <TextArea
           aria-label="Message"
-          placeholder={PLACEHOLDER[blocker ?? "ready"]}
+          placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
           value={text}
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
@@ -93,19 +99,20 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
 
         <Frame direction="row" justify="between" align="center">
           <Frame direction="row" gap="1" align="center">
-            <select
+            <Select
               aria-label="Chat model"
               className="message-field-model"
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
               disabled={modelsLoading || blocker === "streaming" || models.length === 0}
-            >
-              {modelsLoading && <option value="">Loading models…</option>}
-              {!modelsLoading && models.length === 0 && <option value="">No models available</option>}
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
+              options={
+                modelsLoading
+                  ? [{ value: "", label: "Loading models…" }]
+                  : models.length === 0
+                    ? [{ value: "", label: "No models available" }]
+                    : models.map((m) => ({ value: m.id, label: m.name }))
+              }
+            />
             <Button
               hierarchy="tertiary"
               label="Attach file (not available yet)"
@@ -125,16 +132,32 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               onClick={() => imageInput.current?.click()}
             />
           </Frame>
-          <Button
-            hierarchy="primary"
-            label="Send"
-            icon="arrow_upward"
-            showIcon
-            showLabel={false}
-            disabled={!canSend}
-            onClick={submit}
-            className="message-field-send"
-          />
+          {/* keyed, so swapping Send for Stop stamps the new one in */}
+          {blocker === "streaming" ? (
+            <Button
+              key="stop"
+              hierarchy="primary"
+              label="Stop"
+              icon="stop"
+              showIcon
+              showLabel={false}
+              onClick={onStop}
+              className="message-field-send"
+              data-stop
+            />
+          ) : (
+            <Button
+              key="send"
+              hierarchy="primary"
+              label="Send"
+              icon="arrow_upward"
+              showIcon
+              showLabel={false}
+              disabled={!canSend}
+              onClick={submit}
+              className="message-field-send"
+            />
+          )}
         </Frame>
       </Frame>
 

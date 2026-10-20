@@ -34,9 +34,16 @@ describe("toFlow", () => {
     expect(stateById(s)).toEqual({ r: "path", a: "default", b: "path", c: "selected" });
     const pathEdges = toFlow(s).edges.filter((e) => e.className?.includes("mindmap-edge-path")).map((e) => e.id);
     expect(pathEdges.sort()).toEqual(["b->c", "r->b"]);
+    // drawn last, so the red path paints over grey strings
+    expect(toFlow(s).edges.slice(-2).map((e) => e.id).sort()).toEqual(["b->c", "r->b"]);
   });
 
   it("labels an untitled node", () => {
     expect(toFlow(slice(null)).nodes.find((n) => n.id === "c")?.data.title).toBe(UNTITLED);
+  });
+
+  it("numbers nodes like an outline, by sibling order", () => {
+    const labels = Object.fromEntries(toFlow(slice(null)).nodes.map((n) => [n.id, n.data.exhibit]));
+    expect(labels).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
   });
 });

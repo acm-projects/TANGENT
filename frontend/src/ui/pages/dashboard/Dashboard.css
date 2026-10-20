@@ -1,25 +1,7 @@
-/* Page-level layout only, unlayered (DESIGN.md §2). Measurements: Figma 313:9882. */
+/* Page-level layout only, unlayered (DESIGN.md §2). */
 
 .dashboard {
   min-height: 100dvh;
-  padding: var(--space-4);
-  /* the board the paper panels lie on, as in the workspace */
-  background: var(--texture-grain), var(--color-board);
-}
-
-.dashboard-title {
-  padding: var(--space-6) var(--space-8);
-  color: var(--color-text-secondary);
-}
-
-.dashboard-projects {
-  flex: 1;
-}
-
-/* Figma: section labels are the content face, medium weight, muted. */
-.dashboard-heading {
-  padding: var(--space-4) var(--space-4) 0;
-  font-family: var(--font-content);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted);
+  /* the board the paper lies on, as in the workspace */
+  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
 }

@@ -14,18 +14,98 @@
 
 .toolbar-rail {
   pointer-events: none;
+  /* slides in from off the left edge when the workspace opens */
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: -5rem 0;
+}
+
+/* the panel's wrapper, which Motion swings out from the rail */
+.toolbar-slot {
+  display: flex;
+  transform-origin: left center;
+}
+
+/* Share: a small card level with the Share tile */
+.toolbar-slot[data-panel="share"] {
+  align-self: end;
 }
 
 .toolbar-rail > * {
   pointer-events: auto;
 }
 
-/* Figma tile: a 48px circle */
+/* Figma tile: 48px square, with the same paper radius as every other button */
 .toolbar-tile {
+  position: relative;
   width: 3rem;
   height: 3rem;
-  border-radius: var(--radius-full);
   color: var(--color-text-secondary);
+}
+
+/* A tile's name, on a paper tag that slides out from behind it on hover or
+ * keyboard focus. It reads the tile's own label, so there's one source of truth. */
+.toolbar-tile::before {
+  content: attr(aria-label);
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-3));
+  z-index: 3;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-s);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  translate: -1rem -50%;
+  rotate: -6deg;
+  scale: 0.8;
+  transform-origin: left center;
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    translate var(--motion-spring) var(--ease-spring),
+    rotate var(--motion-spring) var(--ease-spring),
+    scale var(--motion-spring) var(--ease-spring);
+}
+
+.toolbar-tile:is(:hover, :focus-visible)::before {
+  opacity: 1;
+  translate: 0 -50%;
+  rotate: 0deg;
+  scale: 1;
+}
+
+/* an open tool's panel is beside it already, so its tag stays tucked away */
+.toolbar-tile[aria-pressed="true"]::before {
+  display: none;
+}
+
+/* a tile tips as it lifts, like a card nudged on the board */
+[data-ui="panel"][data-component="button"].toolbar-tile:hover:not(:disabled, :active) {
+  rotate: -4deg;
+}
+
+/* The open tool is pinned: a red pin dot drops in beside its tile (red, since
+ * the panel beside it is connected to it). */
+.toolbar-tile[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -0.65rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  translate: 0 -50%;
+  border-radius: var(--radius-full);
+  background: var(--color-string);
+  box-shadow: 0 1px 1px var(--color-string-shadow);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  /* a translate, so it starts above the -50% that centres the dot */
+  --pop-from: 0 -200%;
+  --pop-scale: 2;
+  --pop-rotate: 0deg;
 }
 
 /* ── panels opened from the rail ────────────────────────────── */
@@ -46,20 +126,71 @@
   overflow-y: auto;
 }
 
-.sources-add {
+/* A panel is a case folder: a manila band heads it, bled to its edges. */
+.toolbar-panel.sources {
+  padding-top: 0;
+}
+
+.toolbar-panel-head {
+  margin-inline: calc(-1 * var(--space-6));
+  padding: var(--space-6) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--texture-grain), var(--color-folder);
+  color: var(--color-text);
+}
+
+.toolbar-panel-kicker {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.toolbar-panel-head .toolbar-panel-title {
+  font-family: var(--font-heading);
+  color: var(--color-text);
+}
+
+/* Add is an empty evidence bag: a dashed pocket that firms up under the pointer. */
+[data-ui="panel"][data-component="button"].sources-add {
   width: 100%;
+  min-height: 5rem;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out),
+    translate var(--motion-spring) var(--ease-spring),
+    scale var(--motion-spring) var(--ease-spring);
+}
+
+[data-ui="panel"][data-component="button"].sources-add:hover:not(:disabled) {
+  border-color: var(--color-border-emphasis);
+  border-style: solid;
+  background: var(--color-surface-raised);
+  scale: 1.02;
+}
+
+.sources-empty {
+  text-align: center;
+  padding-inline: var(--space-4);
 }
 
 .source-card {
   padding: var(--space-3);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   cursor: default;
-  transition: border-color var(--motion-fast) var(--ease-out);
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    translate var(--motion-spring) var(--ease-spring),
+    box-shadow var(--motion-fast) var(--ease-out);
 }
 
 .source-card:hover,
 .source-card:focus-visible {
   border-color: var(--color-border-strong);
+  translate: 0 -2px;
+  box-shadow: var(--shadow-lift);
 }
 
 .source-card:focus-visible {
@@ -67,17 +198,29 @@
   outline-offset: 2px;
 }
 
+/* the thumbnail is a small photo in a white border, tipped as it was dropped in the file */
 .source-thumb {
   position: relative;
   display: grid;
   place-items: center;
   flex: none;
-  width: 4.5rem;
-  height: 4.5rem;
-  padding: 0;
-  border-radius: var(--radius-lg);
+  width: 3.75rem;
+  height: 3.75rem;
+  padding: 3px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
+  box-shadow: var(--shadow-floating);
   overflow: hidden;
+  rotate: -3deg;
+  transition: rotate var(--motion-spring) var(--ease-spring);
+}
+
+.source-card:nth-child(even) .source-thumb {
+  rotate: 2.5deg;
+}
+
+.source-card:is(:hover, :focus-visible) .source-thumb {
+  rotate: 0deg;
 }
 
 .source-thumb-image {
@@ -108,6 +251,7 @@
 }
 
 .source-name {
+  font-family: var(--font-heading);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -127,12 +271,36 @@
   opacity: 1;
 }
 
-/* Share: a small card level with the Share tile */
 .share {
-  align-self: end;
   width: 20rem;
+  padding: 0 var(--space-4) var(--space-4);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.share .toolbar-panel-head {
+  margin-inline: calc(-1 * var(--space-4));
   padding: var(--space-4);
-  border-radius: var(--radius-xl);
+}
+
+/* a member's initial on a round paper badge; an invite still out is a dashed one */
+.share-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--texture-grain), var(--color-surface-raised);
+  font-family: var(--font-heading);
+  color: var(--color-text);
+}
+
+.share-avatar[data-pending] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-text-muted);
 }
 
 
@@ -145,10 +313,6 @@
   color: var(--color-text-secondary);
 }
 
-.share-invite:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 
 /* Long member lists scroll inside the card instead of growing it. */
 .share-list {
@@ -157,6 +321,7 @@
 }
 
 .share-member {
+  flex: 1;
   min-width: 0;
 }
 
@@ -164,4 +329,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Source cards and members deal in one after another as the panel opens.
+ * sibling-index() staggers them where supported; elsewhere they land together. */
+.sources li,
+.share-list > li {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -1.5rem 0;
+  --pop-rotate: 0deg;
 }

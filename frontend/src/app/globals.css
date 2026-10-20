@@ -35,4 +35,15 @@
     background: var(--color-surface);
     color: var(--color-text);
   }
+
+  /* Selected text gets a pass of graphite, like a soft pencil underlay. */
+  ::selection {
+    background: var(--color-selection);
+  }
+
+  /* Scrollbars are a thin graphite rule, not app chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
 }

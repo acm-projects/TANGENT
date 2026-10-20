@@ -6,10 +6,12 @@
 
 .workspace {
   display: grid;
-  grid-template: 1fr / 1fr;
+  /* minmax(0, …), not plain 1fr: a 1fr track can't shrink below its content, so one long code line in the
+   * chat would widen the page past the screen and push the right-aligned sheet out of view */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   height: 100dvh;
   overflow: hidden;
-  background: var(--texture-grain), var(--color-board);
+  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
 }
 
 .workspace > * {

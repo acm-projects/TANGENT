@@ -9,7 +9,7 @@
   [data-ui="panel"] {
     padding: var(--space-4);
     border: 1px solid transparent;
-    border-radius: var(--radius-xxl);
+    border-radius: var(--radius-lg);
     background: var(--texture-grain), var(--color-surface);
     color: var(--color-text);
   }
@@ -31,5 +31,12 @@
   /* elevation */
   [data-ui="panel"][data-elevation="floating"] {
     box-shadow: var(--shadow-floating);
+  }
+
+  /* A Panel wrapping a field is the field: it shows the focus ring the bare
+   * Input draws none of (a ring on both would be a box in a box). */
+  [data-ui="panel"]:has(> [data-ui="input"]:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
   }
 }

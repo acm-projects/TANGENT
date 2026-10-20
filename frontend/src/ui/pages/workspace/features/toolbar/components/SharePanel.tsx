@@ -1,16 +1,19 @@
 import { useState } from "react";
-import { Button, Frame, Input, Panel, Text } from "@/ui/library";
+import { useTreeStore } from "@/store/treeStore";
+import { Button, Frame, Input, Loading, Panel, Text } from "@/ui/library";
 import { rowActions } from "../sharesView";
 import { useShares } from "../useShares";
 
 /* The share popover (Figma Toolbar "State=Share"): invite someone by email,
  * then manage who has access. Accepted members read bold, invitations that
- * haven't been accepted are faint and can be resent. Owner-only (backend). */
+ * haven't been accepted are faint and can be resent. Owner-only (backend):
+ * a sharee gets a note instead, and /shares is never called for them. */
 
 type SharePanelProps = { slug: string; projectId: string; onClose(): void };
 
 export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
-  const shares = useShares(slug, projectId);
+  const role = useTreeStore((s) => s.project?.role);
+  const shares = useShares(slug, projectId, role === "owner");
   const [email, setEmail] = useState("");
   const { state, busyId, actionError } = shares;
 
@@ -22,18 +25,24 @@ export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
   return (
     <Panel as="section" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
       <Frame gap="3">
-        <Frame direction="row" justify="between" align="center">
-          <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Share" />
+        <Frame as="header" direction="row" justify="between" align="center" className="toolbar-panel-head">
+          <Frame gap="0">
+            <Text as="span" size="xxs" className="toolbar-panel-kicker" content="On the case" />
+            <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Share" />
+          </Frame>
           <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
-        {state.status === "loading" && <Text role="status" size="s" hierarchy="tertiary" content="Loading…" />}
+        {role === "shared" && (
+          <Text role="status" size="s" hierarchy="tertiary" content="Shared with you. Your first edit creates your own copy." />
+        )}
+        {role !== "shared" && state.status === "loading" && <Loading />}
         {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
         {state.status === "forbidden" && (
           <Text role="status" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
         )}
 
-        {state.status === "ready" && (
+        {role === "owner" && state.status === "ready" && (
           <>
             <Frame direction="row" gap="2" align="center">
               <Panel className="share-invite">
@@ -65,6 +74,13 @@ export function SharePanel({ slug, projectId, onClose }: SharePanelProps) {
                   const accepted = item.status === "ACCEPTED";
                   return (
                     <Frame as="li" key={`${item.type}-${item.id}`} direction="row" justify="between" align="center" gap="2">
+                      <Text
+                        as="span"
+                        size="s"
+                        className="share-avatar"
+                        data-pending={!accepted || undefined}
+                        content={(item.name ?? item.email).charAt(0).toUpperCase()}
+                      />
                       <Frame gap="0" className="share-member">
                         <Text
                           size="s"

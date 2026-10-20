@@ -1,0 +1,28 @@
+/* Select — see DESIGN.md §4. */
+
+@layer ui {
+  [data-ui="select"] {
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--font-size-s);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease-out);
+  }
+
+  [data-ui="select"]:hover:not(:disabled) {
+    border-color: var(--color-border);
+  }
+
+  [data-ui="select"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  [data-ui="select"]:disabled {
+    cursor: default;
+  }
+}

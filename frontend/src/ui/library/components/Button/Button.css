@@ -24,12 +24,21 @@
       background var(--motion-fast) var(--ease-out),
       border-color var(--motion-fast) var(--ease-out),
       opacity var(--motion-fast) var(--ease-out),
-      translate var(--motion-fast) var(--ease-out);
+      translate var(--motion-spring) var(--ease-spring),
+      rotate var(--motion-spring) var(--ease-spring),
+      scale var(--motion-spring) var(--ease-spring);
   }
 
-  /* pressed into the board: a 1px give under the finger */
+  /* pressed into the board: it squashes under the finger and springs back on release */
   [data-ui="panel"][data-component="button"]:active:not(:disabled) {
     translate: 0 1px;
+    scale: 0.92;
+    transition-duration: var(--motion-fast);
+  }
+
+  /* an icon button lifts off the board on hover, straight up */
+  [data-ui="panel"][data-component="button"][data-icon-only]:hover:not(:disabled, :active) {
+    translate: 0 -3px;
   }
 
   /* sizes — padding follows the TextSize handed to Text and Icon */

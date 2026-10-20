@@ -1,8 +1,8 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
 import type { AttachmentKind, NodeMeta } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
-import { selectBreadcrumb } from "@/store/treeStore";
-import { layoutTree } from "./layout";
+import { selectBreadcrumb, selectExhibits } from "@/store/treeStore";
+import { layoutTree } from "@/store/layout";
 
 /**
  * The ReactFlow adapter: tree structure in, React Flow nodes and edges out.
@@ -24,6 +24,8 @@ export interface MindMapNodeData extends Record<string, unknown> {
   hasParent: boolean;
   /** Draw the outgoing-edge dot underneath (every node but a leaf). */
   hasChildren: boolean;
+  /** Its place in the case, outline-numbered like exhibits: "1", "1.2", "1.2.1". */
+  exhibit: string;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -43,6 +45,8 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
   const stateOf = (id: string): MindMapNodeState =>
     id === s.activeNodeId ? "selected" : path.has(id) ? "path" : "default";
 
+  const exhibits = selectExhibits(s);
+
   const nodes: MindMapFlowNode[] = [];
   const edges: Edge[] = [];
 
@@ -59,6 +63,7 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         tags: meta.attachment_kinds ?? [],
         hasParent: meta.parent_id !== null,
         hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
+        exhibit: exhibits[id],
       },
     });
     if (meta.parent_id && positions[meta.parent_id]) {
@@ -69,12 +74,13 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         source: meta.parent_id,
         target: id,
         type: "string",
-        // Where this edge falls along the path, root first: lights the string up in sequence.
-        data: { depth: onPath ? crumbs.indexOf(id) - 1 : 0 },
         className: onPath ? "mindmap-edge mindmap-edge-path" : "mindmap-edge",
       });
     }
   }
 
+  // SVG paints in document order: path edges last, so red always crosses over grey.
+  const onPath = (e: Edge) => Number(e.className?.includes("mindmap-edge-path") ?? false);
+  edges.sort((a, b) => onPath(a) - onPath(b));
   return { nodes, edges };
 }

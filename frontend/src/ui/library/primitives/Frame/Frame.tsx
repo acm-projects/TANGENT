@@ -4,7 +4,7 @@ import "./Frame.css";
 /* Lays children out in a row or column with a token gap: the layout wrapper
  * pages and features use instead of a <div> (DESIGN.md Rule 2). */
 
-type FrameTag = "div" | "main" | "section" | "header" | "footer" | "nav" | "aside" | "ol" | "li";
+type FrameTag = "div" | "main" | "section" | "header" | "footer" | "nav" | "aside" | "ol" | "li" | "form";
 
 type FrameProps<T extends FrameTag> = ComponentProps<T> & {
   as?: T;

@@ -1,0 +1,456 @@
+/* Board — the dashboard's layout and one-offs, unlayered (DESIGN.md §2). */
+
+.board {
+  /* clear of the folder drawer, which is fixed along the bottom */
+  padding: var(--space-8) var(--space-8) 14rem;
+}
+
+/* ── the title ─────────────────────────────────────────────── */
+
+.board-kicker {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.board-title {
+  font-family: var(--font-heading);
+  /* the same faint ink bleed as a map card's title */
+  text-shadow: 0 0 0.25px currentColor;
+  overflow-wrap: anywhere;
+}
+
+.board-title-edit {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.board-head:is(:hover, :focus-within) .board-title-edit {
+  opacity: 1;
+}
+
+.board-title-field {
+  max-width: 40rem;
+  padding: var(--space-1) var(--space-3);
+}
+
+.board-title-field [data-ui="input"] {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-display);
+}
+
+/* ── the grid ──────────────────────────────────────────────── */
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-8) var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+/* A card's slot. Everything in a card is sized in em off the slot's width,
+ * so a card tucked into a folder is the same card, smaller. */
+.case-slot {
+  position: relative;
+  container-type: inline-size;
+}
+
+.case-slot:has(.case-settings[data-open]) {
+  z-index: 5;
+}
+
+.case-link {
+  display: block;
+  border-radius: var(--radius-md);
+}
+
+.case-link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 4px;
+}
+
+/* ── the card: an instant photo pinned to the board ───────── */
+
+.case-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  aspect-ratio: 5 / 6;
+  /* 1em is 1/14 of the card's width */
+  font-size: calc(100cqi / 14);
+  padding: 0.7em 0.7em 0.9em;
+  border-radius: var(--radius-md);
+  transition: box-shadow var(--motion-base) var(--ease-out);
+}
+
+.case-link:is(:hover, :focus-visible) .case-card {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
+}
+
+/* a red pushpin, its head lit from the top left */
+.case-card-pin {
+  position: absolute;
+  top: -0.35em;
+  left: 50%;
+  z-index: 1;
+  width: 0.8em;
+  height: 0.8em;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.55), transparent 45%), var(--color-string);
+  box-shadow: 0 0.12em 0.15em rgb(0 0 0 / 0.3);
+}
+
+.case-card-photo {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 0;
+  padding: 0.4em;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  overflow: hidden;
+}
+
+.case-sketch {
+  width: 100%;
+  height: 100%;
+}
+
+.case-sketch line {
+  stroke: var(--color-text-faint);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.case-sketch line[data-path] {
+  stroke: var(--color-string);
+  stroke-width: 1.3;
+}
+
+.case-sketch circle {
+  fill: var(--color-text-muted);
+}
+
+.case-sketch circle[data-path] {
+  fill: var(--color-string);
+}
+
+.case-card-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  padding-inline: 0.15em;
+  font-family: var(--font-heading);
+  font-size: 1.15em;
+  line-height: 1.2;
+  text-shadow: 0 0 0.25px currentColor;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.case-card-meta {
+  padding-inline: 0.15em;
+  font-size: 0.75em;
+}
+
+/* a rubber stamp across the photo's corner, in the oxblood ink */
+/* Stamped low on the photo, clear of the ⋯ button, and slammed down on arrival. */
+.case-card-stamp {
+  position: absolute;
+  bottom: 6em;
+  right: 0.9em;
+  padding: 0.1em 0.45em;
+  rotate: -9deg;
+  animation: stamp-slam var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  border: 0.14em solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  font-family: var(--font-heading);
+  font-size: 0.8em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+@keyframes stamp-slam {
+  from {
+    opacity: 0;
+    scale: 2.4;
+    rotate: -24deg;
+  }
+}
+
+/* ── settings ──────────────────────────────────────────────── */
+
+.case-settings {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 2;
+}
+
+.case-settings-toggle {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.case-slot:is(:hover, :focus-within) .case-settings-toggle,
+.case-settings[data-open] .case-settings-toggle {
+  opacity: 1;
+}
+
+.case-settings-sheet {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  /* a grid card is at least 13rem: at 14rem the sheet stays inside the board's padding, even on the first card */
+  width: 14rem;
+  transform-origin: top right;
+}
+
+.case-settings-field {
+  flex: 1;
+  padding: var(--space-1) var(--space-3);
+}
+
+.case-settings-delete {
+  width: 100%;
+}
+
+.case-settings-error {
+  color: var(--color-danger);
+}
+
+/* ── the new-project tile ─────────────────────────────────── */
+
+.case-new {
+  width: 100%;
+  aspect-ratio: 5 / 6;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out);
+}
+
+/* With a label (an empty board) the icon sits over it, and the tile beckons once. */
+[data-ui="panel"][data-component="button"].case-new:not([data-icon-only]) {
+  flex-direction: column;
+  animation: case-new-beckon var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+}
+
+@keyframes case-new-beckon {
+  from {
+    opacity: 0;
+    scale: 0.85;
+    rotate: -3deg;
+  }
+}
+
+[data-ui="panel"][data-component="button"].case-new:hover {
+  border-color: var(--color-text-muted);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.case-draft {
+  gap: 0.6em;
+}
+
+.case-draft-field {
+  padding: var(--space-1) var(--space-2);
+}
+
+.case-draft-field [data-ui="input"] {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+}
+
+/* ── the folder drawer ─────────────────────────────────────── */
+
+/* Fixed to the bottom, sunk partly below the screen edge: a folder rises out
+ * of it on hover. Clicks between folders reach the grid underneath. No scroll
+ * container: one would clip cards fanning up or flying in. */
+.drawer {
+  position: fixed;
+  inset: auto 0 -2.75rem;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* shortcut: folders shrink to fit one row rather than scroll; past about a dozen workspaces they get cramped, so add paging then */
+.drawer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0 var(--space-8);
+  list-style: none;
+}
+
+.folder {
+  position: relative;
+  flex: 0 1 10rem;
+  min-width: 6.5rem;
+  height: 7.5rem;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* the back board and its tab */
+.folder-back {
+  position: absolute;
+  inset: 1.4rem 0 0;
+  border-radius: 0 var(--radius-lg) 0 0;
+  background: var(--texture-grain), var(--color-folder);
+  box-shadow: var(--shadow-floating);
+}
+
+.folder-tab {
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 88%;
+  height: 1.5rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--texture-grain), var(--color-folder);
+  color: var(--color-text-secondary);
+}
+
+.folder-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tab-count {
+  flex: none;
+  min-width: 1.25rem;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  text-align: center;
+  /* swells and settles when the count changes */
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 -0.2rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 1.8;
+}
+
+.folder-tab-pin {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-string);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
+}
+
+.folder[data-open] .folder-tab {
+  color: var(--color-text);
+}
+
+/* the cards inside, standing on the folder's floor */
+.folder-stack {
+  position: absolute;
+  right: 0.75rem;
+  /* low enough that a tucked card's top stays under the tab line */
+  bottom: 0.3rem;
+  width: 4.5rem;
+}
+
+.folder-card {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  container-type: inline-size;
+}
+
+/* the front flap, a touch lighter, with a thumb notch cut from its top edge */
+.folder-front {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 20;
+  height: 4.6rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background:
+    radial-gradient(ellipse 1.4rem 0.6rem at 50% 0, rgb(0 0 0 / 0.08), transparent 70%),
+    var(--texture-grain),
+    color-mix(in oklab, var(--color-folder) 45%, var(--color-surface));
+  box-shadow:
+    0 -1px 0 var(--color-border),
+    0 -0.25rem 0.6rem rgb(0 0 0 / 0.08);
+  transform-origin: bottom;
+  transition: transform var(--motion-spring) var(--ease-spring);
+}
+
+/* open, or hovered so its cards can fan out: the flap falls forward */
+.folder:is([data-open], :hover, :focus-within) .folder-front {
+  transform: perspective(20rem) rotateX(-38deg);
+}
+
+/* For keyboards: the whole folder is one button. Mouse presses land on the li. */
+.folder-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.folder-hit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* the new-workspace folder: an outline of one */
+.folder-new .folder-back {
+  border: 2px dashed var(--color-border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+.folder-new .folder-hit {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.folder-new-form {
+  position: absolute;
+  inset: 2rem var(--space-2) auto;
+  z-index: 30;
+}
+
+.folder-new-field {
+  padding: var(--space-1) var(--space-2);
+}
+
+.folder-new-error {
+  padding-top: var(--space-1);
+  color: var(--color-danger);
+}
+
+/* Switching folders remounts the title (keyed by it): the new name swings in
+ * on its pin, the kicker and count a beat behind. */
+.board-head > * {
+  transform-origin: left center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -2rem 0;
+  --pop-rotate: -4deg;
+  --pop-scale: 0.9;
+}

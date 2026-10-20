@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, NodeMeta } from "@/api/types";
+import type { ChatMessage, NodeMeta, ProjectDetail } from "@/api/types";
 
 /**
  * Two slices, on purpose:
@@ -17,6 +17,10 @@ interface StructureSlice {
   addNode(node: NodeMeta): void;
   /** Replace an existing node's metadata (title, tags) without touching tree shape. */
   updateNode(node: NodeMeta): void;
+  /** Drop a node and its subtree (the server cascades the same way). Selection moves to the parent. */
+  removeNode(nodeId: string): void;
+  /** Swap a childless node for another in the same place (an optimistic fork, once the server answers). */
+  replaceNode(oldId: string, node: NodeMeta): void;
   setActive(nodeId: string | null): void;
 }
 
@@ -32,7 +36,23 @@ interface ContentSlice {
   abortStream(nodeId: string): void;
 }
 
-export type TreeState = StructureSlice & ContentSlice;
+/**
+ * State that outlives a project switch (a sharee's first edit moves them into their own copy), so
+ * hydrateTree leaves it alone. `useMindMap` performs the navigation and consumes `pendingSwitch`.
+ */
+interface SwitchSlice {
+  project: ProjectDetail | null;
+  /** Where to go next; nodeId is opened once that project's tree has loaded. */
+  pendingSwitch: { slug: string; projectId: string; nodeId: string | null } | null;
+  /** A message that must survive the navigation ("You already have your own copy.", a stream error). */
+  notice: string | null;
+  setProject(project: ProjectDetail | null): void;
+  requestSwitch(target: { slug: string; projectId: string; nodeId: string | null }, notice?: string): void;
+  clearSwitch(): void;
+  setNotice(notice: string | null): void;
+}
+
+export type TreeState = StructureSlice & ContentSlice & SwitchSlice;
 
 const byForkIndex = (nodes: Record<string, NodeMeta>) => (a: string, b: string) =>
   (nodes[a]?.fork_index ?? 0) - (nodes[b]?.fork_index ?? 0);
@@ -44,6 +64,14 @@ export const useTreeStore = create<TreeState>()((set) => ({
   activeNodeId: null,
   chatsByNode: {},
   streaming: {},
+  project: null,
+  pendingSwitch: null,
+  notice: null,
+
+  setProject: (project) => set({ project }),
+  requestSwitch: (pendingSwitch, notice) => set((s) => ({ pendingSwitch, notice: notice ?? s.notice })),
+  clearSwitch: () => set({ pendingSwitch: null }),
+  setNotice: (notice) => set({ notice }),
 
   hydrateTree: (rootId, nodes) =>
     set(() => {
@@ -71,6 +99,46 @@ export const useTreeStore = create<TreeState>()((set) => ({
 
   updateNode: (node) =>
     set((s) => (s.nodesById[node.id] ? { nodesById: { ...s.nodesById, [node.id]: node } } : s)),
+
+  removeNode: (nodeId) =>
+    set((s) => {
+      const node = s.nodesById[nodeId];
+      if (!node) return s;
+      const gone = new Set<string>();
+      const stack = [nodeId];
+      while (stack.length) {
+        const id = stack.pop()!;
+        gone.add(id);
+        stack.push(...(s.childrenByParent[id] ?? []));
+      }
+      const keep = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.has(k)));
+      const childrenByParent = keep(s.childrenByParent);
+      if (node.parent_id && childrenByParent[node.parent_id]) {
+        childrenByParent[node.parent_id] = childrenByParent[node.parent_id]!.filter((id) => id !== nodeId);
+      }
+      return {
+        nodesById: keep(s.nodesById),
+        childrenByParent,
+        chatsByNode: keep(s.chatsByNode),
+        activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
+      };
+    }),
+
+  replaceNode: (oldId, node) =>
+    set((s) => {
+      if (!s.nodesById[oldId]) return s;
+      const nodesById = { ...s.nodesById, [node.id]: node };
+      delete nodesById[oldId];
+      const childrenByParent = { ...s.childrenByParent };
+      if (node.parent_id) {
+        childrenByParent[node.parent_id] = (childrenByParent[node.parent_id] ?? [])
+          .map((id) => (id === oldId ? node.id : id))
+          .sort(byForkIndex(nodesById));
+      }
+      const chatsByNode = { ...s.chatsByNode, [node.id]: s.chatsByNode[oldId] ?? [] };
+      delete chatsByNode[oldId];
+      return { nodesById, childrenByParent, chatsByNode, activeNodeId: s.activeNodeId === oldId ? node.id : s.activeNodeId };
+    }),
 
   setActive: (nodeId) => set({ activeNodeId: nodeId }),
 
@@ -122,4 +190,17 @@ export function selectBreadcrumb(s: Pick<TreeState, "nodesById">, id: string): N
     cur = cur.parent_id ? s.nodesById[cur.parent_id] : undefined;
   }
   return out.reverse();
+}
+
+/** Outline numbers, like a case file's exhibits: the root is "1", its children
+ * "1.1", "1.2", theirs "1.2.1". By sibling order, so they stay gapless after a delete. */
+export function selectExhibits(s: Pick<TreeState, "rootId" | "childrenByParent">): Record<string, string> {
+  const out: Record<string, string> = {};
+  const number = (id: string, label: string) => {
+    if (id in out) return; // corrupt data: a cycle
+    out[id] = label;
+    s.childrenByParent[id]?.forEach((child, i) => number(child, `${label}.${i + 1}`));
+  };
+  if (s.rootId) number(s.rootId, "1");
+  return out;
 }

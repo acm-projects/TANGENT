@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeMeta } from "@/api/types";
-import { selectBreadcrumb, selectIsLeaf, useTreeStore } from "./treeStore";
+import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "./treeStore";
 
 const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
@@ -15,6 +15,18 @@ describe("tree store", () => {
     expect(selectIsLeaf(s, "c2")).toBe(true);
     expect(selectIsLeaf(s, "c1")).toBe(false);
     expect(selectBreadcrumb(s, "g").map((n) => n.id)).toEqual(["r", "c1", "g"]);
+  });
+
+  // A fork switches projects: the next page's hydrate must not wipe the pending switch or the notice.
+  it("hydrateTree keeps the cross-switch state", () => {
+    const s = useTreeStore.getState();
+    s.requestSwitch({ slug: "me", projectId: "p2", nodeId: "n" }, "You already have your own copy.");
+    s.hydrateTree("r", [node("r", null, 0)]);
+    expect(useTreeStore.getState().pendingSwitch).toEqual({ slug: "me", projectId: "p2", nodeId: "n" });
+    expect(useTreeStore.getState().notice).toBe("You already have your own copy.");
+    useTreeStore.getState().clearSwitch();
+    expect(useTreeStore.getState().pendingSwitch).toBeNull();
+    useTreeStore.getState().setNotice(null);
   });
 
   // Guards the invariant that a streamed token must not re-render the mind map.
@@ -96,5 +108,27 @@ describe("tree store", () => {
     // Unknown ids are ignored rather than inserted as orphans.
     after.updateNode(node("ghost", "r", 9));
     expect(useTreeStore.getState().nodesById["ghost"]).toBeUndefined();
+  });
+
+  it("removeNode drops the subtree and selects the parent", () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("c1", "r", 1), node("c2", "r", 2), node("g", "c1", 1)]);
+    useTreeStore.getState().setActive("g");
+    useTreeStore.getState().removeNode("c1");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById).sort()).toEqual(["c2", "r"]);
+    expect(s.childrenByParent["r"]).toEqual(["c2"]);
+    expect(s.childrenByParent["c1"]).toBeUndefined();
+    expect(s.activeNodeId).toBe("r");
+  });
+});
+
+describe("selectExhibits", () => {
+  it("numbers the tree like an outline, by sibling order", () => {
+    const childrenByParent = { r: ["a", "b"], b: ["c"] };
+    expect(selectExhibits({ rootId: "r", childrenByParent })).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
+  });
+
+  it("is empty with no tree", () => {
+    expect(selectExhibits({ rootId: null, childrenByParent: {} })).toEqual({});
   });
 });

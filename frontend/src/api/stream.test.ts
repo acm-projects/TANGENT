@@ -24,6 +24,7 @@ describe("sseFrames", () => {
 describe("streamMessage", () => {
   const sse = (...frames: string[]) =>
     new Response(frames.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const frame = (event: string, data: object) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   const opts = { baseURL: "/api", nodeId: "n1", content: "hi", getAccessToken: () => "t", refresh: async () => "t2" };
 
   it("sends the model and forwards tokens, then usage from done", async () => {
@@ -46,6 +47,35 @@ describe("streamMessage", () => {
     const events: StreamEvent[] = [];
     await streamMessage({ ...opts, onEvent: (e) => events.push(e) });
     expect(events).toEqual([{ type: "error", message: "boom" }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards fork on done and on error", async () => {
+    const fork = { project_id: "p2", workspace_slug: "me", node_map: { a: "b" }, tree_map: {}, node_id: "b" };
+    vi.stubGlobal("fetch", async () => sse(frame("done", { fork })));
+    const done: StreamEvent[] = [];
+    await streamMessage({ ...opts, onEvent: (e) => done.push(e) });
+    expect(done).toEqual([{ type: "done", fork }]);
+
+    vi.stubGlobal("fetch", async () => sse(frame("error", { message: "boom", fork })));
+    const err: StreamEvent[] = [];
+    await streamMessage({ ...opts, onEvent: (e) => err.push(e) });
+    expect(err).toEqual([{ type: "error", message: "boom", fork, forkedProjectId: undefined }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces a copy-exists race from the stream as forkedProjectId", async () => {
+    vi.stubGlobal("fetch", async () => sse(frame("error", { message: "m", forked_project_id: "p2" })));
+    const events: StreamEvent[] = [];
+    await streamMessage({ ...opts, onEvent: (e) => events.push(e) });
+    expect(events).toMatchObject([{ type: "error", forkedProjectId: "p2" }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("throws CopyExistsError on a 409 with the copy's id", async () => {
+    const detail = { message: "You already have your own copy.", forked_project_id: "p2" };
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail }), { status: 409 }));
+    await expect(streamMessage({ ...opts, onEvent: () => {} })).rejects.toMatchObject({ forkedProjectId: "p2" });
     vi.unstubAllGlobals();
   });
 

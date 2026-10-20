@@ -21,6 +21,7 @@ class AvailableModel(BaseModel):
     name: str
     description: str
     supports_images: bool
+    context_length: int
 
 
 AVAILABLE_MODELS: list[AvailableModel] = [
@@ -29,24 +30,21 @@ AVAILABLE_MODELS: list[AvailableModel] = [
         name="Nemotron 3 Ultra",
         description="Large text model with a 1M-token context window (best)",
         supports_images=False,
+        context_length=1_000_000,
     ),
     AvailableModel(
-        id="google/gemma-4-31b-it:free",
-        name="Gemma 4 31B",
-        description="General-purpose model that allow inputs of images, video, and audio with a 256K token context window",
+        id="nvidia/nemotron-3.5-super-vl:free",
+        name="Nemotron 3.5 Super VL",
+        description="General-purpose model that allow inputs of text, images, and video with a 1M-token context window",
         supports_images=True,
+        context_length=1_000_000,
     ),
     AvailableModel(
         id="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
         name="Nemotron 3 Nano Omni",
-        description="Model that accepts text, image, video, and audio inputs with 300K context length",
+        description="Model that accepts text, image, video, and audio inputs with 256K-token context window",
         supports_images=True,
-    ),
-    AvailableModel(
-        id="nvidia/nemotron-3.5-lightning:free",
-        name="Nemotron 3.5 Lightning",
-        description="Fast text model for coding and structured output - 1M context",
-        supports_images=False,
+        context_length=256_000,
     ),
 ]
 

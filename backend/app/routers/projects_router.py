@@ -219,9 +219,8 @@ async def create_project(
     )
 
     db.add(new_project)
-    await db.flush()
-    await db.refresh(new_project)
     await db.commit()
+    await db.refresh(new_project)
 
     return _summary(new_project, "owner", slug)
 

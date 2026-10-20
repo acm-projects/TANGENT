@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Tangent's mark: a red pin on paper with a length of string running off it.
+       An asset, so its colours are the palette's (colors.css) written out. -->
+  <style>
+    .paper { fill: #f3f2ef; stroke: #cfcbc4; }
+    .string { stroke: #8f8a84; }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #2a2826; stroke: #46423e; }
+      .string { stroke: #6e6a65; }
+    }
+  </style>
+  <rect class="paper" x="1.5" y="1.5" width="29" height="29" rx="4" stroke-width="1" />
+  <path class="string" d="M13 13 Q17 24 27 26" fill="none" stroke-width="1.6" stroke-linecap="round" />
+  <path d="M13 13 Q8 21 5 27" fill="none" stroke="#e5484a" stroke-width="1.6" stroke-linecap="round" />
+  <circle cx="14" cy="14.5" r="6" fill="#000" opacity="0.18" />
+  <circle cx="13" cy="13" r="6" fill="#e5484a" />
+  <circle cx="11" cy="11" r="2" fill="#fff" opacity="0.75" />
+</svg>
