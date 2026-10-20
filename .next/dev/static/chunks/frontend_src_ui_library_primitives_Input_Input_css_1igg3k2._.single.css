@@ -1,0 +1,24 @@
+/* [project]/frontend/src/ui/library/primitives/Input/Input.css [app-client] (css) */
+@layer ui {
+  [data-ui="input"] {
+    width: 100%;
+    min-width: 0;
+    color: var(--color-text);
+    font-family: var(--font-content);
+    font-size: var(--font-size-s);
+    line-height: var(--line-height-normal);
+    text-overflow: ellipsis;
+    background: none;
+    border: 0;
+  }
+
+  [data-ui="input"]::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  [data-ui="input"]:focus-visible {
+    outline: none;
+  }
+}
+
+/*# sourceMappingURL=frontend_src_ui_library_primitives_Input_Input_css_1igg3k2._.single.css.map*/

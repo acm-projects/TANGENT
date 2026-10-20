@@ -1,0 +1,11 @@
+/* [project]/frontend/src/ui/pages/login/Login.css [app-client] (css) */
+.login {
+  min-height: 100dvh;
+  padding: var(--space-4);
+  background: radial-gradient(color-mix(in srgb, var(--color-text-faint) 45%, transparent) .75px, transparent 1px) 0 0 / 16px 16px,
+    var(--texture-grain),
+    var(--color-board);
+  justify-content: center;
+}
+
+/*# sourceMappingURL=frontend_src_ui_pages_login_Login_css_1igg3k2._.single.css.map*/

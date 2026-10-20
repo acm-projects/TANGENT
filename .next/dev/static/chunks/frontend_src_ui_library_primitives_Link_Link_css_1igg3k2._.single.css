@@ -1,0 +1,16 @@
+/* [project]/frontend/src/ui/library/primitives/Link/Link.css [app-client] (css) */
+@layer ui {
+  [data-ui="link"] {
+    color: inherit;
+    border-radius: var(--radius-xxl);
+    text-decoration: none;
+    display: block;
+  }
+
+  [data-ui="link"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/*# sourceMappingURL=frontend_src_ui_library_primitives_Link_Link_css_1igg3k2._.single.css.map*/
