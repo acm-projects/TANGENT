@@ -150,6 +150,8 @@ async def _copy_project(
                 status=n.status,
                 title=n.title,
                 summary=n.summary,
+                model=n.model,
+                tokens=n.tokens,
                 chats=remap_branch_sources(n.chats, node_map),
                 created_by_id=new_owner_id,
                 created_at=n.created_at,

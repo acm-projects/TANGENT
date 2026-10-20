@@ -223,6 +223,19 @@ export function Chat({ className }: ChatProps) {
 
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
+        {lastSection && (
+          <Frame
+            direction="row"
+            gap="3"
+            className="chat-token-usage"
+            role="status"
+            aria-label="Saved token usage"
+          >
+            <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
+            <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
+          </Frame>
+        )}
+
         {chat.usage && (
           <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
             <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
@@ -248,6 +261,7 @@ export function Chat({ className }: ChatProps) {
           onStop={chat.stop}
           models={chat.models}
           selectedModel={chat.selectedModel}
+          modelLocked={chat.modelLocked}
           modelsLoading={chat.modelsLoading}
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}

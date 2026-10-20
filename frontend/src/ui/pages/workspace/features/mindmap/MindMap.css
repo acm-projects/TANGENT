@@ -205,6 +205,14 @@
   text-shadow: 0 0 0.25px currentColor;
 }
 
+.mindmap-node-tokens {
+  display: block;
+  margin-left: calc(var(--space-6) + 1.5rem);
+  color: var(--color-text-muted);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The pin each card hangs from, where its string is wound. A domed head: a
  * highlight up-left, a shadow cast down-right onto the card. Graphite at rest;
  * red on the selected path, since red means connected. */

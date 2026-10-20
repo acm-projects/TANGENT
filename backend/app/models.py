@@ -202,6 +202,8 @@ class Node(Base):
     chats = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
+    model = Column(Text, nullable=True)
+    tokens = Column(Integer, nullable=False, server_default=text("0"))
 
     __table_args__ = (
         UniqueConstraint("parent_id", "fork_index", name="uq_nodes_parent_fork_index"),

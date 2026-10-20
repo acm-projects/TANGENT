@@ -139,6 +139,13 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               </Panel>
             ))}
           </Frame>
+          <Text
+            as="span"
+            size="xs"
+            className="mindmap-node-tokens"
+            content={`${data.tokens.toLocaleString()} tokens`}
+            aria-label={`${data.tokens.toLocaleString()} tokens used on this node`}
+          />
         </Panel>
       </motion.div>
       <Frame

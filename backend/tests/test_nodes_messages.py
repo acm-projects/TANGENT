@@ -80,8 +80,13 @@ def client(monkeypatch):
             raise prepare["error"]
         return prepare["result"] or (node_id, None)
 
-    async def fake_persist(user_id, write_node_id, user_text, assistant_text, replace_last=False):
-        persisted.append((user_id, write_node_id, user_text, assistant_text) + (("replace",) if replace_last else ()))
+    async def fake_persist(
+        user_id, write_node_id, user_text, assistant_text, model_id, response_tokens, replace_last=False
+    ):
+        persisted.append(
+            (user_id, write_node_id, user_text, assistant_text, model_id, response_tokens)
+            + (("replace",) if replace_last else ())
+        )
 
     async def fake_path(db, node_id, user_id):
         return [PathNode(id="root", chats=[
@@ -130,7 +135,9 @@ def test_streams_tokens_sends_history_and_persists(client, monkeypatch):
         ("done", {"usage": usage, "model": "m"}),
     ]
     assert [m["content"] for m in seen["body"]["messages"]] == ["earlier q", "earlier a", "hi"]
-    assert client.persisted == [(USER.id, NODE, "hi", "Hello")]
+    assert client.persisted == [
+        (USER.id, NODE, "hi", "Hello", openrouter.DEFAULT_MODEL_ID, 7)
+    ]
     assert client.prepare["calls"] == [(USER.id, PROJECT, NODE)]
 
 
@@ -159,7 +166,9 @@ def test_sharee_first_message_saves_into_the_copy_and_done_carries_fork(client, 
         ("done", {"usage": usage, "model": "m", "fork": fork}),
     ]
     # written into the copy's node, never the original
-    assert client.persisted == [(USER.id, copy_node, "hi", "Hi")]
+    assert client.persisted == [
+        (USER.id, copy_node, "hi", "Hi", openrouter.DEFAULT_MODEL_ID, 7)
+    ]
 
 
 def test_error_after_the_fork_still_carries_it(client, monkeypatch):
@@ -278,7 +287,9 @@ def test_stop_saves_what_arrived_and_ends_with_done_stopped(client, monkeypatch)
     r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
 
     assert events(r) == [("token", {"text": "Hel"}), ("done", {"stopped": True})]
-    assert client.persisted == [(USER.id, NODE, "hi", "Hel")]
+    assert client.persisted == [
+        (USER.id, NODE, "hi", "Hel", openrouter.DEFAULT_MODEL_ID, None)
+    ]
     assert (USER.id, NODE) not in nodes_router._stops
 
 
@@ -309,7 +320,28 @@ def test_retry_reasks_the_last_question_without_the_old_reply_and_replaces_it(cl
     assert events(r) == [("token", {"text": "Again"}), ("done", {})]
     # the stored question is re-asked, and the reply being replaced isn't in the context
     assert [m["content"] for m in seen["body"]["messages"]] == ["earlier q"]
-    assert client.persisted == [(USER.id, NODE, "earlier q", "Again", "replace")]
+    assert client.persisted == [
+        (USER.id, NODE, "earlier q", "Again", openrouter.DEFAULT_MODEL_ID, None, "replace")
+    ]
+
+
+def test_node_rejects_a_different_model_before_calling_provider(client, monkeypatch):
+    async def locked_path(db, node_id, user_id):
+        return [nodes_router.PathNode(id="root", chats=[], model="locked-model")], PROJECT
+
+    monkeypatch.setattr(nodes_router, "_load_path", locked_path)
+    transport, seen = provider([chunk("Should not run"), "data: [DONE]"])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(
+        f"/nodes/{NODE}/messages",
+        json={"content": "hi", "model": openrouter.DEFAULT_MODEL_ID},
+    )
+
+    assert r.status_code == 409
+    assert "locked to model locked-model" in r.json()["detail"]
+    assert "body" not in seen
+    assert client.persisted == []
 
 
 def test_retry_with_no_reply_to_replace_is_refused(client, monkeypatch):

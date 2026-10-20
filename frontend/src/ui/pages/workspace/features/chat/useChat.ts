@@ -30,6 +30,9 @@ export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | "pending" 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
   const path = useTreeStore(useShallow((s) => (s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId) : [])));
+  const nodeModel = path.at(-1)?.model ?? null;
+  const nodeTokens = path.at(-1)?.tokens ?? 0;
+  const branchTokens = path.reduce((total, node) => total + node.tokens, 0);
   const isLeaf = useTreeStore((s) => (s.activeNodeId ? selectIsLeaf(s, s.activeNodeId) : false));
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
   const rootId = useTreeStore((s) => s.rootId);
@@ -42,6 +45,7 @@ export function useChat() {
   const error = localError ?? notice;
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
+  const activeModel = nodeModel ?? selectedModel;
   const [modelsLoading, setModelsLoading] = useState(true);
   const [usage, setUsage] = useState<ModelUsage | null>(null);
   const [usageUnavailable, setUsageUnavailable] = useState(false);
@@ -137,7 +141,7 @@ export function useChat() {
   /** Ask `text` on `nodeId` (as a retry: in place of its last exchange) and stream the reply. Resolves to
    * whether a reply was saved. */
   async function ask(nodeId: string, text: string, isRetry: boolean): Promise<boolean> {
-    if (!selectedModel) {
+    if (!activeModel) {
       setError("Choose a model before sending a message.");
       return false;
     }
@@ -171,7 +175,7 @@ export function useChat() {
         baseURL: "/api",
         nodeId,
         content: text,
-        model: selectedModel,
+        model: activeModel,
         retry: isRetry,
         getAccessToken,
         refresh: apiClient.refresh,
@@ -188,7 +192,7 @@ export function useChat() {
             saved = true;
             setUsage(e.usage ?? null);
             setUsageUnavailable(!e.usage);
-            setUsageModel(e.model ?? selectedModel);
+            setUsageModel(e.model ?? activeModel);
             s.endStream(nodeId, {
               role: "assistant",
               content: s.streaming[nodeId] ?? "",
@@ -246,11 +250,15 @@ export function useChat() {
   return {
     activeNodeId,
     history,
+    nodeModel,
+    nodeTokens,
+    branchTokens,
     streaming,
     blocker,
     error,
     models,
-    selectedModel,
+    selectedModel: activeModel,
+    modelLocked: nodeModel !== null,
     modelsLoading,
     setSelectedModel,
     usage,

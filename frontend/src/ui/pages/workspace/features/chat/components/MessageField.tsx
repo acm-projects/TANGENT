@@ -19,6 +19,7 @@ type MessageFieldProps = {
   blocker: SendBlocker;
   models: AvailableModel[];
   selectedModel: string;
+  modelLocked: boolean;
   modelsLoading: boolean;
   onModelChange(modelId: string): void;
   className?: string;
@@ -29,7 +30,7 @@ type MessageFieldProps = {
   onStop(): void;
 };
 
-export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
+export function MessageField({ blocker, models, selectedModel, modelLocked, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -104,15 +105,21 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               className="message-field-model"
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
-              disabled={modelsLoading || blocker === "streaming" || models.length === 0}
+              disabled={modelsLoading || modelLocked || blocker === "streaming" || models.length === 0}
               options={
                 modelsLoading
                   ? [{ value: "", label: "Loading models…" }]
-                  : models.length === 0
+                  : models.length === 0 && !selectedModel
                     ? [{ value: "", label: "No models available" }]
-                    : models.map((m) => ({ value: m.id, label: m.name }))
+                    : [
+                        ...(!models.some((m) => m.id === selectedModel)
+                          ? [{ value: selectedModel, label: selectedModel }]
+                          : []),
+                        ...models.map((m) => ({ value: m.id, label: m.name })),
+                      ]
               }
             />
+            {modelLocked && <Text as="span" size="xxs" hierarchy="tertiary" content="Locked for this node" />}
             <Button
               hierarchy="tertiary"
               label="Attach file (not available yet)"

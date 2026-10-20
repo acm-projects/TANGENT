@@ -46,6 +46,8 @@ export interface NodeMeta {
   status: NodeStatus;
   title: string | null;
   summary: string | null; // display-only (mind-map hover)
+  model: string | null;
+  tokens: number;
   created_by_id: string;
   created_at: string;
   /** [proposed] Kinds of files attached anywhere in this node, for the mind-map tags. */

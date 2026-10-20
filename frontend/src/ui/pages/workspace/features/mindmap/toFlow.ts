@@ -26,6 +26,7 @@ export interface MindMapNodeData extends Record<string, unknown> {
   hasChildren: boolean;
   /** Its place in the case, outline-numbered like exhibits: "1", "1.2", "1.2.1". */
   exhibit: string;
+  tokens: number;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -64,6 +65,7 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         hasParent: meta.parent_id !== null,
         hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
         exhibit: exhibits[id],
+        tokens: meta.tokens,
       },
     });
     if (meta.parent_id && positions[meta.parent_id]) {

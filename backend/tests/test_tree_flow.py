@@ -109,6 +109,11 @@ def test_tree_fork_and_prompt(monkeypatch):
         node = c.get(f"/nodes/{a['id']}", headers=auth).json()
         assert [(m["role"], m["content"], m["seq"]) for m in node["chats"]] == [("user", "ping", 0), ("assistant", "pong", 1)]
         assert node["title"] == "ping"
+        assert node["model"] == nodes_router.DEFAULT_MODEL_ID
+        assert node["tokens"] == 0
+        tree_node = next(n for n in c.get(f"/trees/{t['tree']['id']}", headers=auth).json()["nodes"] if n["id"] == a["id"])
+        assert tree_node["model"] == node["model"]
+        assert tree_node["tokens"] == node["tokens"]
 
         # deleting a branch takes its children with it; the root can't be deleted
         a2 = c.post(f"/nodes/{a['id']}/fork", headers=auth).json()
