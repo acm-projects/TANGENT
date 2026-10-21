@@ -30,6 +30,8 @@ export function useShares(slug: string, projectId: string, enabled: boolean, bra
   const [actionError, setActionError] = useState<string | null>(null);
   // State updates are async; a ref makes a double-click send exactly one request.
   const busy = useRef(false);
+  // Reloads overlap now (the next action doesn't wait for one), so only the latest result is shown.
+  const reloads = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -42,7 +44,16 @@ export function useShares(slug: string, projectId: string, enabled: boolean, bra
     };
   }, [slug, projectId, enabled, branchNodeId]);
 
-  /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed. */
+  /** Re-reads the list in the background; nothing waits on it. */
+  function refresh() {
+    const mine = ++reloads.current;
+    load(slug, projectId, branchNodeId).then((next) => {
+      if (mine === reloads.current) setState(next);
+    });
+  }
+
+  /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed.
+   *  The buttons free up as soon as the action resolves, not after the reload. */
   async function run(id: string, action: () => Promise<unknown>, fallback: string): Promise<boolean> {
     if (busy.current) return false;
     busy.current = true;
@@ -55,9 +66,9 @@ export function useShares(slug: string, projectId: string, enabled: boolean, bra
       ok = false;
       setActionError(apiErrorMessage(e, fallback));
     }
-    setState(await load(slug, projectId, branchNodeId));
     busy.current = false;
     setBusyId(null);
+    refresh();
     return ok;
   }
 

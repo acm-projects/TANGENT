@@ -1,6 +1,7 @@
 import hashlib
+import logging
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
@@ -12,6 +13,8 @@ from app.database import get_db_session
 from app.auth import get_current_user
 from app.core.email_utils import send_invite_email
 from app.models import User, Project, Workspace, Share, Invitation, Node
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/shares",
@@ -40,9 +43,26 @@ def _branch_is(column, branch_node_id: UUID | None):
 
 
 def _blocking_shares(branch_node_id: UUID | None):
-    """Conditions for 'already has access': a whole-project invite is blocked only by a whole-project
-    share, a branch invite by any share (branch shares are one per user, and a full share covers it)."""
-    return [] if branch_node_id is not None else [Share.branch_node_id.is_(None)]
+    """Conditions for 'already has access'. A whole-project invite is blocked by a whole-project share.
+    A branch invite is blocked by an existing branch share (branch_scope.branch_root assumes one per user),
+    but not by a whole-project share: the user then holds both rows and resolves to full access."""
+    if branch_node_id is None:
+        return [Share.branch_node_id.is_(None)]
+    return [Share.branch_node_id.is_not(None)]
+
+
+def _send_invite(to_email: str, token: str, project_name: str, inviter_name: str) -> None:
+    """Background task (FastAPI runs it in the threadpool, after the response). The invitation is already
+    saved, so a failed send is logged rather than raised; the owner can Resend it from the list."""
+    try:
+        sent = send_invite_email(
+            to_email=to_email, token=token, project_name=project_name, inviter_name=inviter_name
+        )
+    except Exception:
+        log.exception("Invite email to %s raised; the invitation stays pending (use Resend)", to_email)
+        return
+    if not sent:
+        log.error("Invite email to %s was not sent; the invitation stays pending (use Resend)", to_email)
 
 
 async def get_owned_project(
@@ -74,6 +94,7 @@ async def create_share_invitation(
     workspace_slug: str,
     project_id: UUID,
     request: ShareCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -138,23 +159,9 @@ async def create_share_invitation(
     )
 
     db.add(new_invite)
-
-    try:
-        await db.flush()
-        email_sent = send_invite_email(
-            to_email=new_invite.email,
-            token=secure_token,
-            project_name=project.name,
-            inviter_name=current_user.name,
-        )
-
-        if not email_sent:
-            raise Exception("SMTP Server rejected the payload.")
-        await db.commit()
-
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to dispatch email. Share cancelled.")
+    project_name, inviter_name = project.name, current_user.name  # plain values: the task outlives the session
+    await db.commit()
+    background_tasks.add_task(_send_invite, invitee_email, secure_token, project_name, inviter_name)
 
     return {"message": "Share invitation sent successfully."}
 
@@ -291,6 +298,7 @@ async def resend_invitation(
     workspace_slug: str,
     project_id: UUID,
     invitation_id: UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -348,22 +356,9 @@ async def resend_invitation(
     invite.status = PENDING
     invite.expires_at = datetime.now(timezone.utc) + timedelta(days=INVITE_TTL_DAYS)
 
-    try:
-        await db.flush()
-        email_sent = send_invite_email(
-            to_email=invite.email,
-            token=secure_token,
-            project_name=project.name,
-            inviter_name=current_user.name,
-        )
-
-        if not email_sent:
-            raise Exception("SMTP Server rejected the payload.")
-        await db.commit()
-
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to dispatch email. Invitation unchanged.")
+    to_email, project_name, inviter_name = invite.email, project.name, current_user.name
+    await db.commit()
+    background_tasks.add_task(_send_invite, to_email, secure_token, project_name, inviter_name)
 
     return {"message": "Invitation resent successfully."}
 
@@ -433,13 +428,26 @@ async def accept_share_invitation(
     if existing_share:
         raise HTTPException(status_code=400, detail="You already have access to this project.")
 
-    db.add(Share(
-        project_id=invite.project_id,
-        shared_by_id=invite.invited_by_id,
-        shared_with_id=current_user.id,
-        branch_node_id=invite.branch_node_id,
-        permission="view"
-    ))
+    # The DB allows one active share row per user per project (uq_shares_active_project_user). Someone who
+    # already has the whole project keeps that row (full access); a branch invite is then just closed.
+    has_whole_share = (
+        await db.execute(
+            select(Share.id).where(
+                Share.project_id == invite.project_id,
+                Share.shared_with_id == current_user.id,
+                Share.revoked_at.is_(None),
+                Share.branch_node_id.is_(None),
+            )
+        )
+    ).first() is not None
+    if not (invite.branch_node_id is not None and has_whole_share):
+        db.add(Share(
+            project_id=invite.project_id,
+            shared_by_id=invite.invited_by_id,
+            shared_with_id=current_user.id,
+            branch_node_id=invite.branch_node_id,
+            permission="view"
+        ))
     await db.flush()
 
     row = (

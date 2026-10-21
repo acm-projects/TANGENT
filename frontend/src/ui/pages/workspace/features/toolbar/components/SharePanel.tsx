@@ -7,7 +7,9 @@ import { useShares } from "../useShares";
 /* The share popover (Figma Toolbar "State=Share"): invite someone by email,
  * then manage who has access. Accepted members read bold, invitations that
  * haven't been accepted are faint and can be resent. Owner-only (backend):
- * a sharee gets a note instead, and /shares is never called for them.
+ * a sharee gets a note instead, and /shares is never called for them. The
+ * input shows at once (the toolbar can open this before the project's role has
+ * loaded); a non-owner's invite is refused by the backend and shown as an error.
  * With `branchNodeId` it shares and lists just that branch (a node's tray opens it). */
 
 type SharePanelProps = { slug: string; projectId: string; branchNodeId?: string; onClose(): void };
@@ -17,6 +19,8 @@ export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePane
   const shares = useShares(slug, projectId, role === "owner", branchNodeId);
   const [email, setEmail] = useState("");
   const { state, busyId, actionError } = shares;
+  // Unknown role counts as owner: the backend's 403 settles it.
+  const canInvite = role !== "shared" && state.status !== "forbidden";
 
   async function send() {
     if (!email.trim() || busyId !== null) return;
@@ -34,13 +38,7 @@ export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePane
         {role === "shared" && (
           <Text role="status" size="s" hierarchy="tertiary" content="Shared with you. Your first edit creates your own copy." />
         )}
-        {role !== "shared" && state.status === "loading" && <Text role="status" size="s" hierarchy="tertiary" content="Loading…" />}
-        {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
-        {state.status === "forbidden" && (
-          <Text role="status" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
-        )}
-
-        {role === "owner" && state.status === "ready" && (
+        {canInvite && (
           <>
             <Frame direction="row" gap="2" align="center">
               <Panel className="share-invite">
@@ -63,7 +61,18 @@ export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePane
             </Frame>
 
             {actionError && <Text role="alert" size="xs" content={actionError} />}
+          </>
+        )}
 
+        {/* The list loads on its own: its states never gate the input above. */}
+        {role !== "shared" && state.status === "loading" && <Text role="status" size="s" hierarchy="tertiary" content="Loading…" />}
+        {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
+        {state.status === "forbidden" && (
+          <Text role="status" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
+        )}
+
+        {role !== "shared" && state.status === "ready" && (
+          <>
             {state.items.length === 0 ? (
               <Text size="s" hierarchy="tertiary" content="No one has been invited yet." />
             ) : (

@@ -157,22 +157,63 @@ def test_branch_sharee_sees_only_the_branch(sent):
         assert len(copy["nodes"]) == 3
 
 
-def test_whole_project_share_still_sees_everything(sent):
+def project_with_branches(c):
+    """Owner + sharee signed up; a project with root -> a, root -> b."""
+    owner = sign_up(c, OWNER)
+    sharee = sign_up(c, SHAREE)
+    wid, slug = workspace_of(c.get("/auth/me", headers=owner).json()["id"])
+    pid = c.post("/projects/", json={"project_name": "P", "workspace_id": wid}, headers=owner).json()["id"]
+    root = c.get(f"/projects/{pid}/tree", headers=owner).json()["tree"]["root_node_id"]
+    a = c.post(f"/nodes/{root}/fork", headers=owner).json()["id"]
+    b = c.post(f"/nodes/{root}/fork", headers=owner).json()["id"]
+    return owner, sharee, f"/shares/{slug}/{pid}", pid, root, a, b
+
+
+def test_whole_project_share_allows_a_branch_invite(sent):
+    """A whole-project share no longer blocks a branch invite (create, resend, accept); the user then
+    holds both rows and resolves to full access. A duplicate whole-project share is still refused."""
     with TestClient(app) as c:
-        owner = sign_up(c, OWNER)
-        sharee = sign_up(c, SHAREE)
+        owner, sharee, base, pid, root, a, b = project_with_branches(c)
 
-        wid, slug = workspace_of(c.get("/auth/me", headers=owner).json()["id"])
-        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": wid}, headers=owner).json()["id"]
-        root = c.get(f"/projects/{pid}/tree", headers=owner).json()["tree"]["root_node_id"]
-        c.post(f"/nodes/{root}/fork", headers=owner)
-
-        assert c.post(f"/shares/{slug}/{pid}/share", json={"email": SHAREE}, headers=owner).status_code == 201
+        assert c.post(f"{base}/share", json={"email": SHAREE}, headers=owner).status_code == 201
         assert c.post(f"/shares/{sent[SHAREE]}/accept", headers=sharee).status_code == 200
+        assert len(c.get(f"/projects/{pid}/tree", headers=sharee).json()["nodes"]) == 3
 
+        # still refused: the whole project, twice
+        assert c.post(f"{base}/share", json={"email": SHAREE}, headers=owner).status_code == 400
+
+        # create: allowed, and listed under the branch only
+        assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": a}, headers=owner).status_code == 201
+        invite = c.get(f"{base}/shares", params={"branch_node_id": a}, headers=owner).json()["shares"]
+        assert [i["type"] for i in invite] == ["invitation"]
+
+        # resend: allowed too, and issues a fresh token
+        old_token = sent[SHAREE]
+        assert c.post(f"{base}/invitations/{invite[0]['id']}/resend", headers=owner).status_code == 200
+        assert sent[SHAREE] != old_token
+
+        # accept: allowed; full access is unchanged, the sharee did not get narrowed to the branch
+        assert c.post(f"/shares/{sent[SHAREE]}/accept", headers=sharee).status_code == 200
         t = c.get(f"/projects/{pid}/tree", headers=sharee).json()
-        assert len(t["nodes"]) == 2 and t["tree"]["root_node_id"] == root
-        # a full share already covers any branch
-        a = t["nodes"][1]["id"] if t["nodes"][0]["id"] == root else t["nodes"][0]["id"]
-        assert c.post(f"/shares/{slug}/{pid}/share", json={"email": SHAREE, "branch_node_id": a},
-                      headers=owner).status_code == 400
+        assert {n["id"] for n in t["nodes"]} == {root, a, b}
+        assert c.get(f"/nodes/{b}", headers=sharee).status_code == 200
+
+
+def test_a_second_branch_share_is_still_refused(sent):
+    """Branch shares stay one per user per project (branch_scope.branch_root assumes it)."""
+    with TestClient(app) as c:
+        owner, sharee, base, pid, root, a, b = project_with_branches(c)
+
+        # two pending branch invites to different branches can coexist...
+        assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": a}, headers=owner).status_code == 201
+        token_a = sent[SHAREE]
+        assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": b}, headers=owner).status_code == 201
+        token_b = sent[SHAREE]
+
+        # ...but only the first can be accepted
+        assert c.post(f"/shares/{token_a}/accept", headers=sharee).status_code == 200
+        assert c.post(f"/shares/{token_b}/accept", headers=sharee).status_code == 400
+
+        # and with an active branch share, a new branch invite is refused up front
+        assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": b}, headers=owner).status_code == 400
+        assert {n["id"] for n in c.get(f"/projects/{pid}/tree", headers=sharee).json()["nodes"]} == {root, a}
