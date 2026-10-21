@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.auth import get_current_user
+from app.branch_scope import require_visible
 from app.context.flatten import flatten, to_provider_messages
 from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
@@ -118,6 +119,8 @@ async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tupl
         await session.execute(
             text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)}
         )
+        # Before anything is copied or sent to the model: a branch sharee may only prompt inside their branch.
+        await require_visible(session, project_id, user_id, node_id)
         _, fork = await get_write_target(session, project_id, user_id)
         if fork is None:
             return node_id, None
@@ -221,11 +224,12 @@ async def _create_child(
 async def get_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     node = await db.get(Node, node_id)  # RLS: nodes of invisible projects are simply absent
     if node is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
     return node
 
 
@@ -241,6 +245,7 @@ async def fork_node(
     parent = await db.get(Node, node_id)
     if parent is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, parent.project_id, user.id, node_id)
 
     parent_id, tree_id = parent.id, parent.tree_id
     project_id, fork = await get_write_target(db, parent.project_id, user.id)
@@ -281,6 +286,7 @@ async def merge_nodes(
     if len({m.tree_id for m in metas}) != 1 or len({m.project_id for m in metas}) != 1:
         raise HTTPException(400, "Both nodes must be in the same tree")
     tree_id, project_id = metas[0].tree_id, metas[0].project_id
+    await require_visible(db, project_id, user.id, a_id, b_id)
 
     has_child = (
         await db.execute(select(Node.id).where(Node.parent_id.in_([a_id, b_id])).limit(1))

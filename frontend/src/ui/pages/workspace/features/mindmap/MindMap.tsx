@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTreeStore } from "@/store/treeStore";
 import { Frame, Loading, Panel, Text } from "@/ui/library";
-import { MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
+import { MapProject, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
 import { useMindMap } from "./useMindMap";
@@ -23,9 +23,10 @@ import "./MindMap.css";
 const nodeTypes = { tangent: MindMapNode };
 const edgeTypes = { string: StringEdge };
 
-type MindMapProps = { projectId: string; className?: string };
+type MindMapProps = { slug: string; projectId: string; className?: string };
 
-export function MindMap({ projectId, className }: MindMapProps) {
+export function MindMap({ slug, projectId, className }: MindMapProps) {
+  const project = useMemo(() => ({ slug, projectId }), [slug, projectId]);
   const load = useMindMap(projectId);
   // Structure slice only -- streamed tokens never re-render the map.
   const structure = useTreeStore(
@@ -67,6 +68,7 @@ export function MindMap({ projectId, className }: MindMapProps) {
         <MotionConfig reducedMotion="user">
         <StaggerPinIn value={stagger}>
         <ReportMapError value={setActionError}>
+        <MapProject value={project}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -91,6 +93,7 @@ export function MindMap({ projectId, className }: MindMapProps) {
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>
+        </MapProject>
         </ReportMapError>
         </StaggerPinIn>
         </MotionConfig>

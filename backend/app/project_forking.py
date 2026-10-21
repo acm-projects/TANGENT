@@ -2,7 +2,7 @@ import copy
 import json
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Set, Tuple
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.branch_scope import visible_to
 from app.models import Node, NodeMergeSource, Project, Share, Tree, Workspace
 
 
@@ -95,8 +96,13 @@ async def build_fork_info(db: AsyncSession, fork: ForkResult) -> ForkInfo:
 
 
 async def _copy_project(
-    db: AsyncSession, original: Project, new_owner_id: UUID, workspace_id: UUID
+    db: AsyncSession,
+    original: Project,
+    new_owner_id: UUID,
+    workspace_id: UUID,
+    visible: Optional[Set[UUID]] = None,
 ) -> ForkResult:
+    """`visible`: copy only these node ids (a branch sharee's path); None copies everything."""
     new_project = Project(
         id=uuid4(),
         workspace_id=workspace_id,
@@ -113,6 +119,8 @@ async def _copy_project(
     nodes = (
         await db.execute(select(Node).where(Node.project_id == original.id))
     ).scalars().all()
+    if visible is not None:
+        nodes = [n for n in nodes if n.id in visible]
 
     tree_map = {t.id: uuid4() for t in trees}
     node_map = {n.id: uuid4() for n in nodes}
@@ -190,6 +198,7 @@ async def duplicate_project_for_user(
     original_project_id: UUID,
     new_owner_id: UUID,
     workspace_id: Optional[UUID] = None,
+    visible: Optional[Set[UUID]] = None,
 ) -> ForkResult:
     existing = await get_user_copy(db, original_project_id, new_owner_id)
     if existing is not None:
@@ -206,7 +215,7 @@ async def duplicate_project_for_user(
 
     try:
         async with db.begin_nested():
-            return await _copy_project(db, original, new_owner_id, workspace_id)
+            return await _copy_project(db, original, new_owner_id, workspace_id, visible)
     except IntegrityError:
         existing = await get_user_copy(db, original_project_id, new_owner_id)
         if existing is not None:
@@ -240,5 +249,7 @@ async def get_write_target(
     if share_id is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found!")
 
-    result = await duplicate_project_for_user(db, project_id, user_id)
+    # A branch sharee's copy holds only what they could see, never the rest of the tree.
+    visible = await visible_to(db, project_id, user_id)
+    result = await duplicate_project_for_user(db, project_id, user_id, visible=visible)
     return result.project.id, result

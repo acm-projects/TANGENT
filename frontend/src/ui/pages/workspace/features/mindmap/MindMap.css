@@ -309,7 +309,7 @@
     opacity var(--motion-fast) var(--ease-out);
 }
 
-.mindmap-node-wrap:is(:hover, :has(:focus-visible)) .mindmap-node-actions {
+.mindmap-node-wrap:is(:hover, :has(:focus-visible), [data-peeled]) .mindmap-node-actions {
   opacity: 1;
   translate: 0 -25%;
   pointer-events: auto;
@@ -411,6 +411,14 @@
   .mindmap-case-label {
     display: none;
   }
+}
+
+/* Share branch reuses the toolbar's share panel, which is a flyout that sits at the end of its
+ * column. Inside the popup it is the content, so it fills the popup instead. */
+.mindmap-node-wrap dialog .share {
+  align-self: stretch;
+  width: auto;
+  min-width: 20rem;
 }
 
 .mindmap-action-error {

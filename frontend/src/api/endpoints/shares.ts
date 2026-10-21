@@ -11,10 +11,15 @@ export function createSharesApi({ http }: ApiClient) {
   const token = (t: string) => `/shares/${encodeURIComponent(t)}`;
 
   return {
-    invite: (slug: string, projectId: string, email: string) =>
-      http.post<{ message: string }>(`${project(slug, projectId)}/share`, { email }).then((r) => r.data),
-    list: (slug: string, projectId: string) =>
-      http.get<{ shares: ShareItem[] }>(`${project(slug, projectId)}/shares`).then((r) => r.data.shares),
+    // branchNodeId: share only that node and what is under it; omitted = the whole project.
+    invite: (slug: string, projectId: string, email: string, branchNodeId?: string) =>
+      http
+        .post<{ message: string }>(`${project(slug, projectId)}/share`, { email, branch_node_id: branchNodeId })
+        .then((r) => r.data),
+    list: (slug: string, projectId: string, branchNodeId?: string) =>
+      http
+        .get<{ shares: ShareItem[] }>(`${project(slug, projectId)}/shares`, { params: { branch_node_id: branchNodeId } })
+        .then((r) => r.data.shares),
     revokeShare: (slug: string, projectId: string, shareId: string) =>
       http.delete(`${project(slug, projectId)}/shares/${shareId}`).then((r) => r.data),
     revokeInvitation: (slug: string, projectId: string, invitationId: string) =>

@@ -54,6 +54,25 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
+# Columns added after the first schema. The models define them but nothing migrates existing databases,
+# so each startup adds any that are missing (IF NOT EXISTS: safe to repeat).
+# ponytail: hand-rolled; move to Alembic once this list is more than a handful of columns.
+_ADDED_COLUMNS = [
+    "ALTER TABLE invitations ADD COLUMN IF NOT EXISTS branch_node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
+    "ALTER TABLE shares ADD COLUMN IF NOT EXISTS branch_node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
+]
+
+
+async def ensure_columns() -> None:
+    """Best effort like warm_pool: startup must not depend on the database being up or on DDL rights."""
+    try:
+        async with engine.begin() as conn:
+            for statement in _ADDED_COLUMNS:
+                await conn.execute(text(statement))
+    except Exception as exc:
+        logging.getLogger("uvicorn.error").warning("Schema check skipped: %s", type(exc).__name__)
+
+
 async def warm_pool(n: int = 3) -> None:
     """Open n connections up front so the first requests don't each pay a fresh TLS + auth
     handshake, plus asyncpg's one-off per-connection lookup of the enum types the tables use
