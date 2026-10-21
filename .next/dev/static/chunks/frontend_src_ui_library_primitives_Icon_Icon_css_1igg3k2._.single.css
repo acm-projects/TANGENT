@@ -1,0 +1,61 @@
+/* [project]/frontend/src/ui/library/primitives/Icon/Icon.css [app-client] (css) */
+@layer ui {
+  [data-ui="icon"] {
+    font-family: var(--font-icon);
+    font-weight: var(--font-weight-regular);
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    font-feature-settings: "liga";
+    font-variation-settings: "FILL" 1;
+    -webkit-font-smoothing: antialiased;
+    color: inherit;
+    -webkit-user-select: none;
+    user-select: none;
+    direction: ltr;
+    font-style: normal;
+    line-height: 1;
+  }
+
+  [data-ui="icon"][data-hierarchy="tertiary"] {
+    color: var(--color-text-muted);
+  }
+
+  [data-ui="icon"][data-size="xxs"] {
+    font-size: var(--font-size-xxs);
+  }
+
+  [data-ui="icon"][data-size="xs"] {
+    font-size: var(--font-size-xs);
+  }
+
+  [data-ui="icon"][data-size="s"] {
+    font-size: var(--font-size-s);
+  }
+
+  [data-ui="icon"][data-size="base"] {
+    font-size: var(--font-size-base);
+  }
+
+  [data-ui="icon"][data-size="m"] {
+    font-size: var(--font-size-m);
+  }
+
+  [data-ui="icon"][data-size="l"] {
+    font-size: var(--font-size-l);
+  }
+
+  [data-ui="icon"][data-size="xl"] {
+    font-size: var(--font-size-xl);
+  }
+
+  [data-ui="icon"][data-size="xxl"] {
+    font-size: var(--font-size-xxl);
+  }
+
+  [data-ui="icon"][data-size="display"] {
+    font-size: var(--font-size-display);
+  }
+}
+
+/*# sourceMappingURL=frontend_src_ui_library_primitives_Icon_Icon_css_1igg3k2._.single.css.map*/

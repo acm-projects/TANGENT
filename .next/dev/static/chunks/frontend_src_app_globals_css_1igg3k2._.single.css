@@ -1,0 +1,22 @@
+/* [project]/frontend/src/app/globals.css [app-client] (css) */
+@layer reset, ui;
+
+@layer reset {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  ol, ul {
+    list-style: none;
+  }
+
+  body {
+    font-family: var(--font-content);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+}
+
+/*# sourceMappingURL=frontend_src_app_globals_css_1igg3k2._.single.css.map*/

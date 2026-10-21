@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/library/tokens/text.css"],"sourcesContent":["/* text.css — typography. See DESIGN.md Rule 1a.\r\n *\r\n * Font files are loaded by next/font in app/layout.tsx, which sets\r\n * --font-heading, --font-content and --font-symbols on <html>. Components name the roles below,\r\n * never the font itself.\r\n *\r\n * The size scale matches the TextSize type in types/Types.ts one-to-one.\r\n * A step in the type with no token here is a bug. */\r\n\r\n:root {\r\n  /* families */\r\n  --font-icon: var(--font-symbols);\r\n\r\n  /* sizes — one per TextSize */\r\n  --font-size-xxs: 0.625rem;\r\n  --font-size-xs: 0.75rem;\r\n  --font-size-s: 0.875rem;\r\n  --font-size-base: 1rem;\r\n  --font-size-m: 1.125rem;\r\n  --font-size-l: 1.25rem;\r\n  --font-size-xl: 1.5rem;\r\n  --font-size-xxl: 2rem;\r\n  --font-size-display: 3rem;\r\n\r\n  /* weights */\r\n  --font-weight-regular: 400;\r\n  --font-weight-medium: 500;\r\n\r\n  /* line heights */\r\n  --line-height-tight: 1.2;\r\n  --line-height-normal: 1.5;\r\n}\r\n"],"names":[],"mappings":"AASA"}}]
+}

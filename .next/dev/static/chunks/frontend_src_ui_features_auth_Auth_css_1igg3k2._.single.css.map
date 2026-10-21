@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/features/auth/Auth.css"],"sourcesContent":["/* Auth — the feature's own layout and one-offs, unlayered (DESIGN.md §2, Rule 6). */\r\n\r\n.auth {\r\n  width: 100%;\r\n  max-width: 24rem;\r\n  padding: var(--space-6);\r\n}\r\n\r\n.auth-header {\r\n  text-align: center;\r\n}\r\n\r\n/* One-off: the wordmark is brand-coloured, spaced out, in the heading face. */\r\n.auth-wordmark {\r\n  font-family: var(--font-heading);\r\n  letter-spacing: 0.2em;\r\n  color: var(--color-brand);\r\n}\r\n\r\n.auth-field {\r\n  padding: var(--space-3) var(--space-4);\r\n}\r\n\r\n.auth-field:focus-within {\r\n  outline: 2px solid var(--color-focus-ring);\r\n  outline-offset: 2px;\r\n}\r\n\r\n.auth-google {\r\n  width: 100%;\r\n}\r\n\r\n.auth-legal,\r\n.auth-switch {\r\n  text-align: center;\r\n}\r\n"],"names":[],"mappings":"AAEA;;;;;;AAMA;;;;AAKA;;;;;;AAMA;;;;AAIA;;;;;AAKA;;;;AAIA"}}]
+}
