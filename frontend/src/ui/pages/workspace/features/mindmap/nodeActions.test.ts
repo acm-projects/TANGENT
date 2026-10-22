@@ -230,3 +230,65 @@ describe("mergeNodes", () => {
     expect(s.chatsByNode["m"]).toBeUndefined(); // read fresh from the server
   });
 });
+
+describe("placeholders made from a merged card", () => {
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  beforeEach(() => {
+    // m merges a and b, and has used tokens; it is what gets split or forked
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("b", "r", 2), { ...node("m", "r", 3), merge_source_ids: ["a", "b"], tokens: 500 }]);
+    s.setChats("m", [msg("user", "q1", 0), msg("assistant", "r1", 1), msg("user", "q2", 2), msg("assistant", "r2", 3)]);
+    s.setActive("m");
+  });
+
+  it("splitting it gives a tail and a tangent that aren't merges, with no tokens of their own yet", () => {
+    split.mockReturnValueOnce(new Promise(() => {})); // still waiting on the server: the placeholders are what's drawn
+    void splitNode("m", 1);
+    const s = useTreeStore.getState();
+    for (const id of s.childrenByParent["m"]!) {
+      expect(s.nodesById[id]).toMatchObject({ merge_source_ids: [], tokens: 0 });
+    }
+    expect(s.nodesById["m"]!.merge_source_ids).toEqual(["a", "b"]);
+  });
+
+  it("forking it gives a branch that isn't a merge", () => {
+    fork.mockReturnValueOnce(new Promise(() => {}));
+    void forkNode("m");
+    const s = useTreeStore.getState();
+    expect(s.nodesById[s.activeNodeId!]).toMatchObject({ parent_id: "m", merge_source_ids: [], tokens: 0 });
+  });
+});
+
+describe("ready to type after a branch or merge", () => {
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const asks = async (act: () => Promise<unknown>) => {
+    const before = useTreeStore.getState().composeAt;
+    await act().catch(() => {});
+    return useTreeStore.getState().composeAt > before;
+  };
+  beforeEach(() => {
+    // r -> a -> t ; r -> b
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("t", "a", 1), node("b", "r", 2)]);
+    s.setChats("a", [msg("user", "q1", 0), msg("assistant", "r1", 1), msg("user", "q2", 2), msg("assistant", "r2", 3)]);
+    s.setChats("t", []);
+  });
+
+  it("a fork, a split and both kinds of merge ask the message box for focus", async () => {
+    fork.mockResolvedValueOnce({ ...node("f", "b", 1), fork: null });
+    expect(await asks(() => forkNode("b"))).toBe(true);
+    split.mockResolvedValueOnce({ head: node("a", "r", 1), tail: node("t2", "a", 2), tangent: node("g", "a", 3), fork: null });
+    expect(await asks(() => splitNode("a", 1))).toBe(true);
+  });
+
+  it("joining a card with its only branch asks too", async () => {
+    join.mockResolvedValueOnce({ ...node("a", "r", 1), fork: null });
+    expect(await asks(() => mergeNodes("a", "t"))).toBe(true);
+  });
+
+  it("merging two leaves asks too, and a refused merge doesn't", async () => {
+    merge.mockResolvedValueOnce({ ...node("m", "r", 3), fork: null });
+    expect(await asks(() => mergeNodes("t", "b"))).toBe(true);
+    expect(await asks(() => mergeNodes("a", "b"))).toBe(false); // a has a branch: not a leaf
+  });
+});

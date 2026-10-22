@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Input, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { AvailableModel } from "@/api/types";
 import type { SendBlocker } from "../useChat";
@@ -35,6 +36,14 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
+
+  // A branch or merge made a card to write on (treeStore requestCompose): be ready for typing.
+  // Only then, not on every selection, so picking cards with the keyboard keeps focus on the map.
+  const composeAt = useTreeStore((s) => s.composeAt);
+  useEffect(() => {
+    if (composeAt) input.current?.focus();
+  }, [composeAt]);
 
   // a fork still being confirmed only holds Send back for a moment; typing can start straight away
   const disabled = blocker !== null && blocker !== "pending";
@@ -89,6 +98,7 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
         )}
 
         <TextArea
+          ref={input}
           aria-label="Message"
           placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
           value={text}

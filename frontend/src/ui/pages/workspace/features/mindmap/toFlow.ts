@@ -1,7 +1,7 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
 import type { AttachmentKind, NodeMeta } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
-import { selectBreadcrumb, selectExhibits } from "@/store/treeStore";
+import { selectExhibits, selectThread } from "@/store/treeStore";
 import { layoutTree } from "@/store/layout";
 
 /**
@@ -50,11 +50,22 @@ function mergesOf(s: StructureSlice): Map<string, string[]> {
   return out;
 }
 
-/** The tree as it's drawn: a merged card is laid out under the deeper of its sources (the first, on a tie)
- * rather than under its real parent, so the join reads down the board like every other string. */
+/** The tree as it's drawn: a merged card is laid out under the deepest of its sources (the first, on a tie)
+ * rather than under its real parent, so it sits below every card it joins and the join reads down the board.
+ * Depth is the drawn one: a merged card is drawn deeper than its real depth, and so is everything under it. */
 function drawnChildren(s: StructureSlice, merges: Map<string, string[]>): Record<string, string[]> {
   if (!merges.size) return s.childrenByParent;
-  const depth = (id: string) => selectBreadcrumb(s, id).length;
+  const depths = new Map<string, number>();
+  const depth = (id: string): number => {
+    const known = depths.get(id);
+    if (known !== undefined) return known;
+    depths.set(id, 0); // cycle guard: corrupt data mustn't recurse forever
+    const sources = merges.get(id);
+    const parent = s.nodesById[id]?.parent_id;
+    const d = sources ? 1 + Math.max(...sources.map(depth)) : parent ? 1 + depth(parent) : 0;
+    depths.set(id, d);
+    return d;
+  };
   const out = { ...s.childrenByParent };
   for (const [id, sources] of merges) {
     const parent = s.nodesById[id]!.parent_id;
@@ -71,8 +82,8 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
   const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
-  const crumbs = s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId).map((n) => n.id) : [];
-  const path = new Set(crumbs);
+  // (through a merged node, both branches it merged: selectThread)
+  const path = s.activeNodeId ? selectThread(s, s.activeNodeId) : new Set<string>();
 
   const stateOf = (id: string): MindMapNodeState =>
     id === s.activeNodeId ? "selected" : path.has(id) ? "path" : "default";

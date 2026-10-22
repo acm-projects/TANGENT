@@ -316,6 +316,10 @@ async def split_node(
         db, tree_id=node.tree_id, project_id=project_id, parent_id=node.id, user_id=user.id, chats=rest
     )
     tail.title = first_question[:40] if first_question else None
+    # a merge whose source was this node took the conversation to its end, which now ends at the tail
+    await db.execute(
+        NodeMergeSource.__table__.update().where(NodeMergeSource.source_leaf_id == node.id).values(source_leaf_id=tail.id)
+    )
     # its replies came from the node's model, so it's locked to the same one; the token count stays with the node
     tail.model = node.model
     await db.execute(
@@ -371,6 +375,11 @@ async def join_child(
     # out of the way first: a grandchild moving up may hold the same fork_index under the node
     await db.execute(Node.__table__.update().where(Node.id == child.id).values(fork_index=-1))
     await db.execute(Node.__table__.update().where(Node.parent_id == child.id).values(parent_id=node.id))
+    # merges that came from the child, or that the child is, are the node's now: deleting it would drop them
+    await db.execute(
+        NodeMergeSource.__table__.update().where(NodeMergeSource.source_leaf_id == child.id).values(source_leaf_id=node.id)
+    )
+    await db.execute(NodeMergeSource.__table__.update().where(NodeMergeSource.node_id == child.id).values(node_id=node.id))
     # Core delete: the ORM's delete-orphan cascade must not reach the children that just moved
     await db.execute(Node.__table__.delete().where(Node.id == child.id))
     info = await build_fork_info(db, fork) if fork is not None else None

@@ -241,6 +241,46 @@ def test_join_undoes_a_split_and_merge_reads_back(monkeypatch):
         assert sorted(nodes[merged["id"]]["merge_source_ids"]) == sorted([below["id"], other["id"]])
 
 
+def test_merge_sources_follow_a_split_and_a_join(monkeypatch):
+    """The Linear Algebra case: m merges (a, b); m2 merges (c, m); then m is split and later joined back.
+    m2's source must follow the conversation's end: the tail after the split, m again after the join."""
+    replies = iter(f"r{i}" for i in range(20))
+
+    async def fake_llm(messages, model):
+        yield {"text": next(replies)}
+
+    monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
+
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])},
+                     headers=auth).json()["id"]
+        t = c.get(f"/projects/{pid}/tree", headers=auth).json()
+        root = t["tree"]["root_node_id"]
+        ask = lambda nid, q: c.post(f"/nodes/{nid}/messages", json={"content": q}, headers=auth)
+        fork = lambda nid: c.post(f"/nodes/{nid}/fork", headers=auth).json()["id"]
+        sources = lambda nid: sorted({n["id"]: n for n in c.get(f"/trees/{t['tree']['id']}", headers=auth).json()["nodes"]}[nid]["merge_source_ids"])
+
+        a, b = fork(root), fork(root)
+        ask(a, "qa"), ask(b, "qb")
+        m = c.post("/nodes/merge", json={"source_leaf_ids": [a, b]}, headers=auth).json()["id"]
+        ask(m, "q1"), ask(m, "q2")
+        cc = fork(b)
+        ask(cc, "qc")
+        m2 = c.post("/nodes/merge", json={"source_leaf_ids": [cc, m]}, headers=auth).json()["id"]
+
+        # split m after its first own reply (index 5: two merged exchanges, then q1 and its reply): the tail ends m's conversation
+        tail = c.post(f"/nodes/{m}/split", json={"after_seq": 5}, headers=auth).json()["tail"]["id"]
+        assert sources(m2) == sorted([cc, tail])
+        assert sources(m) == sorted([a, b])  # still a merge itself
+
+        # joined back: m2 points at m again, and nothing was lost to the tail's delete
+        assert c.post(f"/nodes/{m}/join", headers=auth).status_code == 200
+        assert sources(m2) == sorted([cc, m])
+        assert sources(m) == sorted([a, b])
+
+
 def _workspace_id(user_id):
     """The API doesn't expose workspace ids, so read it straight from the table."""
     async def run():

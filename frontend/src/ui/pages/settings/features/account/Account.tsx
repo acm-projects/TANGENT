@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button, Frame, Input, Link, Loading, Panel, Text } from "@/ui/library";
 import { FieldGuide } from "@/ui/features/settings/FieldGuide";
@@ -29,13 +29,17 @@ export function Account() {
   const signOut = useSignOut();
   // the slug this page sits under, kept current by renames (history.replaceState): the way back to the board
   const slug = usePathname().split("/")[1] ?? "";
+  // Back returns where settings was opened from (?from=, set by the workspace's Settings panel), else to the board.
+  // Only a path on this site: it comes from the URL, so a full or protocol-relative URL ("//", "/\") could send the reader off-site.
+  const from = useSearchParams().get("from");
+  const back = from && /^\/(?![/\\])/.test(from) ? from : null;
   const active = useReading(state.status === "ready");
 
   return (
     <Frame gap="6" className="account">
       <Frame as="header" gap="1" className="account-head">
-        <Link href={`/${slug}/dashboard`} className="account-back">
-          <Text as="span" size="s" content="← Back to the board" />
+        <Link href={back ?? `/${slug}/dashboard`} className="account-back">
+          <Text as="span" size="s" content={back ? "← Back" : "← Back to the board"} />
         </Link>
         <Text as="span" size="xs" className="account-kicker" content="Personnel file" />
         <Text as="h1" size="display" hierarchy="primary" className="account-title" content="Settings" />

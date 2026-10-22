@@ -20,6 +20,20 @@ type Ready = Extract<AccountState, { status: "ready" }>;
 
 const settingsPath = (slug: string) => `/${encodeURIComponent(slug)}/settings`;
 
+/** Moves the page's URL from workspace `from` to `to`, if it's on `from`. The ?from= path back (Account.tsx) points
+ * inside the same workspace, so it follows a rename (`keepBack`) and is dropped when the workspace is deleted. */
+function moveUrl(from: string, to: string, keepBack: boolean) {
+  if (window.location.pathname !== settingsPath(from)) return;
+  const params = new URLSearchParams(window.location.search);
+  const back = params.get("from");
+  const prefix = `/${encodeURIComponent(from)}/`;
+  if (back?.startsWith(prefix)) {
+    if (keepBack) params.set("from", `/${encodeURIComponent(to)}/` + back.slice(prefix.length));
+    else params.delete("from");
+  }
+  window.history.replaceState(null, "", settingsPath(to) + (params.size ? `?${params}` : ""));
+}
+
 export function useAccount() {
   const [state, setState] = useState<AccountState>({ status: "loading" });
   const [actionError, setActionError] = useState<string | null>(null);
@@ -75,7 +89,7 @@ export function useAccount() {
       async () => {
         const { workspace_slug } = await api.workspaces.rename(old.workspace_slug, name);
         update(setWorkspaces((w) => (w.workspace_id === id ? { ...w, workspace_slug } : w)));
-        if (window.location.pathname === settingsPath(old.workspace_slug)) window.history.replaceState(null, "", settingsPath(workspace_slug));
+        moveUrl(old.workspace_slug, workspace_slug, true);
       },
       "Could not rename the workspace.",
     );
@@ -88,7 +102,7 @@ export function useAccount() {
     if (index < 0 || all.length < 2) return;
     const gone = all[index];
     const next = all.find((w) => w.workspace_id !== id)!;
-    if (window.location.pathname === settingsPath(gone.workspace_slug)) window.history.replaceState(null, "", settingsPath(next.workspace_slug));
+    moveUrl(gone.workspace_slug, next.workspace_slug, false);
     optimistic(
       (s) => ({ workspaces: s.workspaces.filter((w) => w.workspace_id !== id) }),
       (s) => ({ workspaces: [...s.workspaces.slice(0, index), gone, ...s.workspaces.slice(index)] }),

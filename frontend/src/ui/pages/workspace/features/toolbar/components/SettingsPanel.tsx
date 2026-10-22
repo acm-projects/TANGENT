@@ -1,3 +1,4 @@
+import { usePathname } from "next/navigation";
 import { Button, Frame, Link, Panel, Text } from "@/ui/library";
 import { FieldGuide } from "@/ui/features/settings/FieldGuide";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
@@ -10,6 +11,8 @@ type SettingsPanelProps = { slug: string; onClose(): void };
 
 export function SettingsPanel({ slug, onClose }: SettingsPanelProps) {
   const signOut = useSignOut();
+  // the settings page's Back returns here (Account.tsx)
+  const here = usePathname();
   return (
     <Panel as="section" elevation="floating" className="toolbar-panel settings" aria-labelledby="settings-heading">
       <Frame gap="4">
@@ -32,7 +35,7 @@ export function SettingsPanel({ slug, onClose }: SettingsPanelProps) {
         </Frame>
 
         <Frame direction="row" justify="between" align="center" className="settings-foot">
-          <Link href={`/${slug}/settings`} className="settings-all">
+          <Link href={`/${slug}/settings?from=${encodeURIComponent(here)}`} className="settings-all">
             <Text as="span" size="s" content="All settings →" />
           </Link>
           <Button hierarchy="tertiary" size="s" icon="logout" label="Sign out" showIcon onClick={signOut} />

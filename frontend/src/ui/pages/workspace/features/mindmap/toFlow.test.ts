@@ -65,4 +65,32 @@ describe("toFlow", () => {
     expect(edges.map((e) => e.id).filter((id) => id.endsWith("m")).sort()).toEqual(["a->m", "c->m"]);
     expect(nodes.find((n) => n.id === "a")!.data.feedsMerge).toBe(true);
   });
+
+  it("with a merged card picked, both branches it merged and its joining strings are the path", () => {
+    // r -> (a, b) ; b -> (c) ; m merges a and c
+    const s = slice("m");
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    expect(stateById(s)).toEqual({ r: "path", a: "path", b: "path", c: "path", m: "selected" });
+    const pathEdges = toFlow(s).edges.filter((e) => e.className?.includes("mindmap-edge-path")).map((e) => e.id);
+    expect(pathEdges.sort()).toEqual(["a->m", "b->c", "c->m", "r->a", "r->b"]);
+  });
+
+  it("draws a merged card below the deepest card it joins, counting a merged source's own drawn depth", () => {
+    // The Linear Algebra shape: m merges (a, c) so it's drawn below c; t branches off m; m2 merges (x, t),
+    // where x is as deep as t in the real tree (both at depth 2) but t is drawn two rows lower.
+    const s = slice("m2");
+    s.nodesById = {
+      ...s.nodesById,
+      x: meta("x", "a", 1),
+      m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] },
+      t: meta("t", "m", 1),
+      m2: { ...meta("m2", "r", 4), merge_source_ids: ["x", "t"] },
+    };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m", "m2"], a: ["x"], m: ["t"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["t"]!.y).toBeGreaterThan(at["x"]!.y);
+    expect(at["m2"]!.y).toBeGreaterThan(at["t"]!.y);
+    expect(at["m2"]!.y).toBeGreaterThan(at["x"]!.y);
+  });
 });
