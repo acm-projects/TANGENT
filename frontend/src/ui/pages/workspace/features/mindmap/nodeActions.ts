@@ -60,9 +60,13 @@ export async function forkNode(nodeId: string) {
       summary: null,
       created_at: new Date().toISOString(),
       attachment_kinds: [],
+      // a new card, not a copy: the parent may be a merge, and its tokens are its own
+      merge_source_ids: [],
+      tokens: 0,
     });
     store.setChats(tempId, []);
     store.setActive(tempId);
+    store.requestCompose();
   }
   const drop = () => {
     const s = useTreeStore.getState();
@@ -133,11 +137,15 @@ export async function splitNode(nodeId: string, afterIndex: number) {
     summary: null,
     created_at: new Date().toISOString(),
     attachment_kinds: [],
+    // a new card, not a copy: the node it was cut from may be a merge, and its tokens stay with it
+    merge_source_ids: [],
+    tokens: 0,
   });
   const tail = placeholder(nextIndex, question?.slice(0, 40) ?? null);
   const tangent = { ...placeholder(nextIndex + 1, null), node_type: null };
   store.splitNode(nodeId, afterIndex, tail, tangent);
   store.setActive(tangent.id);
+  store.requestCompose();
 
   // a placeholder deleted meanwhile hands its real node (or null: none was made) to that delete
   const settle = (tempId: string, real: NodeMeta | null) => {
@@ -209,6 +217,7 @@ export async function mergeNodes(a: string, b: string) {
   };
   now.joinChild(parent.id);
   if (useTreeStore.getState().activeNodeId !== parent.id) useTreeStore.getState().setActive(parent.id);
+  useTreeStore.getState().requestCompose();
 
   let res;
   try {
@@ -256,12 +265,14 @@ async function mergeBranches(a: string, b: string) {
     summary: null,
     created_at: new Date().toISOString(),
     attachment_kinds: [],
+    tokens: 0,
     merge_source_ids: [a, b],
   };
   const previous = store.activeNodeId;
   store.addNode(temp);
   store.setChats(temp.id, [...below(pathA, "a"), ...below(pathB, "b")].map((m, i) => ({ ...m, seq: i })));
   store.setActive(temp.id);
+  store.requestCompose();
 
   const queued = () => {
     const waiting = queuedDeletes.get(temp.id);

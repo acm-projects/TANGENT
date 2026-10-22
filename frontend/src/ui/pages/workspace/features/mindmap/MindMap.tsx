@@ -2,12 +2,13 @@
 
 import { Background, BackgroundVariant, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { MotionConfig } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { apiErrorMessage } from "@/api";
 import { useShallow } from "zustand/react/shallow";
-import { selectBreadcrumb, useTreeStore } from "@/store/treeStore";
+import { selectThread, useTreeStore } from "@/store/treeStore";
 import { Frame, Loading, Panel, Text } from "@/ui/library";
+import { spring } from "@/ui/library/tokens/motion";
 import { MapProject, Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { mergeNodes } from "./nodeActions";
 import { StringEdge } from "./components/StringEdge";
@@ -25,15 +26,16 @@ import "./MindMap.css";
 const nodeTypes = { tangent: MindMapNode };
 const edgeTypes = { string: StringEdge };
 
-/** Marks the strings from `id` up to the root (MindMap.css [data-traced]); null clears them. */
+/** Marks the strings of `id`'s thread up to the root, through both branches of a merge (MindMap.css [data-traced]); null clears them. */
 function traceThread(from: Element, id: string | null) {
   const map = from.closest(".mindmap");
   map?.querySelectorAll("[data-traced]").forEach((el) => el.removeAttribute("data-traced"));
   if (!map || !id) return;
-  const crumbs = selectBreadcrumb(useTreeStore.getState(), id);
-  for (let i = 1; i < crumbs.length; i++) {
-    map.querySelector(`.react-flow__edge[data-id="${crumbs[i - 1].id}->${crumbs[i].id}"]`)?.setAttribute("data-traced", "");
-  }
+  const thread = selectThread(useTreeStore.getState(), id);
+  map.querySelectorAll(".react-flow__edge").forEach((edge) => {
+    const [source, target] = (edge.getAttribute("data-id") ?? "").split("->");
+    if (thread.has(source!) && thread.has(target!)) edge.setAttribute("data-traced", "");
+  });
 }
 
 type MindMapProps = { slug: string; projectId: string; className?: string };
@@ -55,6 +57,12 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
   const [stagger, setStagger] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  // A failed action's reason is read once, not kept: it lifts off after a few seconds (a new one restarts the wait).
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(null), 5000);
+    return () => clearTimeout(t);
+  }, [actionError]);
   // A merge from the tray waits for a second card: the next card clicked joins it, the board or Escape cancels.
   const [mergeFrom, setMergeFrom] = useState<string | null>(null);
   useEffect(() => {
@@ -93,7 +101,17 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
     >
       {load.status === "loading" && <Loading size="base" label="Loading map…" className="mindmap-status" />}
       {load.status === "error" && <Text role="alert" className="mindmap-status" content={load.message} />}
-      {actionError && <Text role="alert" size="s" className="mindmap-action-error" content={actionError} />}
+      <AnimatePresence>
+        {actionError && (
+          <motion.div
+            key={actionError}
+            className="mindmap-action-error"
+            exit={{ opacity: 0, y: -12, scale: 0.96, transition: spring.lift }}
+          >
+            <Text role="alert" size="s" content={actionError} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {mergeFrom && (
         <Text role="status" size="s" className="mindmap-merge-hint" content="Pick a card to merge with · Esc to cancel" />
       )}
