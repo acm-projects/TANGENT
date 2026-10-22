@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { OnboardingResponse } from "../types";
+import type { Account, OnboardingResponse } from "../types";
 
 /**
  * /auth/* -- everything except refresh, which lives in `client.ts` because the
@@ -14,6 +14,8 @@ export function createAuthApi({ http }: ApiClient) {
     onboarding: (workspaceName: string, next?: string) =>
       http.post<OnboardingResponse>("/auth/onboarding", { workspace_name: workspaceName, next }).then((r) => r.data),
     logout: () => http.post("/auth/logout").then((r) => r.data),
+    me: () => http.get<Account>("/auth/me").then((r) => r.data),
+    updateMe: (changes: { name: string }) => http.patch("/auth/me", changes).then((r) => r.data),
   };
 }
 

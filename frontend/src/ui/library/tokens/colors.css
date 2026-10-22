@@ -9,12 +9,24 @@
  *      `--color-paper` is tier 1 in disguise.
  *
  * Three materials: paper (surfaces), graphite (ink), flag red (a connection).
- * Light and dark are both defined here and the OS picks between them, so each
- * semantic token is written once as light-dark(light, dark). */
+ * Light and dark are both defined here and the OS picks between them (unless
+ * the reader picks in Settings: lighting.ts), so each semantic token is
+ * written once as light-dark(light, dark). */
 
 :root {
   color-scheme: light dark;
+}
 
+/* a reader's pick from Settings overrides the OS (lighting.ts) */
+:root[data-lighting="light"] {
+  color-scheme: light;
+}
+
+:root[data-lighting="dark"] {
+  color-scheme: dark;
+}
+
+:root {
   /* ── tier 1: palette ─────────────────────────────────────────── */
 
   --paper-light: #f3f2ef;

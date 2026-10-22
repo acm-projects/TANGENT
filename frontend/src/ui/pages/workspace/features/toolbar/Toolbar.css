@@ -25,8 +25,8 @@
   transform-origin: left center;
 }
 
-/* Share: a small card level with the Share tile */
-.toolbar-slot[data-panel="share"] {
+/* Share and Settings: small cards level with their tiles */
+.toolbar-slot:is([data-panel="share"], [data-panel="settings"]) {
   align-self: end;
 }
 
@@ -271,14 +271,16 @@
   opacity: 1;
 }
 
-.share {
+.share,
+.settings {
   width: 20rem;
   padding: 0 var(--space-4) var(--space-4);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-.share .toolbar-panel-head {
+.share .toolbar-panel-head,
+.settings .toolbar-panel-head {
   margin-inline: calc(-1 * var(--space-4));
   padding: var(--space-4);
 }
@@ -339,4 +341,22 @@
   animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
   --pop-from: -1.5rem 0;
   --pop-rotate: 0deg;
+}
+
+/* ── settings ──────────────────────────────────────────────── */
+
+.settings-foot {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-all {
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.settings-all:is(:hover, :focus-visible) {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }

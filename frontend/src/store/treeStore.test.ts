@@ -76,6 +76,17 @@ describe("tree store", () => {
       expect(s().chatsByNode["b"]?.at(-1)?.content).toBe("B!");
     });
 
+    it("a reply finished off-screen stays unread until its node is selected", () => {
+      start();
+      const s = () => useTreeStore.getState();
+      s().setActive("a");
+      s().endStream("a", assistant("A"));
+      s().endStream("b", assistant("B"));
+      expect(s().unread).toEqual({ b: true });
+      s().setActive("b");
+      expect(s().unread).toEqual({});
+    });
+
     it("an error on one node clears only that node", () => {
       start();
       const s = () => useTreeStore.getState();

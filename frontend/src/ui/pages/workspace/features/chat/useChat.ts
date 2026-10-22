@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { forkNode, isPending, redirectToCopy, switchToFork } from "../mindmap/nodeActions";
+import { forkNode, isPending, redirectToCopy, splitNode, switchToFork } from "../mindmap/nodeActions";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -237,11 +237,16 @@ export function useChat() {
     api.nodes.stopMessage(activeNodeId).catch((e: unknown) => setError(apiErrorMessage(e, "Could not stop the reply.")));
   }
 
-  /** Start a tangent: a new child of `nodeId`, selected and ready to prompt. */
-  async function fork(nodeId: string) {
+  /** Start a tangent from the reply `seq` of `nodeId`, selected and ready to prompt. From the node's last
+   * reply that's a new child; from an earlier one the node is split there first (splitNode), so the tangent
+   * carries only what came before. */
+  async function branch(nodeId: string, seq: number) {
     setError(null);
+    const chats = useTreeStore.getState().chatsByNode[nodeId] ?? [];
+    const at = chats.findIndex((m) => m.seq === seq && m.role === "assistant");
     try {
-      await forkNode(nodeId);
+      if (at < 0 || at === chats.length - 1) await forkNode(nodeId);
+      else await splitNode(nodeId, at);
     } catch (e: unknown) {
       setError(apiErrorMessage(e, "Could not create a branch."));
     }
@@ -268,6 +273,6 @@ export function useChat() {
     stop,
     canRetry,
     retry,
-    fork,
+    branch,
   };
 }

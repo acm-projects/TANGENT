@@ -4,8 +4,15 @@ import { useTreeStore } from "@/store/treeStore";
 
 const fork = vi.fn();
 const remove = vi.fn();
-vi.mock("@/api", () => ({ api: { nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id) } }, forkedProjectIdOf: () => null }));
-const { deleteNode, forkNode, isPending } = await import("./nodeActions");
+const get = vi.fn();
+const split = vi.fn();
+const join = vi.fn();
+const merge = vi.fn();
+vi.mock("@/api", () => ({
+  api: { nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids) } },
+  forkedProjectIdOf: () => null,
+}));
+const { deleteNode, forkNode, isPending, loadChats, mergeNodes, splitNode } = await import("./nodeActions");
 
 const node = (id: string, parent: string | null, idx: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: idx, node_type: null,
@@ -106,5 +113,120 @@ describe("deleting a placeholder fork", () => {
     await Promise.all([forked, deleted]);
     expect(remove).not.toHaveBeenCalled();
     expect(useTreeStore.getState().childrenByParent["r"] ?? []).toEqual([]);
+  });
+});
+
+describe("loadChats", () => {
+  it("asks the server once for a node never opened, then answers from the store", async () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("a", "r", 1)]);
+    get.mockResolvedValueOnce({ chats: [] });
+    expect(await loadChats("a")).toEqual([]);
+    expect(await loadChats("a")).toEqual([]);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(useTreeStore.getState().chatsByNode["a"]).toEqual([]);
+  });
+});
+
+describe("splitNode (optimistic)", () => {
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  beforeEach(() => {
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("k", "a", 1)]);
+    s.setChats("a", [msg("user", "q1", 0), msg("assistant", "r1", 1), msg("user", "q2", 2), msg("assistant", "r2", 3)]);
+    s.setActive("a");
+  });
+
+  it("cuts at once, moves the rest and the branches down, then swaps in the server's nodes", async () => {
+    let answer!: (r: unknown) => void;
+    split.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const done = splitNode("a", 1);
+    let s = useTreeStore.getState();
+    const [tail, tangent] = s.childrenByParent["a"]!;
+    expect(isPending(tail!) && isPending(tangent!)).toBe(true);
+    expect(s.activeNodeId).toBe(tangent);
+    expect(s.chatsByNode["a"]!.map((m) => m.content)).toEqual(["q1", "r1"]);
+    expect(s.chatsByNode[tail!]!.map((m) => [m.content, m.seq])).toEqual([["q2", 0], ["r2", 1]]);
+    expect(s.childrenByParent[tail!]).toEqual(["k"]);
+    expect(s.nodesById[tail!]!.title).toBe("q2");
+
+    answer({ head: node("a", "r", 1), tail: node("t", "a", 2), tangent: node("g", "a", 3), fork: null });
+    await done;
+    s = useTreeStore.getState();
+    expect(s.childrenByParent["a"]).toEqual(["t", "g"]);
+    expect(s.childrenByParent["t"]).toEqual(["k"]);
+    expect(s.nodesById["k"]!.parent_id).toBe("t");
+    expect(s.chatsByNode["t"]!.map((m) => m.content)).toEqual(["q2", "r2"]);
+    expect(s.activeNodeId).toBe("g");
+  });
+
+  it("puts the node back whole when the server refuses", async () => {
+    split.mockRejectedValueOnce(new Error("no"));
+    await expect(splitNode("a", 1)).rejects.toThrow("no");
+    const s = useTreeStore.getState();
+    expect(s.childrenByParent["a"]).toEqual(["k"]);
+    expect(s.nodesById["k"]!.parent_id).toBe("a");
+    expect(s.chatsByNode["a"]!.length).toBe(4);
+    expect(s.activeNodeId).toBe("a");
+    expect(Object.keys(s.nodesById).some(isPending)).toBe(false);
+  });
+});
+
+describe("mergeNodes", () => {
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  beforeEach(() => {
+    // r -> a -> t -> k   (a, t: a split; k: a branch of t)
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("t", "a", 1), node("k", "t", 1)]);
+    s.setChats("a", [msg("user", "q1", 0), msg("assistant", "r1", 1)]);
+    s.setChats("t", [msg("user", "q2", 0), msg("assistant", "r2", 1)]);
+    s.setActive("t");
+  });
+
+  it("joins a card and its only branch at once, in either order, and keeps it when the server agrees", async () => {
+    join.mockResolvedValueOnce({ ...node("a", "r", 1), fork: null });
+    await mergeNodes("t", "a");
+    const s = useTreeStore.getState();
+    expect(join).toHaveBeenCalledWith("a");
+    expect(s.nodesById["t"]).toBeUndefined();
+    expect(s.chatsByNode["a"]!.map((m) => [m.content, m.seq])).toEqual([["q1", 0], ["r1", 1], ["q2", 2], ["r2", 3]]);
+    expect(s.childrenByParent["a"]).toEqual(["k"]);
+    expect(s.nodesById["k"]!.parent_id).toBe("a");
+    expect(s.activeNodeId).toBe("a");
+  });
+
+  it("splits them back if the server refuses", async () => {
+    join.mockRejectedValueOnce(new Error("no"));
+    await expect(mergeNodes("a", "t")).rejects.toThrow("no");
+    const s = useTreeStore.getState();
+    expect(s.childrenByParent["a"]).toEqual(["t"]);
+    expect(s.chatsByNode["a"]!.length).toBe(2);
+    expect(s.activeNodeId).toBe("t");
+  });
+
+  it("won't take a branch back in when other tangents branch from the card", async () => {
+    join.mockClear();
+    useTreeStore.getState().addNode(node("o", "a", 2));
+    await expect(mergeNodes("a", "t")).rejects.toThrow(/other tangents/i);
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it("merges two leaves of separate branches into a placeholder under where they part, then the server's node", async () => {
+    // r -> (a -> t -> k, b)
+    useTreeStore.getState().addNode(node("b", "r", 2));
+    let answer!: (r: unknown) => void;
+    merge.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const done = mergeNodes("k", "b");
+    let s = useTreeStore.getState();
+    const temp = s.activeNodeId!;
+    expect(isPending(temp)).toBe(true);
+    expect(s.nodesById[temp]!.parent_id).toBe("r");
+    expect(s.nodesById[temp]!.merge_source_ids).toEqual(["k", "b"]);
+    answer({ ...node("m", "r", 3), fork: null });
+    await done;
+    s = useTreeStore.getState();
+    expect(merge).toHaveBeenCalledWith(["k", "b"]);
+    expect(s.activeNodeId).toBe("m");
+    expect(s.nodesById["m"]!.merge_source_ids).toEqual(["k", "b"]);
+    expect(s.chatsByNode["m"]).toBeUndefined(); // read fresh from the server
   });
 });

@@ -45,6 +45,8 @@ class NodeMeta(BaseModel):
     tokens: int
     created_by_id: UUID
     created_at: datetime
+    # a merged node's two source leaves (node_merge_sources); filled in by the tree endpoints only
+    merge_source_ids: list[UUID] = []
 
 
 class NodeOut(NodeMeta):

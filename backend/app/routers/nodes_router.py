@@ -61,6 +61,20 @@ class ForkNodeOut(NodeMeta):
     fork: Optional[ForkInfo] = None
 
 
+class SplitRequest(BaseModel):
+    # seq of the reply the node is cut after; it stays, everything after it moves down
+    after_seq: int = Field(ge=0)
+    # also start an empty tangent off the cut, beside the moved-down rest
+    tangent: bool = False
+
+
+class SplitOut(BaseModel):
+    head: NodeMeta  # the node itself, now ending at the cut
+    tail: NodeMeta  # its new only child: the rest of its messages, and every branch it had
+    tangent: Optional[NodeMeta] = None
+    fork: Optional[ForkInfo] = None
+
+
 class NodeModelConflict(Exception):
     """Raised when a concurrent write tries to change a node's already-selected model."""
 
@@ -262,6 +276,109 @@ async def fork_node(
     return ForkNodeOut(**NodeMeta.model_validate(child).model_dump(), fork=info)
 
 
+@router.post("/{node_id}/split", response_model=SplitOut)
+async def split_node(
+    node_id: UUID,
+    req: SplitRequest,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Cut a node in two after one of its replies, so a long conversation can be branched from mid-way.
+    The node keeps its messages up to and including that reply; a new child takes the rest (renumbered
+    from 0) and every child the node had, so nothing below moves. With `tangent`, an empty sibling of that
+    child is made too: a branch off the cut, ready to prompt. A non-owner's first write forks the project,
+    exactly like fork_node, and the split happens in their copy."""
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
+    project_id, fork = await get_write_target(db, node.project_id, user.id)
+    if fork is not None:
+        node = await db.get(Node, fork.node_map[node.id])
+    # locked, so a reply being saved can't land on either half mid-split
+    node = (await db.execute(select(Node).where(Node.id == node.id).with_for_update())).scalar_one()
+    # shortcut: _stops is in-process, so this only sees streams on this worker; same limit as stop_message
+    if any(streaming == node_id or streaming == node.id for _, streaming in _stops):
+        raise HTTPException(409, "Wait for the reply to finish before splitting")
+
+    chats = _as_list(node.chats)
+    if req.after_seq >= len(chats) - 1:
+        raise HTTPException(400, "Nothing comes after that message; fork the node instead")
+    if chats[req.after_seq].get("role") != "assistant":
+        raise HTTPException(400, "A node can only be split after a reply")
+
+    head, rest = chats[: req.after_seq + 1], chats[req.after_seq + 1 :]
+    rest = [{**m, "seq": i} for i, m in enumerate(rest)]
+    first_question = next((m["content"] for m in rest if m.get("role") == "user"), None)
+
+    node.chats = head
+    tail = await _create_child(
+        db, tree_id=node.tree_id, project_id=project_id, parent_id=node.id, user_id=user.id, chats=rest
+    )
+    tail.title = first_question[:40] if first_question else None
+    # its replies came from the node's model, so it's locked to the same one; the token count stays with the node
+    tail.model = node.model
+    await db.execute(
+        Node.__table__.update()
+        .where(Node.parent_id == node.id, Node.id != tail.id)
+        .values(parent_id=tail.id)
+    )
+    tangent = (
+        await _create_child(db, tree_id=node.tree_id, project_id=project_id, parent_id=node.id, user_id=user.id)
+        if req.tangent
+        else None
+    )
+    info = await build_fork_info(db, fork) if fork is not None else None
+    await db.commit()
+    for n in (node, tail, tangent):
+        if n is not None:
+            await db.refresh(n)
+    return SplitOut(
+        head=NodeMeta.model_validate(node),
+        tail=NodeMeta.model_validate(tail),
+        tangent=NodeMeta.model_validate(tangent) if tangent else None,
+        fork=info,
+    )
+
+
+@router.post("/{node_id}/join", response_model=ForkNodeOut)
+async def join_child(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Fold a node's only child back into it: a split undone. The child's messages are appended (renumbered),
+    its children move up to the node, and it is deleted. A non-owner's first write forks the project, as for fork."""
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
+    _, fork = await get_write_target(db, node.project_id, user.id)
+    target_id = fork.node_map[node.id] if fork is not None else node.id
+    node = (await db.execute(select(Node).where(Node.id == target_id).with_for_update())).scalar_one()
+    children = (await db.execute(select(Node).where(Node.parent_id == node.id).with_for_update())).scalars().all()
+    if len(children) != 1:
+        raise HTTPException(409, "Only a node with exactly one branch can take it back in")
+    child = children[0]
+    if any(streaming in (node_id, node.id, child.id) for _, streaming in _stops):
+        raise HTTPException(409, "Wait for the reply to finish before merging")
+    if node.model and child.model and node.model != child.model:
+        raise HTTPException(409, "These two use different models, so they can't become one node")
+    node.model = node.model or child.model
+    node.tokens += child.tokens
+
+    node.chats = [{**m, "seq": i} for i, m in enumerate(_as_list(node.chats) + _as_list(child.chats))]
+    # out of the way first: a grandchild moving up may hold the same fork_index under the node
+    await db.execute(Node.__table__.update().where(Node.id == child.id).values(fork_index=-1))
+    await db.execute(Node.__table__.update().where(Node.parent_id == child.id).values(parent_id=node.id))
+    # Core delete: the ORM's delete-orphan cascade must not reach the children that just moved
+    await db.execute(Node.__table__.delete().where(Node.id == child.id))
+    info = await build_fork_info(db, fork) if fork is not None else None
+    await db.commit()
+    await db.refresh(node)
+    return ForkNodeOut(**NodeMeta.model_validate(node).model_dump(), fork=info)
+
+
 @router.post("/merge", response_model=ForkNodeOut)
 async def merge_nodes(
     req: MergeRequest,
@@ -304,10 +421,11 @@ async def merge_nodes(
     ancestor_id = UUID(path_a[shared - 1].id)
 
     chats: list[dict] = []
-    for leaf_id, rows in ((a_id, path_a), (b_id, path_b)):
+    # tagged "a" / "b" by branch, which is what ChatMessage and flatten() read
+    for key, rows in (("a", path_a), ("b", path_b)):
         for row in rows[shared:]:
             for message in _as_list(row.chats):
-                chats.append({**message, "branch_source": str(leaf_id)})
+                chats.append({**message, "branch_source": key})
     for seq, message in enumerate(chats):
         message["seq"] = seq
 
@@ -317,8 +435,6 @@ async def merge_nodes(
         tree_id = fork.tree_map[tree_id]
         ancestor_id = fork.node_map[ancestor_id]
         sources = [fork.node_map[s] for s in sources]
-        for message in chats:
-            message["branch_source"] = str(fork.node_map[UUID(message["branch_source"])])
 
     child = await _create_child(
         db, tree_id=tree_id, project_id=project_id, parent_id=ancestor_id, user_id=user.id, chats=chats

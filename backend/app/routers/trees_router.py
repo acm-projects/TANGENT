@@ -9,7 +9,7 @@ from app.auth import get_current_user
 from app.branch_scope import visible_to
 from app.context.schemas import NodeMeta, TreeMeta, TreeOut
 from app.database import get_db_session
-from app.models import Node, Project, Tree, User
+from app.models import Node, NodeMergeSource, Project, Tree, User
 
 router = APIRouter(tags=["Trees"], dependencies=[Depends(get_current_user)])
 
@@ -20,7 +20,15 @@ async def _tree_out(db: AsyncSession, tree: Tree, user: User) -> TreeOut:
             select(Node).where(Node.tree_id == tree.id).order_by(Node.created_at).options(defer(Node.chats))
         )
     ).scalars().all()
-    metas = [NodeMeta.model_validate(n) for n in nodes]
+    sources: dict[UUID, list[UUID]] = {}
+    rows = await db.execute(
+        select(NodeMergeSource.node_id, NodeMergeSource.source_leaf_id)
+        .join(Node, Node.id == NodeMergeSource.node_id)
+        .where(Node.tree_id == tree.id)
+    )
+    for merged_id, source_id in rows:
+        sources.setdefault(merged_id, []).append(source_id)
+    metas = [NodeMeta.model_validate(n).model_copy(update={"merge_source_ids": sources.get(n.id, [])}) for n in nodes]
 
     keep = await visible_to(db, tree.project_id, user.id)
     if keep is not None:
