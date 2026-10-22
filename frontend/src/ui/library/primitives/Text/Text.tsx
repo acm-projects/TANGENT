@@ -6,7 +6,7 @@ import "./Text.css";
  * native tag: a heading is <Text as="h1">, never a bare <h1>, and Text inside
  * a Button is a <span>, since a <p> isn't allowed inside a <button>. */
 
-type TextTag = "p" | "span" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+type TextTag = "p" | "span" | "label" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
 type TextProps<T extends TextTag> = Omit<ComponentProps<T>, "children"> & {
   as?: T;

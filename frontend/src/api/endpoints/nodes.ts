@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { ForkedNode, Node } from "../types";
+import type { ForkedNode, Node, SplitResult } from "../types";
 
 /** /nodes/* -- a single node with its chats, plus forking and merging. */
 export function createNodesApi({ http }: ApiClient) {
@@ -7,6 +7,14 @@ export function createNodesApi({ http }: ApiClient) {
     get: (nodeId: string) => http.get<Node>(`/nodes/${nodeId}`).then((r) => r.data),
     /** fork_index is assigned server-side (max sibling + 1, retry on unique violation). */
     fork: (nodeId: string) => http.post<ForkedNode>(`/nodes/${nodeId}/fork`).then((r) => r.data),
+    /** Cuts the node after the reply at `afterIndex`: a new child takes the rest and the node's children.
+     * `tangent` also makes an empty child beside it to prompt. */
+    split: (nodeId: string, afterIndex: number, tangent = false) =>
+      http.post<SplitResult>(`/nodes/${nodeId}/split`, { after_seq: afterIndex, tangent }).then((r) => r.data),
+    /** Folds the node's only child back into it --
+     * a split undone: the child's chats are appended (renumbered), its children move up to the node, and the
+     * child is deleted. 409 if the node has any other child. A sharee's first write forks the project, as for fork. */
+    join: (nodeId: string) => http.post<ForkedNode>(`/nodes/${nodeId}/join`).then((r) => r.data),
     /** Deletes the node and its whole subtree (the root refuses: 409). */
     delete: (nodeId: string) => http.delete(`/nodes/${nodeId}`).then(() => undefined),
     /** Stops the caller's reply streaming on this node; the stream then ends with `done {stopped: true}`. */

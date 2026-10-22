@@ -5,7 +5,8 @@ import { Icon, Panel, Text } from "@/ui/library";
 
 /* Press a card and drag: instead of moving the card, a dotted string runs from
  * it to the pointer, with a tip beside the pointer saying what letting go will
- * do. Below the card: a new tangent. Above it: delete (not for the root).
+ * do. Over another card: merge with it (that card gets a dotted outline too).
+ * Otherwise below the card: a new tangent; above it: delete (not for the root).
  * Anywhere else cancels, as does Escape; back inside the card the string goes
  * away too. A press that barely moves is still a click.
  *
@@ -30,11 +31,12 @@ function outlineBox(card: HTMLElement, zoom: number): DOMRect {
   return new DOMRect(r.x + r.width / 2 - w / 2, r.y + r.height / 2 - h / 2, w, h);
 }
 
-export type DragAction = "branch" | "delete" | null;
+export type DragAction = "branch" | "delete" | "merge" | null;
 
 const TIP = {
   branch: { icon: "call_split", label: "New tangent" },
   delete: { icon: "delete", label: "Delete" },
+  merge: { icon: "merge", label: "Merge" },
   cancel: { icon: "close", label: "Cancel" },
   root: { icon: "block", label: "Cannot delete root node" },
 };
@@ -43,6 +45,16 @@ const TIP = {
 export function dragAction(card: { top: number; bottom: number }, y: number, canDelete: boolean): DragAction {
   if (y > card.bottom) return "branch";
   if (y < card.top && canDelete) return "delete";
+  return null;
+}
+
+/** The id of the card under the pointer, other than `own`, or null. */
+function cardUnder(p: Point, own: HTMLElement): { id: string; card: HTMLElement } | null {
+  for (const el of document.elementsFromPoint(p.x, p.y)) {
+    const card = el.closest<HTMLElement>(".mindmap-node");
+    const id = card?.closest(".react-flow__node")?.getAttribute("data-id");
+    if (card && card !== own && id) return { id, card };
+  }
   return null;
 }
 
@@ -73,14 +85,23 @@ function anchor(card: DOMRect, to: Point): { from: Point; side: Position } {
   return to.x < cx ? { from: { x: card.left, y: cy }, side: Position.Left } : { from: { x: card.right, y: cy }, side: Position.Right };
 }
 
-export function useDragAction({ onBranch, onDelete }: { onBranch(): void; onDelete?: () => void }) {
+export function useDragAction({ onBranch, onDelete, onMerge }: { onBranch(): void; onDelete?: () => void; onMerge(id: string): void }) {
   const { getZoom } = useReactFlow();
   const press = useRef<{ start: Point; card: HTMLElement } | null>(null);
   const dragged = useRef(false);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // the card a merge would join, outlined straight on the DOM (MindMap.css [data-merge-target])
+  const target = useRef<HTMLElement | null>(null);
+  const mark = (card: HTMLElement | null) => {
+    if (card === target.current) return;
+    target.current?.removeAttribute("data-merge-target");
+    card?.setAttribute("data-merge-target", "");
+    target.current = card;
+  };
 
   const end = () => {
     press.current = null;
+    mark(null);
     setDrag(null);
   };
 
@@ -114,17 +135,22 @@ export function useDragAction({ onBranch, onDelete }: { onBranch(): void; onDele
       }
       const to = { x: e.clientX, y: e.clientY };
       const box = outlineBox(p.card, getZoom());
+      const over = cardUnder(to, p.card);
+      mark(over?.card ?? null);
       setDrag({
         ...anchor(box, to),
         to,
         inside: to.x >= box.left && to.x <= box.right && to.y >= box.top && to.y <= box.bottom,
-        action: dragAction(box, e.clientY, Boolean(onDelete)),
-        root: !onDelete && e.clientY < box.top,
+        action: over ? "merge" : dragAction(box, e.clientY, Boolean(onDelete)),
+        root: !over && !onDelete && e.clientY < box.top,
       });
     },
     onPointerUp(e: PointerEvent<HTMLElement>) {
-      const action = dragged.current && press.current ? dragAction(outlineBox(press.current.card, getZoom()), e.clientY, Boolean(onDelete)) : null;
+      const p = dragged.current ? press.current : null;
+      const over = p && cardUnder({ x: e.clientX, y: e.clientY }, p.card);
+      const action = over ? "merge" : p ? dragAction(outlineBox(p.card, getZoom()), e.clientY, Boolean(onDelete)) : null;
       end();
+      if (action === "merge") onMerge(over!.id);
       if (action === "branch") onBranch();
       if (action === "delete") onDelete?.();
     },

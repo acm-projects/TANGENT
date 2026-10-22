@@ -46,4 +46,17 @@ describe("toFlow", () => {
     const labels = Object.fromEntries(toFlow(slice(null)).nodes.map((n) => [n.id, n.data.exhibit]));
     expect(labels).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
   });
+
+  it("hangs a merged card under the deeper of its sources and strings it from both", () => {
+    // r -> (a, b) ; b -> (c) ; m merges a and c, and really hangs off r
+    const s = slice("m");
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    const { nodes, edges } = toFlow(s);
+    const at = Object.fromEntries(nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.y).toBeGreaterThan(at["c"]!.y);
+    expect(at["m"]!.x).toBe(at["c"]!.x);
+    expect(edges.map((e) => e.id).filter((id) => id.endsWith("m")).sort()).toEqual(["a->m", "c->m"]);
+    expect(nodes.find((n) => n.id === "a")!.data.feedsMerge).toBe(true);
+  });
 });

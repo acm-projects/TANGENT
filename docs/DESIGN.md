@@ -338,8 +338,9 @@ Typography tokens live in their own file, `tokens/text.css`.
   in the type needs a matching `--font-size-*` token, and each component maps its
   `size` prop onto those tokens. A size in the type with no token is a bug.
 - **Light and dark both ship; the OS picks** (`prefers-color-scheme`, through `light-dark()` in
-  `colors.css`). `layout.tsx` sets no theme attribute. Check both by emulating the preference in devtools.
-  Check a new component in light as well (remove the attribute in devtools).
+  `colors.css`) unless the reader picks in Settings, which sets `data-lighting` on `<html>`
+  (`tokens/lighting.ts`). Not an inline `color-scheme`: the build polyfills `light-dark()` with
+  media-query variables an inline style can't reach. Check both by emulating the preference in devtools.
 
 ### Shared types
 

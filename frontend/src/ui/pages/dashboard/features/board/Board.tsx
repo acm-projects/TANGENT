@@ -4,7 +4,7 @@ import { LayoutGroup, motion, MotionConfig } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiErrorMessage } from "@/api";
-import { Button, Frame, Input, Loading, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, Input, Link, Loading, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { FOLDER_CARDS, FolderDrawer } from "./components/FolderDrawer";
 import { NewProjectTile } from "./components/NewProjectTile";
@@ -41,6 +41,9 @@ export function Board({ slug }: BoardProps) {
       <TreePreviews value={trees}>
         <LayoutGroup>
           <Frame gap="6" className="board">
+            <Link href={`/${encodeURIComponent(board.activeSlug)}/settings`} aria-label="Settings" title="Settings" className="board-settings">
+              <Icon icon="settings" size="l" />
+            </Link>
             <BoardTitle key={title} title={title} count={projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
 
             {board.actionError && <Text role="alert" size="s" content={board.actionError} />}

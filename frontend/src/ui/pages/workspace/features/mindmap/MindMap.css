@@ -49,6 +49,21 @@
   stroke-width: 2.6;
 }
 
+/* Traced (hovering a card, MindMap.tsx): its thread back to the case pulls
+ * taut in ink (red stays the selected path's). */
+.mindmap .mindmap-edge[data-traced] {
+  opacity: 1;
+}
+
+.mindmap .mindmap-edge[data-traced]:not(.mindmap-edge-path) .react-flow__edge-path {
+  stroke: var(--color-text-secondary);
+  stroke-width: 2.4;
+}
+
+.mindmap .mindmap-edge[data-traced]:not(.mindmap-edge-path) .mindmap-string-end {
+  fill: var(--color-text-secondary);
+}
+
 /* drawn in while the map first lands (StringEdge) */
 .mindmap .mindmap-edge .react-flow__edge-path[data-landing] {
   animation: draw-in var(--motion-slow) var(--ease-out) var(--string-delay) backwards;
@@ -275,6 +290,23 @@
   rotate: -5deg;
 }
 
+/* A reply that landed while the card wasn't picked: a small inked slip stuck
+ * over the card's top-left corner, until the card is opened (MindMapNode.tsx). */
+.mindmap-node-unread {
+  position: absolute;
+  top: -0.65rem;
+  left: -0.6rem;
+  z-index: 1;
+  padding: 0.15em 0.55em;
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-text);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  color: var(--color-surface);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 /* ── the hover actions ────────────────────────────────────── */
 
 /* The tray hides under the card. Hovering the card (or keyboard focus, but not
@@ -405,11 +437,62 @@
   }
 }
 
-.mindmap-action-error {
+/* A failed action's reason, and the merge hint: paper slips pinned beside the
+ * case label, clear of the toolbar and the chat. The error carries a danger rule. */
+.mindmap-action-error,
+.mindmap-merge-hint {
   position: absolute;
   top: var(--space-4);
-  left: var(--space-4);
+  left: 22rem;
   z-index: 5;
+  max-width: 24rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text);
+  animation: pop-in var(--motion-spring) var(--ease-spring);
+  --pop-from: 0 -1rem;
+}
+
+.mindmap-action-error {
+  border-left: 3px solid var(--color-danger);
+}
+
+/* below the case label when the board is too narrow to sit beside it */
+@media (max-width: 48rem) {
+  .mindmap-action-error,
+  .mindmap-merge-hint {
+    top: 7rem;
+    left: var(--space-4);
+  }
+}
+
+/* ── merging two cards (MindMap.tsx, DragAction.tsx) ───────── */
+
+/* The card a merge started from, and the card it would join (hovered, or
+ * under a drag): both get the drag's dotted outline, in string red. */
+.mindmap-node:is([data-merge-from], [data-merge-target]),
+.mindmap[data-merging] .mindmap-node:not([data-merge-from]):is(:hover, :focus-visible) {
+  outline: 2px dashed var(--color-string);
+  outline-offset: 6px;
+  transition: outline-offset var(--motion-spring) var(--ease-spring);
+}
+
+@starting-style {
+  .mindmap-node:is([data-merge-from], [data-merge-target]) {
+    outline-offset: 0;
+  }
+}
+
+.mindmap[data-merging] .mindmap-node {
+  cursor: copy;
+}
+
+.mindmap-node[data-drag-action="merge"],
+.drag-action[data-action="merge"] {
+  --drag-ink: var(--color-string);
 }
 
 /* ── drag a card to branch or delete it (DragAction.tsx) ───────── */

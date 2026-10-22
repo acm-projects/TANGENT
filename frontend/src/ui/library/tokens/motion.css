@@ -57,3 +57,24 @@
     --motion-spring: 0ms;
   }
 }
+
+/* Switching the lighting (lighting.ts): the new light spreads out in a circle
+ * from the switch, like a lamp coming on over the board. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: lamp-on calc(var(--motion-slow) * 1.5) var(--ease-out);
+}
+
+@keyframes lamp-on {
+  from {
+    clip-path: circle(0 at var(--lamp-x) var(--lamp-y));
+  }
+  to {
+    clip-path: circle(150vmax at var(--lamp-x) var(--lamp-y));
+  }
+}

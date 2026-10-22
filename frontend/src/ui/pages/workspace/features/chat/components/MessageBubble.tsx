@@ -20,8 +20,8 @@ type MessageBubbleProps = {
   message: ChatMessage;
   /** The node this message belongs to, which Branch forks from. */
   nodeId?: string;
-  /** Branch from `nodeId`. Omitted while streaming. */
-  onBranch?: (nodeId: string) => void;
+  /** Branch from this reply (`seq`) of `nodeId`. Omitted while streaming. */
+  onBranch?: (nodeId: string, seq: number) => void;
   /** Ask the question again for a new reply in this one's place. Only the newest reply on the selected leaf has it. */
   onRetry?: () => void;
   /** true for the reply that is still arriving */
@@ -119,7 +119,7 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming }: Omi
               showIcon
               // the core action of the app, so it is spelled out, not a bare icon
               className="message-branch"
-              onClick={() => onBranch(nodeId)}
+              onClick={() => onBranch(nodeId, message.seq)}
             />
           )}
         </Frame>

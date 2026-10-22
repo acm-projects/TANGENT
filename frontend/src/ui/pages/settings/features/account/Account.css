@@ -1,0 +1,497 @@
+/* The settings page's content -- unlayered feature CSS (DESIGN.md §2). */
+
+.account {
+  width: 100%;
+  max-width: 68rem;
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) calc(var(--space-8) * 3);
+}
+
+/* ── the head ─────────────────────────────────────────────── */
+
+.account-head > * {
+  transform-origin: left center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -2rem 0;
+  --pop-rotate: -4deg;
+  --pop-scale: 0.9;
+}
+
+.account-back {
+  align-self: start;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  transition: translate var(--motion-base) var(--ease-spring), color var(--motion-base) var(--ease-out);
+}
+
+.account-back:is(:hover, :focus-visible) {
+  translate: -0.25rem 0;
+  color: var(--color-text);
+}
+
+.account-kicker {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.account-title {
+  font-family: var(--font-heading);
+}
+
+/* ── the aside: the badge and the index ───────────────────── */
+
+.account-body > * {
+  min-width: 0;
+}
+
+.account-aside {
+  position: sticky;
+  top: var(--space-8);
+  flex: none;
+  width: 16rem;
+}
+
+.account-sections {
+  flex: 1;
+}
+
+/* the badge hangs from a strap and a clip at its top edge, and swings from there */
+.id-badge-hang {
+  position: relative;
+  padding-top: 3.5rem;
+  transform-origin: 50% 0;
+}
+
+/* the lanyard: a ribbed strap fading up out of sight */
+.id-badge-hang::before {
+  content: "";
+  position: absolute;
+  top: -1rem;
+  left: 50%;
+  width: 1rem;
+  height: 3.8rem;
+  translate: -50% 0;
+  mask-image: linear-gradient(transparent, currentColor 70%);
+  border-inline: 1px solid var(--color-border-strong);
+  background: repeating-linear-gradient(90deg, var(--color-text-muted) 0 1px, transparent 1px 3px), var(--color-surface-raised);
+}
+
+/* the clip: a strip of bent metal, lit along one edge, biting down through the badge's slot */
+.id-badge-hang::after {
+  content: "";
+  position: absolute;
+  top: 2.3rem;
+  left: 50%;
+  z-index: 1;
+  width: 1.5rem;
+  height: 2.15rem;
+  translate: -50% 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-sm);
+  background:
+    linear-gradient(transparent 0 0.55rem, var(--color-border-strong) 0.55rem calc(0.55rem + 1px), transparent 0),
+    linear-gradient(90deg, var(--color-text-muted), var(--color-surface-raised) 35%, var(--color-text-muted) 80%);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+}
+
+.id-badge {
+  position: relative;
+  width: 14rem;
+  padding: var(--space-6) var(--space-4) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--texture-grain), var(--color-surface);
+}
+
+/* the punched slot the clip goes through */
+.id-badge::before {
+  content: "";
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  width: 2.4rem;
+  height: 0.45rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background: var(--color-board);
+  box-shadow: inset 0 1px 2px var(--color-string-shadow);
+}
+
+.id-badge-kicker {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* the photo: a square print, a little grey-washed like a file photo */
+.id-badge-photo {
+  width: 7rem;
+  height: 7rem;
+  object-fit: cover;
+  border: 0.4rem solid var(--color-surface-raised);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px var(--color-string-shadow);
+  filter: grayscale(0.35) contrast(1.05);
+}
+
+.id-badge-initial {
+  display: grid;
+  place-items: center;
+  background: var(--texture-grain), var(--color-folder);
+  font-family: var(--font-heading);
+  color: var(--color-text);
+}
+
+.id-badge-caption {
+  max-width: 100%;
+  text-align: center;
+}
+
+.id-badge-name {
+  font-family: var(--font-heading);
+}
+
+.id-badge-name,
+.id-badge-email {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* stamped across the bottom of the badge as it's issued */
+.id-badge-stamp {
+  padding: 0.15em 0.6em;
+  rotate: -4deg;
+  border: 0.14em solid var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  --pop-from: 0 0;
+  --pop-scale: 2.4;
+  --pop-rotate: -14deg;
+}
+
+/* Contents: a ruled index card. Each line has a dotted leader out to its
+ * section number; the paperclip (a Motion layoutId) marks the one being read. */
+.contents {
+  align-self: stretch;
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--texture-grain), var(--color-surface);
+  rotate: 1deg;
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
+  --pop-from: 0 2rem;
+  --pop-rotate: 6deg;
+}
+
+/* a double rule under the heading, single rules under each line, as on a ruled card */
+.contents-heading {
+  padding-bottom: var(--space-2);
+  border-bottom: 3px double var(--color-border-strong);
+  font-family: var(--font-heading);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.contents-item {
+  position: relative;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contents-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  transition: color var(--motion-base) var(--ease-out);
+}
+
+.contents-link:is(:hover, :focus-visible),
+.contents-link[aria-current] {
+  color: var(--color-text);
+}
+
+.contents-label {
+  transition: translate var(--motion-base) var(--ease-spring);
+}
+
+.contents-link:is(:hover, :focus-visible) .contents-label {
+  translate: 0.2rem 0;
+}
+
+.contents-leader {
+  flex: 1;
+  min-width: var(--space-4);
+  border-bottom: 2px dotted var(--color-border-strong);
+  translate: 0 -0.3em;
+}
+
+.contents-link[aria-current] .contents-label {
+  font-weight: var(--font-weight-medium);
+}
+
+.contents-number {
+  font-family: var(--font-heading);
+}
+
+/* a paperclip slid onto the card's left edge: an outer loop and an inner one */
+.contents-clip {
+  position: absolute;
+  top: 0.1rem;
+  left: calc(-1 * var(--space-6) - 0.4rem);
+  width: 0.85rem;
+  height: 2.4rem;
+  rotate: -6deg;
+  border: 2px solid var(--color-text-muted);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+
+.contents-clip::before {
+  content: "";
+  position: absolute;
+  inset: 0.3rem 0.1rem 0.6rem;
+  border: 2px solid var(--color-text-muted);
+  border-bottom: 0;
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
+}
+
+/* ── the sections ─────────────────────────────────────────── */
+
+/* A section is a folder: a sheet with a tab standing up off its top-left
+ * edge, carrying the section's number. */
+.account-section {
+  position: relative;
+  margin-top: 1.6rem;
+  padding: var(--space-6);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  scroll-margin-top: calc(var(--space-8) + 1.6rem);
+  transform-origin: left top;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(var(--motion-fast) + sibling-index() * var(--motion-fast) / 2);
+  --pop-from: 0 2rem;
+  --pop-rotate: 1.5deg;
+  --pop-scale: 0.96;
+}
+
+/* jumped to from Contents: the folder gives a little shake, so the eye finds it */
+.account-section:target {
+  animation: section-found var(--motion-slow) var(--ease-spring);
+}
+
+@keyframes section-found {
+  30% {
+    rotate: -0.8deg;
+    scale: 1.01;
+  }
+  60% {
+    rotate: 0.5deg;
+  }
+}
+
+.account-section-tab {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding: 0.45rem var(--space-4) 0.3rem;
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--texture-grain), var(--color-folder);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+/* the section's own head on the sheet, ruled off from its body */
+.account-section-head {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px dashed var(--color-border-strong);
+}
+
+.account-section-title {
+  font-family: var(--font-heading);
+}
+
+.account-error {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+/* a field's paper well; its focus ring comes from Panel */
+.settings-field {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.account-name-field {
+  flex: 1;
+  max-width: 24rem;
+}
+
+.account-lighting {
+  max-width: 24rem;
+}
+
+.account-row + .account-row {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── workspaces ───────────────────────────────────────────── */
+
+/* the rows' hover wash bleeds past the sheet's text edge, so their contents line up with it */
+.workspace-list {
+  margin-inline: calc(-1 * var(--space-3));
+}
+
+.workspace-row {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background-color var(--motion-base) var(--ease-out);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(var(--motion-base) + sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -1.5rem 0;
+  --pop-rotate: 0deg;
+}
+
+.workspace-row:is(:hover, :focus-within) {
+  background: var(--color-surface-raised);
+}
+
+/* a little folder, with the workspace's initial written on its front */
+.workspace-row-tab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 1.9rem;
+  margin-top: 0.35rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+  background: var(--texture-grain), var(--color-folder);
+  font-family: var(--font-heading);
+  color: var(--color-text);
+  transform-origin: left bottom;
+  transition: rotate var(--motion-base) var(--ease-spring);
+}
+
+.workspace-row-tab::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  width: 1.1rem;
+  height: 0.35rem;
+  border: 1px solid var(--color-border-strong);
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-folder);
+}
+
+.workspace-row:hover .workspace-row-tab {
+  rotate: -6deg;
+}
+
+.workspace-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* the name's link covers the whole row, so anywhere on it opens the workspace */
+.workspace-row-link {
+  min-width: 0;
+  border-radius: var(--radius-sm);
+}
+
+.workspace-row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+}
+
+.workspace-row-link:focus-visible {
+  outline: none;
+}
+
+.workspace-row:has(.workspace-row-link:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.workspace-row:has(.workspace-row-link:hover) .workspace-row-name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* the row's buttons stay clickable above the stretched link */
+.workspace-row-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.workspace-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* stamped on the folder this page was opened from */
+.workspace-row-here {
+  flex: none;
+  padding: 0.1em 0.5em;
+  rotate: -3deg;
+  border: 0.14em solid var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* With a mouse, a row's actions wait for it to be pointed at; on touch they always show. */
+@media (hover: hover) {
+  .workspace-row-actions {
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease-out);
+  }
+
+  .workspace-row:is(:hover, :focus-within) .workspace-row-actions {
+    opacity: 1;
+  }
+}
+
+/* ── narrow screens: the badge above, the sections below ──── */
+
+@media (max-width: 52rem) {
+  .account {
+    padding-inline: var(--space-4);
+  }
+
+  .account-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-aside {
+    position: static;
+    width: auto;
+  }
+
+  .contents {
+    display: none;
+  }
+}

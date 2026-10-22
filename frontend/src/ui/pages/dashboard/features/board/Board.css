@@ -5,6 +5,48 @@
   padding: var(--space-8) var(--space-8) 14rem;
 }
 
+/* Settings: a paper tile in the top corner, like the workspace rail's; its gear turns under the pointer. */
+.board-settings {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text-secondary);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 5rem 0;
+  transition:
+    translate var(--motion-base) var(--ease-spring),
+    box-shadow var(--motion-base) var(--ease-out),
+    color var(--motion-base) var(--ease-out);
+}
+
+.board-settings:is(:hover, :focus-visible) {
+  translate: 0 -2px;
+  box-shadow: var(--shadow-lift);
+  color: var(--color-text);
+}
+
+.board-settings:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.board-settings [data-ui="icon"] {
+  transition: rotate var(--motion-slow) var(--ease-spring);
+}
+
+.board-settings:is(:hover, :focus-visible) [data-ui="icon"] {
+  rotate: 90deg;
+}
+
 /* ── the title ─────────────────────────────────────────────── */
 
 .board-kicker {

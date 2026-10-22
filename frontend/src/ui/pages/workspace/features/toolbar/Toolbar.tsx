@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, Frame } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { SharePanel } from "./components/SharePanel";
 import { SourcesPanel } from "./components/SourcesPanel";
 import "./Toolbar.css";
@@ -15,14 +16,14 @@ import "./Toolbar.css";
  *   top:     Home · Search · Sources
  *   bottom:  Share · Settings
  *
- * Sources and Share open a panel beside the rail; Escape or the panel's own
+ * Sources, Share and Settings open a panel beside the rail; Escape or the panel's own
  * chevron closes it. Panels swing out from the rail and tuck back into it. */
 
-type Panel = "sources" | "share" | null;
+type Panel = "sources" | "share" | "settings" | null;
 type ToolbarProps = { slug: string; projectId: string; className?: string };
 
-/* TODO(design): Search and Settings have nothing behind them yet (Search
- * isn't in Figma at all). They render disabled, so they don't look like broken buttons. */
+/* TODO(design): Search has nothing behind it yet (it isn't in Figma at all).
+ * It renders disabled, so it doesn't look like a broken button. */
 const notDesignedYet = { disabled: true, onClick: () => {} };
 
 export function Toolbar({ slug, projectId, className }: ToolbarProps) {
@@ -52,7 +53,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
 
         <Frame gap="2">
           <Tile icon="ios_share" label="Share" pressed={open === "share"} onClick={() => toggle("share")} />
-          <Tile icon="settings" label="Settings (not available yet)" {...notDesignedYet} />
+          <Tile icon="settings" label="Settings" pressed={open === "settings"} onClick={() => toggle("settings")} />
         </Frame>
       </Frame>
 
@@ -68,6 +69,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
           >
             {open === "sources" && <SourcesPanel projectId={projectId} onClose={() => setOpen(null)} />}
             {open === "share" && <SharePanel slug={slug} projectId={projectId} onClose={() => setOpen(null)} />}
+            {open === "settings" && <SettingsPanel slug={slug} onClose={() => setOpen(null)} />}
           </motion.div>
         )}
       </AnimatePresence>

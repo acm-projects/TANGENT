@@ -6,7 +6,7 @@ import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
-import { confirmedForks, deleteNode, forkNode, isPending } from "../nodeActions";
+import { confirmedForks, deleteNode, forkNode, isPending, loadChats } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 import { useDragAction } from "./DragAction";
 
@@ -20,7 +20,7 @@ import { useDragAction } from "./DragAction";
  * the springs are in tokens/motion.ts. Hovering a card makes its actions (new
  * tangent; delete for any non-root) peek out from underneath. Hovering or
  * tabbing into them tips the card up and away so they can be clicked. Dragging
- * a card down starts a tangent; up, deletes it (DragAction.tsx). Memoised: React Flow re-renders a node
+ * a card down starts a tangent; up, deletes it; onto another card, merges them (DragAction.tsx). Memoised: React Flow re-renders a node
  * only when its data changes. Styles live in ../MindMap.css. */
 
 const TAG_ICON: Record<string, string> = { pdf: "picture_as_pdf", image: "image" };
@@ -31,9 +31,18 @@ export const StaggerPinIn = createContext(true);
 /** Where a failed node action reports its message (MindMap shows it). */
 export const ReportMapError = createContext<(message: string | null) => void>(() => {});
 
+/** Merging (MindMap.tsx): the card a merge started from, if one is waiting for a second card;
+ * `start` begins one from the tray, `run` merges two cards straight away (a drag let go on another card). */
+export const Merge = createContext<{ from: string | null; start(id: string): void; run(a: string, b: string): void }>({
+  from: null,
+  start: () => {},
+  run: () => {},
+});
+
 export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsoluteY }: NodeProps<MindMapFlowNode>) {
   const stagger = useContext(StaggerPinIn);
   const report = useContext(ReportMapError);
+  const merge = useContext(Merge);
   // a fork the server hasn't confirmed has nothing to fork from yet (deleting it is queued: nodeActions.ts)
   const busy = isPending(id);
   const [peeled, setPeeled] = useState(false);
@@ -55,16 +64,20 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   };
   const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // An empty branch (no messages, nothing under it) has nothing to lose, so it goes without asking.
-  // shortcut: chats never loaded (never opened this visit) count as not empty, so those still ask.
-  const empty = useTreeStore((s) => !data.hasChildren && s.chatsByNode[id]?.length === 0 && !(id in s.streaming));
   const remove = act(() => deleteNode(id), "Could not delete the node.");
   // while its reply is arriving, the card's pin pulses (MindMap.css)
   const thinking = useTreeStore((s) => id in s.streaming);
+  // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
+  const unread = useTreeStore((s) => Boolean(s.unread[id]));
+  // An empty branch (no messages, nothing under it, no reply on its way) has nothing to lose, so it goes without asking.
   const requestDelete = (e?: MouseEvent) => {
     e?.stopPropagation();
-    if (empty) remove();
-    else setConfirmingDelete(true);
+    if (data.hasChildren || thinking) return setConfirmingDelete(true);
+    // a card not opened since the page loaded has no chats in the store yet: look before deciding (asks if that fails)
+    loadChats(id).then(
+      (chats) => (chats.length === 0 ? remove() : setConfirmingDelete(true)),
+      () => setConfirmingDelete(true),
+    );
   };
   // Deleting by drag asks first like the tray's Delete (unless the branch is empty).
   const drag = useDragAction({
@@ -72,6 +85,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       if (!busy) fork();
     },
     onDelete: data.hasParent ? requestDelete : undefined,
+    onMerge: (other) => merge.run(id, other),
   });
 
   // Listed bottom-up. Share branch isn't built yet (no branch sharing on the backend).
@@ -90,7 +104,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           className="mindmap-handle"
         />
       )}
-      {data.hasChildren && (
+      {(data.hasChildren || data.feedsMerge) && (
         <Handle
           type="source"
           position={Position.Bottom}
@@ -124,11 +138,25 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           data-thinking={thinking || undefined}
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
+          data-merge-from={merge.from === id || undefined}
           {...drag.handlers}
           aria-current={data.state === "selected" ? "true" : undefined}
           // the native tooltip would pop up over a drag in progress
           title={drag.dragging ? undefined : data.title}
         >
+          <AnimatePresence>
+            {unread && (
+              // slapped on like a stamp when the reply lands; peeled off when the card is picked
+              <motion.span
+                className="mindmap-node-unread"
+                initial={{ scale: 2.2, rotate: -24, opacity: 0 }}
+                animate={{ scale: 1, rotate: -8, opacity: 1, transition: spring.pin }}
+                exit={{ scale: 0.6, rotate: 6, y: -10, opacity: 0, transition: spring.lift }}
+              >
+                <Text as="span" size="xxs" content="New" />
+              </motion.span>
+            )}
+          </AnimatePresence>
           {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
           <Frame direction="row" gap="2" align="center">
             <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
@@ -148,7 +176,11 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         className="mindmap-node-actions nopan"
         role="group"
         aria-label={`Actions for ${data.title}`}
-        onPointerEnter={() => setPeeled(true)}
+        onPointerEnter={() => {
+          setPeeled(true);
+          // fetch ahead of a Delete click, so an empty branch goes at once
+          if (!data.hasChildren) loadChats(id).catch(() => {});
+        }}
         onPointerLeave={() => {
           setPeeled(false);
           setMoreOpen(false);
@@ -171,6 +203,21 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           label="New tangent"
           disabled={busy}
           onClick={fork}
+        />
+        <Button
+          size="l"
+          title="Merge with another card"
+          elevation="floating"
+          showIcon
+          showLabel={false}
+          icon="merge"
+          label="Merge with another card"
+          disabled={busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            setPeeled(false);
+            merge.start(id);
+          }}
         />
         {/* Not built yet (no debate mode on the backend), so disabled like the toolbar's. */}
         <Button

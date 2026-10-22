@@ -26,6 +26,8 @@ export interface MindMapNodeData extends Record<string, unknown> {
   hasChildren: boolean;
   /** Its place in the case, outline-numbered like exhibits: "1", "1.2", "1.2.1". */
   exhibit: string;
+  /** A merged card hangs below it (draw the outgoing dot). Not a child: deleting this card leaves the merge. */
+  feedsMerge: boolean;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -34,9 +36,38 @@ export type StructureSlice = Pick<TreeState, "rootId" | "nodesById" | "childrenB
 
 /** Shown for a node the summarizer hasn't titled yet (a fresh fork). */
 export const UNTITLED = "New branch";
+/** ...and for a merged node, until the same happens. */
+export const UNTITLED_MERGE = "Merged branches";
+
+/** The merged cards whose sources are on the map, each with those sources. */
+function mergesOf(s: StructureSlice): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const n of Object.values(s.nodesById)) {
+    const sources = (n.merge_source_ids ?? []).filter((id) => s.nodesById[id]);
+    if (sources.length) out.set(n.id, sources);
+  }
+  return out;
+}
+
+/** The tree as it's drawn: a merged card is laid out under the deeper of its sources (the first, on a tie)
+ * rather than under its real parent, so the join reads down the board like every other string. */
+function drawnChildren(s: StructureSlice, merges: Map<string, string[]>): Record<string, string[]> {
+  if (!merges.size) return s.childrenByParent;
+  const depth = (id: string) => selectBreadcrumb(s, id).length;
+  const out = { ...s.childrenByParent };
+  for (const [id, sources] of merges) {
+    const parent = s.nodesById[id]!.parent_id;
+    const under = sources.reduce((a, b) => (depth(b) > depth(a) ? b : a));
+    if (parent) out[parent] = (out[parent] ?? []).filter((c) => c !== id);
+    out[under] = [...(out[under] ?? []), id];
+  }
+  return out;
+}
 
 export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Edge[] } {
-  const positions = layoutTree(s.rootId, s.childrenByParent);
+  const merges = mergesOf(s);
+  const positions = layoutTree(s.rootId, drawnChildren(s, merges));
+  const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
   const crumbs = s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId).map((n) => n.id) : [];
@@ -58,15 +89,28 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
       type: "tangent",
       position,
       data: {
-        title: meta.title ?? UNTITLED,
+        title: meta.title ?? (merges.has(id) ? UNTITLED_MERGE : UNTITLED),
         state: stateOf(id),
         tags: meta.attachment_kinds ?? [],
         hasParent: meta.parent_id !== null,
         hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
         exhibit: exhibits[id],
+        feedsMerge: feeding.has(id),
       },
     });
-    if (meta.parent_id && positions[meta.parent_id]) {
+    const sources = merges.get(id);
+    if (sources) {
+      // a merged card's strings come from both its sources, not from where they parted; red while it's on the path
+      for (const source of sources) {
+        edges.push({
+          id: `${source}->${id}`,
+          source,
+          target: id,
+          type: "string",
+          className: path.has(id) ? "mindmap-edge mindmap-edge-merge mindmap-edge-path" : "mindmap-edge mindmap-edge-merge",
+        });
+      }
+    } else if (meta.parent_id && positions[meta.parent_id]) {
       // An edge is on the path when both its ends are.
       const onPath = path.has(id) && path.has(meta.parent_id);
       edges.push({

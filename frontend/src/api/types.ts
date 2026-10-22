@@ -50,6 +50,8 @@ export interface NodeMeta {
   created_at: string;
   /** [proposed] Kinds of files attached anywhere in this node, for the mind-map tags. */
   attachment_kinds?: AttachmentKind[];
+  /** A merged node's two source leaves (empty otherwise). Only the tree endpoints fill it in. */
+  merge_source_ids?: string[];
 }
 
 /** Returned when a write created the sharee's own copy of a shared project. */
@@ -64,6 +66,16 @@ export interface ForkInfo {
 
 /** POST /nodes/:id/fork and POST /nodes/merge: the new node, plus `fork` when it landed in a fresh copy. */
 export type ForkedNode = NodeMeta & { fork: ForkInfo | null };
+
+/** POST /nodes/:id/split -- app/routers/nodes_router.py SplitOut */
+export interface SplitResult {
+  /** The node itself, now ending at the cut. */
+  head: NodeMeta;
+  /** Its new child: the rest of its messages and every branch it had. */
+  tail: NodeMeta;
+  tangent: NodeMeta | null;
+  fork: ForkInfo | null;
+}
 
 export interface Node extends NodeMeta {
   chats: ChatMessage[];
@@ -109,6 +121,16 @@ export interface OnboardingResponse {
   message: string;
   /** e.g. "/{slug}/dashboard" */
   redirect: string;
+}
+
+/** GET /auth/me -- app/routers/auth_router.py get_account */
+export interface Account {
+  id: string;
+  email: string;
+  name: string;
+  auth_provider: string;
+  avatar_url: string | null;
+  onboarding_completed: boolean;
 }
 
 /** GET /workspaces/ -- app/routers/workspace_router.py WorkspaceResponse */

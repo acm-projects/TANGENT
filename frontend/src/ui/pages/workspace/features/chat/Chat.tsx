@@ -188,7 +188,8 @@ export function Chat({ className }: ChatProps) {
                       key={`${section.node.id}-${m.seq}-${m.role}`}
                       message={m}
                       nodeId={section.node.id}
-                      onBranch={chat.fork}
+                      // a node can't be cut while its reply is still arriving
+                      onBranch={chat.streaming !== null && i === chat.history.length - 1 ? undefined : chat.branch}
                       // only the newest reply on the card being written on can be asked again
                       onRetry={chat.canRetry && i === chat.history.length - 1 && j === all.length - 1 ? chat.retry : undefined}
                     />

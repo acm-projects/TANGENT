@@ -39,9 +39,9 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 | Feature | Folder | Behaviour |
 |---|---|---|
-| Mind map | `workspace/features/mindmap/` | Loads the tree; derived tidy layout (no stored x/y); click a node to select it; the selected node's ancestors and edges highlight as the "path"; click empty canvas to deselect; pan / zoom; attachment tags on nodes; keyboard: Tab + Enter |
+| Mind map | `workspace/features/mindmap/` | Loads the tree; derived tidy layout (no stored x/y); click a node to select it; the selected node's ancestors and edges highlight as the "path"; click empty canvas to deselect; pan / zoom; attachment tags on nodes; keyboard: Tab + Enter; merge two cards (tray button then a second card, or drag one onto another): a card and its only branch join back into one (`POST /nodes/:id/join`), two leaves of separate branches merge into a new card strung from both (`POST /nodes/merge`, drawn under the deeper source) |
 | Chat | `workspace/features/chat/` | Shows the selected node's full root→leaf history with branch dividers; lazy-loads each node's chats once (cached); send with Enter (Shift+Enter = newline); streamed reply; Copy and **Branch from here** on every reply (creates a child node and selects it); attach files / images; "Uploaded / Viewed / Thought for…" lines; only leaves accept prompts; full-screen and collapse |
-| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (invite by email, member list with Resend / Revoke, owner-only); Settings (disabled). Escape closes panels |
+| Toolbar | `workspace/features/toolbar/` | Home → dashboard; Sources panel (list + upload); Share panel (invite by email, member list with Resend / Revoke, owner-only); Settings panel (lighting, field guide, sign out, link to the settings page). Escape closes panels |
 
 ## 2. How the seam works
 
@@ -123,11 +123,12 @@ These are outside the frontend's scope and were **not** changed:
 
 | What | Where | Current behaviour |
 |---|---|---|
-| Toolbar **Search**, **Settings** | `toolbar/Toolbar.tsx` | Rendered as in Figma, do nothing |
+| Toolbar **Search** | `toolbar/Toolbar.tsx` | Rendered as in Figma, does nothing |
 | Clicking a **source card** / its "Used N times" | `toolbar/components/SourcesPanel.tsx` | Hover states match Figma; no action |
 | Toolbar `State=Hidden` variant | — | Not built; unclear from the frame |
 | `Popup` component (empty frame) | — | Not built; nothing uses it yet |
-| Login, signup, onboarding, invite page, account settings | — | Not in Figma. `/login` predates this work; `/signup` and `/invite/[token]` were built without a design |
+| Login, signup, onboarding, invite page, account settings | — | Not in Figma. `/login` predates this work; `/signup`, `/invite/[token]` and `/[slug]/settings` were built without a design |
+| **Delete account** | `settings/features/account/Account.tsx` | Disabled: `GET /auth/reauth/google` needs a Bearer token, which a browser redirect can't carry, so the re-auth step before `DELETE /auth/me` can't be started. The backend also redirects to `/settings/confirm-delete`, which doesn't exist |
 | Merge two branches | — | Not in Figma. `api.nodes.merge` exists in the client |
 
 ## 6. Fidelity notes
