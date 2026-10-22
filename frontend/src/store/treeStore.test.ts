@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { NodeMeta } from "@/api/types";
-import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "./treeStore";
+import { selectBreadcrumb, selectExhibits, selectIsLeaf, selectThread, useTreeStore } from "./treeStore";
 
 const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
-  status: "active", title: null, summary: null, created_by_id: "u", created_at: "",
+  status: "active", title: null, summary: null, model: null, tokens: 0, created_by_id: "u", created_at: "",
 });
 
 describe("tree store", () => {
@@ -76,6 +76,17 @@ describe("tree store", () => {
       expect(s().chatsByNode["b"]?.at(-1)?.content).toBe("B!");
     });
 
+    it("a reply finished off-screen stays unread until its node is selected", () => {
+      start();
+      const s = () => useTreeStore.getState();
+      s().setActive("a");
+      s().endStream("a", assistant("A"));
+      s().endStream("b", assistant("B"));
+      expect(s().unread).toEqual({ b: true });
+      s().setActive("b");
+      expect(s().unread).toEqual({});
+    });
+
     it("an error on one node clears only that node", () => {
       start();
       const s = () => useTreeStore.getState();
@@ -110,6 +121,12 @@ describe("tree store", () => {
     expect(useTreeStore.getState().nodesById["ghost"]).toBeUndefined();
   });
 
+  it("updateNode keeps a merged node's sources when the update doesn't carry them", () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), { ...node("m", "r", 1), merge_source_ids: ["a", "b"] }]);
+    useTreeStore.getState().updateNode({ ...node("m", "r", 1), title: "Merged", merge_source_ids: [] });
+    expect(useTreeStore.getState().nodesById["m"]).toMatchObject({ title: "Merged", merge_source_ids: ["a", "b"] });
+  });
+
   it("removeNode drops the subtree and selects the parent", () => {
     useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("c1", "r", 1), node("c2", "r", 2), node("g", "c1", 1)]);
     useTreeStore.getState().setActive("g");
@@ -119,6 +136,82 @@ describe("tree store", () => {
     expect(s.childrenByParent["r"]).toEqual(["c2"]);
     expect(s.childrenByParent["c1"]).toBeUndefined();
     expect(s.activeNodeId).toBe("r");
+  });
+});
+
+describe("merge sources through a split or join", () => {
+  // The Linear Algebra case: m merged (a, b), then m2 merged (c, m); then m is split, and later joined back.
+  const msg = (content: string, seq: number) => ({ role: (seq % 2 ? "assistant" : "user") as "user" | "assistant", content, seq, branch_source: null, created_at: "" });
+  const sourcesOf = (id: string) => useTreeStore.getState().nodesById[id]!.merge_source_ids;
+  beforeEach(() => {
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [
+      node("r", null, 0), node("a", "r", 1), node("b", "r", 2), node("c", "b", 1),
+      { ...node("m", "r", 3), merge_source_ids: ["a", "b"] },
+      { ...node("m2", "r", 4), merge_source_ids: ["c", "m"] },
+    ]);
+    s.setChats("m", [msg("q1", 0), msg("r1", 1), msg("q2", 2), msg("r2", 3)]);
+  });
+
+  it("a split moves a merge's source to the tail, where the conversation it took now ends", () => {
+    useTreeStore.getState().splitNode("m", 1, node("t", "m", 1), null);
+    expect(sourcesOf("m2")).toEqual(["c", "t"]);
+    expect(sourcesOf("m")).toEqual(["a", "b"]); // the split merge keeps being a merge
+  });
+
+  it("the placeholder tail's real id takes the reference over", () => {
+    useTreeStore.getState().splitNode("m", 1, node("pending:t", "m", 1), null);
+    useTreeStore.getState().replaceNode("pending:t", node("t", "m", 1));
+    expect(sourcesOf("m2")).toEqual(["c", "t"]);
+  });
+
+  it("joining back points the merge at the node again", () => {
+    const s = () => useTreeStore.getState();
+    s().splitNode("m", 1, node("t", "m", 1), null);
+    s().joinChild("m");
+    expect(s().nodesById["t"]).toBeUndefined();
+    expect(sourcesOf("m2")).toEqual(["c", "m"]);
+    expect(s().chatsByNode["m"]!.length).toBe(4);
+  });
+
+  it("joining a merged child into its parent makes the parent the merge", () => {
+    const s = () => useTreeStore.getState();
+    s().hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("b", "r", 2), { ...node("m", "a", 1), merge_source_ids: ["a", "b"] }]);
+    s().setChats("a", [msg("q", 0), msg("r", 1)]);
+    s().setChats("m", []);
+    s().joinChild("a");
+    expect(sourcesOf("a")).toEqual(["a", "b"]);
+  });
+});
+
+describe("selectThread", () => {
+  const tree = (extra: NodeMeta[] = []) => ({
+    nodesById: Object.fromEntries(
+      [node("r", null, 0), node("a", "r", 1), node("b", "r", 2), node("c", "b", 1), node("x", "r", 3), ...extra].map((n) => [n.id, n]),
+    ),
+  });
+
+  it("is a plain node's ancestors", () => {
+    expect([...selectThread(tree(), "c")].sort()).toEqual(["b", "c", "r"]);
+  });
+
+  it("runs through a merge up both branches it merged, not its real parent's other children", () => {
+    const s = tree([{ ...node("m", "r", 4), merge_source_ids: ["a", "c"] }]);
+    expect([...selectThread(s, "m")].sort()).toEqual(["a", "b", "c", "m", "r"]);
+  });
+
+  it("follows a merge of a merge, and a branch of a merged node", () => {
+    const s = tree([
+      { ...node("m", "r", 4), merge_source_ids: ["a", "b"] },
+      node("t", "m", 1),
+      { ...node("m2", "r", 5), merge_source_ids: ["c", "t"] },
+    ]);
+    expect([...selectThread(s, "m2")].sort()).toEqual(["a", "b", "c", "m", "m2", "r", "t"]);
+  });
+
+  it("ignores a source that is gone (deleted)", () => {
+    const s = tree([{ ...node("m", "r", 4), merge_source_ids: ["a", "gone"] }]);
+    expect([...selectThread(s, "m")].sort()).toEqual(["a", "m", "r"]);
   });
 });
 

@@ -5,7 +5,7 @@ import { SKETCH_H, SKETCH_W, leanOf, sketchTree, tiltOf } from "./sketch";
 
 const node = (id: string, parent: string | null, fork_index: number, created_at: string): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index, node_type: null, status: "active",
-  title: null, summary: null, created_by_id: "u", created_at,
+  title: null, summary: null, model: null, tokens: 0, created_by_id: "u", created_at,
 });
 const tree = (root: string | null, nodes: NodeMeta[]): TreeResponse => ({
   tree: { id: "t", project_id: "p", root_node_id: root, created_at: "" },

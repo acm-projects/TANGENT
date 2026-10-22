@@ -19,8 +19,15 @@ interface StructureSlice {
   updateNode(node: NodeMeta): void;
   /** Drop a node and its subtree (the server cascades the same way). Selection moves to the parent. */
   removeNode(nodeId: string): void;
-  /** Swap a childless node for another in the same place (an optimistic fork, once the server answers). */
+  /** Swap a node for another in the same place, its children and chats moving across (an optimistic fork or split, once the server answers). */
   replaceNode(oldId: string, node: NodeMeta): void;
+  /** Cut a node after its message at `afterIndex`: `tail` (a new child) takes the messages after it and every
+   * child the node had; `tangent`, if given, is a new empty child beside it. Mirrors POST /nodes/:id/split. */
+  splitNode(nodeId: string, afterIndex: number, tail: NodeMeta, tangent: NodeMeta | null): void;
+  /** Fold a node's only child back into it (splitNode undone): its messages are appended, its children
+   * move up, and it goes. A selection on the child moves to the node. Mirrors POST /nodes/:id/join. */
+  joinChild(nodeId: string): void;
+  /** Selecting a node also marks its finished reply read. */
   setActive(nodeId: string | null): void;
 }
 
@@ -28,12 +35,17 @@ interface ContentSlice {
   chatsByNode: Record<string, ChatMessage[]>;
   /** nodeId -> reply text so far; a key is present exactly while that node is streaming. */
   streaming: Record<string, string>;
+  /** Nodes whose reply finished while another node was selected; cleared when the node is selected. */
+  unread: Record<string, true>;
   setChats(nodeId: string, chats: ChatMessage[]): void;
   beginStream(nodeId: string, userMessage: ChatMessage): void;
   appendToken(nodeId: string, text: string): void;
   /** Commit the streamed text as an assistant message (server persists on stream end). */
   endStream(nodeId: string, assistantMessage: ChatMessage): void;
   abortStream(nodeId: string): void;
+  /** Bumped to ask the message box for focus: a branch or merge just made a card to write on. */
+  composeAt: number;
+  requestCompose(): void;
 }
 
 /**
@@ -54,6 +66,15 @@ interface SwitchSlice {
 
 export type TreeState = StructureSlice & ContentSlice & SwitchSlice;
 
+/** Point every merge that names `from` as a source at `to` instead: the conversation it took now ends there. */
+function moveSources(nodesById: Record<string, NodeMeta>, from: string, to: string) {
+  for (const [id, n] of Object.entries(nodesById)) {
+    if (n.merge_source_ids?.includes(from)) {
+      nodesById[id] = { ...n, merge_source_ids: n.merge_source_ids.map((s) => (s === from ? to : s)) };
+    }
+  }
+}
+
 const byForkIndex = (nodes: Record<string, NodeMeta>) => (a: string, b: string) =>
   (nodes[a]?.fork_index ?? 0) - (nodes[b]?.fork_index ?? 0);
 
@@ -64,6 +85,8 @@ export const useTreeStore = create<TreeState>()((set) => ({
   activeNodeId: null,
   chatsByNode: {},
   streaming: {},
+  unread: {},
+  composeAt: 0,
   project: null,
   pendingSwitch: null,
   notice: null,
@@ -82,7 +105,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
         if (n.parent_id) (childrenByParent[n.parent_id] ??= []).push(n.id);
       }
       for (const k of Object.keys(childrenByParent)) childrenByParent[k]!.sort(byForkIndex(nodesById));
-      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: {} };
+      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: {}, unread: {} };
     }),
 
   addNode: (node) =>
@@ -98,7 +121,11 @@ export const useTreeStore = create<TreeState>()((set) => ({
     }),
 
   updateNode: (node) =>
-    set((s) => (s.nodesById[node.id] ? { nodesById: { ...s.nodesById, [node.id]: node } } : s)),
+    set((s) => {
+      const old = s.nodesById[node.id];
+      // merge sources are shape, and only the tree endpoints report them: a single node's read has none
+      return old ? { nodesById: { ...s.nodesById, [node.id]: { ...node, merge_source_ids: old.merge_source_ids } } } : s;
+    }),
 
   removeNode: (nodeId) =>
     set((s) => {
@@ -120,6 +147,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
         nodesById: keep(s.nodesById),
         childrenByParent,
         chatsByNode: keep(s.chatsByNode),
+        unread: keep(s.unread),
         activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
       };
     }),
@@ -135,12 +163,73 @@ export const useTreeStore = create<TreeState>()((set) => ({
           .map((id) => (id === oldId ? node.id : id))
           .sort(byForkIndex(nodesById));
       }
+      moveSources(nodesById, oldId, node.id);
+      const children = childrenByParent[oldId];
+      if (children) {
+        delete childrenByParent[oldId];
+        childrenByParent[node.id] = children;
+        for (const id of children) nodesById[id] = { ...nodesById[id]!, parent_id: node.id };
+      }
       const chatsByNode = { ...s.chatsByNode, [node.id]: s.chatsByNode[oldId] ?? [] };
       delete chatsByNode[oldId];
       return { nodesById, childrenByParent, chatsByNode, activeNodeId: s.activeNodeId === oldId ? node.id : s.activeNodeId };
     }),
 
-  setActive: (nodeId) => set({ activeNodeId: nodeId }),
+  joinChild: (nodeId) =>
+    set((s) => {
+      const [childId, ...others] = s.childrenByParent[nodeId] ?? [];
+      const head = s.chatsByNode[nodeId];
+      const rest = childId ? s.chatsByNode[childId] : undefined;
+      if (!childId || others.length || !head || !rest) return s;
+      const moved = s.childrenByParent[childId] ?? [];
+      const nodesById = { ...s.nodesById };
+      const child = nodesById[childId]!;
+      delete nodesById[childId];
+      for (const id of moved) nodesById[id] = { ...nodesById[id]!, parent_id: nodeId };
+      moveSources(nodesById, childId, nodeId);
+      // a merged child makes the node the merge (its merged messages are the node's now)
+      if (child.merge_source_ids?.length) {
+        const own = nodesById[nodeId]!.merge_source_ids ?? [];
+        nodesById[nodeId] = { ...nodesById[nodeId]!, merge_source_ids: [...own, ...child.merge_source_ids] };
+      }
+      const childrenByParent = { ...s.childrenByParent, [nodeId]: moved };
+      delete childrenByParent[childId];
+      const chatsByNode = { ...s.chatsByNode, [nodeId]: [...head, ...rest].map((m, i) => ({ ...m, seq: i })) };
+      delete chatsByNode[childId];
+      const unread = { ...s.unread };
+      delete unread[childId];
+      return { nodesById, childrenByParent, chatsByNode, unread, activeNodeId: s.activeNodeId === childId ? nodeId : s.activeNodeId };
+    }),
+
+  splitNode: (nodeId, afterIndex, tail, tangent) =>
+    set((s) => {
+      const chats = s.chatsByNode[nodeId];
+      if (!s.nodesById[nodeId] || !chats) return s;
+      const moved = s.childrenByParent[nodeId] ?? [];
+      const nodesById = { ...s.nodesById, [tail.id]: tail, ...(tangent && { [tangent.id]: tangent }) };
+      for (const id of moved) nodesById[id] = { ...nodesById[id]!, parent_id: tail.id };
+      moveSources(nodesById, nodeId, tail.id);
+      return {
+        nodesById,
+        childrenByParent: { ...s.childrenByParent, [nodeId]: tangent ? [tail.id, tangent.id] : [tail.id], [tail.id]: moved },
+        chatsByNode: {
+          ...s.chatsByNode,
+          [nodeId]: chats.slice(0, afterIndex + 1),
+          [tail.id]: chats.slice(afterIndex + 1).map((m, i) => ({ ...m, seq: i })),
+          ...(tangent && { [tangent.id]: [] }),
+        },
+      };
+    }),
+
+  setActive: (nodeId) =>
+    set((s) => {
+      if (!nodeId || !s.unread[nodeId]) return { activeNodeId: nodeId };
+      const unread = { ...s.unread };
+      delete unread[nodeId];
+      return { activeNodeId: nodeId, unread };
+    }),
+
+  requestCompose: () => set((s) => ({ composeAt: s.composeAt + 1 })),
 
   setChats: (nodeId, chats) => set((s) => ({ chatsByNode: { ...s.chatsByNode, [nodeId]: chats } })),
 
@@ -162,6 +251,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
       return {
         chatsByNode: { ...s.chatsByNode, [nodeId]: [...(s.chatsByNode[nodeId] ?? []), assistantMessage] },
         streaming,
+        unread: nodeId === s.activeNodeId ? s.unread : { ...s.unread, [nodeId]: true },
       };
     }),
 
@@ -190,6 +280,21 @@ export function selectBreadcrumb(s: Pick<TreeState, "nodesById">, id: string): N
     cur = cur.parent_id ? s.nodesById[cur.parent_id] : undefined;
   }
   return out.reverse();
+}
+
+/** Every node whose conversation `id` carries: its ancestors and, through a merged node, both branches it
+ * merged, back up to the root. The map's selected path and hover trace (the chat's history is selectBreadcrumb). */
+export function selectThread(s: Pick<TreeState, "nodesById">, id: string): Set<string> {
+  const out = new Set<string>();
+  const stack = [id];
+  while (stack.length) {
+    const n = s.nodesById[stack.pop()!];
+    if (!n || out.has(n.id)) continue;
+    out.add(n.id);
+    const sources = (n.merge_source_ids ?? []).filter((source) => s.nodesById[source]);
+    stack.push(...(sources.length ? sources : n.parent_id ? [n.parent_id] : []));
+  }
+  return out;
 }
 
 /** Outline numbers, like a case file's exhibits: the root is "1", its children

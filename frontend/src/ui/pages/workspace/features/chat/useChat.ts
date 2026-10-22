@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { forkNode, isPending, redirectToCopy, switchToFork } from "../mindmap/nodeActions";
+import { forkNode, isPending, redirectToCopy, splitNode, switchToFork } from "../mindmap/nodeActions";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -30,6 +30,9 @@ export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | "pending" 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
   const path = useTreeStore(useShallow((s) => (s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId) : [])));
+  const nodeModel = path.at(-1)?.model ?? null;
+  const nodeTokens = path.at(-1)?.tokens ?? 0;
+  const branchTokens = path.reduce((total, node) => total + node.tokens, 0);
   const isLeaf = useTreeStore((s) => (s.activeNodeId ? selectIsLeaf(s, s.activeNodeId) : false));
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
   const rootId = useTreeStore((s) => s.rootId);
@@ -42,6 +45,7 @@ export function useChat() {
   const error = localError ?? notice;
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
+  const activeModel = nodeModel ?? selectedModel;
   const [modelsLoading, setModelsLoading] = useState(true);
   const [usage, setUsage] = useState<ModelUsage | null>(null);
   const [usageUnavailable, setUsageUnavailable] = useState(false);
@@ -137,7 +141,7 @@ export function useChat() {
   /** Ask `text` on `nodeId` (as a retry: in place of its last exchange) and stream the reply. Resolves to
    * whether a reply was saved. */
   async function ask(nodeId: string, text: string, isRetry: boolean): Promise<boolean> {
-    if (!selectedModel) {
+    if (!activeModel) {
       setError("Choose a model before sending a message.");
       return false;
     }
@@ -171,7 +175,7 @@ export function useChat() {
         baseURL: "/api",
         nodeId,
         content: text,
-        model: selectedModel,
+        model: activeModel,
         retry: isRetry,
         getAccessToken,
         refresh: apiClient.refresh,
@@ -188,7 +192,7 @@ export function useChat() {
             saved = true;
             setUsage(e.usage ?? null);
             setUsageUnavailable(!e.usage);
-            setUsageModel(e.model ?? selectedModel);
+            setUsageModel(e.model ?? activeModel);
             s.endStream(nodeId, {
               role: "assistant",
               content: s.streaming[nodeId] ?? "",
@@ -233,11 +237,16 @@ export function useChat() {
     api.nodes.stopMessage(activeNodeId).catch((e: unknown) => setError(apiErrorMessage(e, "Could not stop the reply.")));
   }
 
-  /** Start a tangent: a new child of `nodeId`, selected and ready to prompt. */
-  async function fork(nodeId: string) {
+  /** Start a tangent from the reply `seq` of `nodeId`, selected and ready to prompt. From the node's last
+   * reply that's a new child; from an earlier one the node is split there first (splitNode), so the tangent
+   * carries only what came before. */
+  async function branch(nodeId: string, seq: number) {
     setError(null);
+    const chats = useTreeStore.getState().chatsByNode[nodeId] ?? [];
+    const at = chats.findIndex((m) => m.seq === seq && m.role === "assistant");
     try {
-      await forkNode(nodeId);
+      if (at < 0 || at === chats.length - 1) await forkNode(nodeId);
+      else await splitNode(nodeId, at);
     } catch (e: unknown) {
       setError(apiErrorMessage(e, "Could not create a branch."));
     }
@@ -246,11 +255,15 @@ export function useChat() {
   return {
     activeNodeId,
     history,
+    nodeModel,
+    nodeTokens,
+    branchTokens,
     streaming,
     blocker,
     error,
     models,
-    selectedModel,
+    selectedModel: activeModel,
+    modelLocked: nodeModel !== null,
     modelsLoading,
     setSelectedModel,
     usage,
@@ -260,6 +273,6 @@ export function useChat() {
     stop,
     canRetry,
     retry,
-    fork,
+    branch,
   };
 }

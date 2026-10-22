@@ -12,6 +12,8 @@ export function createWorkspacesApi({ http }: ApiClient) {
       http
         .patch<{ workspace_slug: string }>(`/workspaces/${workspaceSlug}/name`, { new_name: newName })
         .then((r) => r.data),
+    /** Deletes the workspace and every project in it. */
+    remove: (workspaceSlug: string) => http.delete(`/workspaces/${workspaceSlug}`).then((r) => r.data),
   };
 }
 

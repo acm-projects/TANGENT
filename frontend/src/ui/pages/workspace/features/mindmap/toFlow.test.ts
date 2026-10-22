@@ -4,7 +4,7 @@ import { UNTITLED, toFlow, type StructureSlice } from "./toFlow";
 
 const meta = (id: string, parent: string | null, fork: number, title: string | null = id): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
-  status: "active", title, summary: null, created_by_id: "u", created_at: "",
+  status: "active", title, summary: null, model: null, tokens: 0, created_by_id: "u", created_at: "",
 });
 
 // r -> (a, b) ; b -> (c)
@@ -42,8 +42,55 @@ describe("toFlow", () => {
     expect(toFlow(slice(null)).nodes.find((n) => n.id === "c")?.data.title).toBe(UNTITLED);
   });
 
+  it("includes each node's saved token count in its card data", () => {
+    const s = slice(null);
+    s.nodesById.c = { ...s.nodesById.c!, tokens: 42 };
+    expect(toFlow(s).nodes.find((n) => n.id === "c")?.data.tokens).toBe(42);
+  });
+
   it("numbers nodes like an outline, by sibling order", () => {
     const labels = Object.fromEntries(toFlow(slice(null)).nodes.map((n) => [n.id, n.data.exhibit]));
     expect(labels).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
+  });
+
+  it("hangs a merged card under the deeper of its sources and strings it from both", () => {
+    // r -> (a, b) ; b -> (c) ; m merges a and c, and really hangs off r
+    const s = slice("m");
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    const { nodes, edges } = toFlow(s);
+    const at = Object.fromEntries(nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.y).toBeGreaterThan(at["c"]!.y);
+    expect(at["m"]!.x).toBe(at["c"]!.x);
+    expect(edges.map((e) => e.id).filter((id) => id.endsWith("m")).sort()).toEqual(["a->m", "c->m"]);
+    expect(nodes.find((n) => n.id === "a")!.data.feedsMerge).toBe(true);
+  });
+
+  it("with a merged card picked, both branches it merged and its joining strings are the path", () => {
+    // r -> (a, b) ; b -> (c) ; m merges a and c
+    const s = slice("m");
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    expect(stateById(s)).toEqual({ r: "path", a: "path", b: "path", c: "path", m: "selected" });
+    const pathEdges = toFlow(s).edges.filter((e) => e.className?.includes("mindmap-edge-path")).map((e) => e.id);
+    expect(pathEdges.sort()).toEqual(["a->m", "b->c", "c->m", "r->a", "r->b"]);
+  });
+
+  it("draws a merged card below the deepest card it joins, counting a merged source's own drawn depth", () => {
+    // The Linear Algebra shape: m merges (a, c) so it's drawn below c; t branches off m; m2 merges (x, t),
+    // where x is as deep as t in the real tree (both at depth 2) but t is drawn two rows lower.
+    const s = slice("m2");
+    s.nodesById = {
+      ...s.nodesById,
+      x: meta("x", "a", 1),
+      m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] },
+      t: meta("t", "m", 1),
+      m2: { ...meta("m2", "r", 4), merge_source_ids: ["x", "t"] },
+    };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m", "m2"], a: ["x"], m: ["t"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["t"]!.y).toBeGreaterThan(at["x"]!.y);
+    expect(at["m2"]!.y).toBeGreaterThan(at["t"]!.y);
+    expect(at["m2"]!.y).toBeGreaterThan(at["x"]!.y);
   });
 });

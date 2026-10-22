@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Input, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { AvailableModel } from "@/api/types";
 import type { SendBlocker } from "../useChat";
@@ -19,6 +20,7 @@ type MessageFieldProps = {
   blocker: SendBlocker;
   models: AvailableModel[];
   selectedModel: string;
+  modelLocked: boolean;
   modelsLoading: boolean;
   onModelChange(modelId: string): void;
   className?: string;
@@ -29,11 +31,19 @@ type MessageFieldProps = {
   onStop(): void;
 };
 
-export function MessageField({ blocker, models, selectedModel, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
+export function MessageField({ blocker, models, selectedModel, modelLocked, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
+
+  // A branch or merge made a card to write on (treeStore requestCompose): be ready for typing.
+  // Only then, not on every selection, so picking cards with the keyboard keeps focus on the map.
+  const composeAt = useTreeStore((s) => s.composeAt);
+  useEffect(() => {
+    if (composeAt) input.current?.focus();
+  }, [composeAt]);
 
   // a fork still being confirmed only holds Send back for a moment; typing can start straight away
   const disabled = blocker !== null && blocker !== "pending";
@@ -88,6 +98,7 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
         )}
 
         <TextArea
+          ref={input}
           aria-label="Message"
           placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
           value={text}
@@ -104,15 +115,21 @@ export function MessageField({ blocker, models, selectedModel, modelsLoading, on
               className="message-field-model"
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
-              disabled={modelsLoading || blocker === "streaming" || models.length === 0}
+              disabled={modelsLoading || modelLocked || blocker === "streaming" || models.length === 0}
               options={
                 modelsLoading
                   ? [{ value: "", label: "Loading models…" }]
-                  : models.length === 0
+                  : models.length === 0 && !selectedModel
                     ? [{ value: "", label: "No models available" }]
-                    : models.map((m) => ({ value: m.id, label: m.name }))
+                    : [
+                        ...(!models.some((m) => m.id === selectedModel)
+                          ? [{ value: selectedModel, label: selectedModel }]
+                          : []),
+                        ...models.map((m) => ({ value: m.id, label: m.name })),
+                      ]
               }
             />
+            {modelLocked && <Text as="span" size="xxs" hierarchy="tertiary" content="Locked for this node" />}
             <Button
               hierarchy="tertiary"
               label="Attach file (not available yet)"

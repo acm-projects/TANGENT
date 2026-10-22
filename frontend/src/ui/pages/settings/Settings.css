@@ -1,0 +1,18 @@
+/* Page-level layout only, unlayered (DESIGN.md §2). */
+
+.settings-page {
+  min-height: 100dvh;
+  /* the board the file lies on, as on the dashboard */
+  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
+}
+
+/* the index scrolls to a section instead of jumping */
+:root:has(.settings-page) {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:has(.settings-page) {
+    scroll-behavior: auto;
+  }
+}

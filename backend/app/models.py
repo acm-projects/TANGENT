@@ -155,6 +155,8 @@ class Invitation(Base):
     expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
     inviter_name = Column(Text, nullable=False)
     invited_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Set: the invite is for this node's branch (the node and everything under it), not the whole tree.
+    branch_node_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
 
     project = relationship("Project", back_populates="invitations")
@@ -202,6 +204,8 @@ class Node(Base):
     chats = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
+    model = Column(Text, nullable=True)
+    tokens = Column(Integer, nullable=False, server_default=text("0"))
 
     __table_args__ = (
         UniqueConstraint("parent_id", "fork_index", name="uq_nodes_parent_fork_index"),
@@ -243,6 +247,7 @@ class Share(Base):
     shared_with_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     share_token = Column(Text, unique=True, nullable=True)
     permission = Column(share_permission_enum, nullable=False, server_default=text("'view'"))
+    branch_node_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
 
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
     revoked_at = Column(TIMESTAMP(timezone=True), nullable=True)

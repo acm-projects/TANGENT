@@ -70,7 +70,15 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
   }
 
   return (
-    <Frame ref={ref} gap="0" className="case-settings" data-open={open || undefined}>
+    <motion.div
+      ref={ref}
+      className="case-settings"
+      data-open={open || undefined}
+      // Claims every press inside, so pressing ⋯ or its sheet never presses the card itself down
+      // (ProjectCard's whileTap: that's for opening the project). A press gesture needs a whileTap to claim with.
+      propagate={{ tap: false }}
+      whileTap={{}}
+    >
       <Button
         elevation="floating"
         size="s"
@@ -151,6 +159,6 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
           </motion.div>
         )}
       </AnimatePresence>
-    </Frame>
+    </motion.div>
   );
 }

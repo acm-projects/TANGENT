@@ -1,0 +1,30 @@
+/* Settings pieces shared by the workspace's quick panel and the settings page.
+ * Unlayered feature CSS (DESIGN.md §2). */
+
+.settings-heading {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Lighting: three switches on one plate; the lit one is pressed in. */
+.settings-lighting {
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.settings-lighting-option {
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* The guide's lines come up one after another as it appears. */
+.settings-guide > * {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  --pop-from: -0.75rem 0;
+  --pop-scale: 1;
+}

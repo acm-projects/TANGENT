@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Aleo, Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
+import { lightingScript } from "@/ui/library/tokens/lighting";
 import "./globals.css";
 
 const heading = Aleo({ weight: "400", subsets: ["latin"], variable: "--font-heading" });
@@ -26,7 +27,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${heading.variable} ${content.variable} ${materialSymbols.variable}`}
+      // lightingScript marks <html>'s lighting before React hydrates
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: lightingScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );
