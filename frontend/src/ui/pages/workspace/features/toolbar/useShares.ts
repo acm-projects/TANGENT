@@ -13,35 +13,47 @@ export type SharesState =
   | { status: "error"; message: string }
   | { status: "ready"; items: ShareItem[] };
 
-async function load(slug: string, projectId: string): Promise<SharesState> {
+async function load(slug: string, projectId: string, branchNodeId?: string): Promise<SharesState> {
   try {
-    return { status: "ready", items: sortShares(await api.shares.list(slug, projectId)) };
+    return { status: "ready", items: sortShares(await api.shares.list(slug, projectId, branchNodeId)) };
   } catch (e) {
     if (apiErrorStatus(e) === 403) return { status: "forbidden" };
     return { status: "error", message: apiErrorMessage(e, "Couldn't load sharing.") };
   }
 }
 
-export function useShares(slug: string, projectId: string, enabled: boolean) {
+/** `branchNodeId`: manage the shares of that one branch instead of the whole project's. */
+export function useShares(slug: string, projectId: string, enabled: boolean, branchNodeId?: string) {
   const [state, setState] = useState<SharesState>({ status: "loading" });
   /** The row being acted on, or "invite" while inviting. Disables its buttons. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   // State updates are async; a ref makes a double-click send exactly one request.
   const busy = useRef(false);
+  // Reloads overlap now (the next action doesn't wait for one), so only the latest result is shown.
+  const reloads = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    load(slug, projectId).then((next) => {
+    load(slug, projectId, branchNodeId).then((next) => {
       if (!cancelled) setState(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [slug, projectId, enabled]);
+  }, [slug, projectId, enabled, branchNodeId]);
 
-  /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed. */
+  /** Re-reads the list in the background; nothing waits on it. */
+  function refresh() {
+    const mine = ++reloads.current;
+    load(slug, projectId, branchNodeId).then((next) => {
+      if (mine === reloads.current) setState(next);
+    });
+  }
+
+  /** Runs one action, then re-reads the list, so the panel matches the server even if the action failed.
+   *  The buttons free up as soon as the action resolves, not after the reload. */
   async function run(id: string, action: () => Promise<unknown>, fallback: string): Promise<boolean> {
     if (busy.current) return false;
     busy.current = true;
@@ -54,9 +66,9 @@ export function useShares(slug: string, projectId: string, enabled: boolean) {
       ok = false;
       setActionError(apiErrorMessage(e, fallback));
     }
-    setState(await load(slug, projectId));
     busy.current = false;
     setBusyId(null);
+    refresh();
     return ok;
   }
 
@@ -66,7 +78,7 @@ export function useShares(slug: string, projectId: string, enabled: boolean) {
     actionError,
     /** True if the invitation was sent. */
     invite: (email: string) =>
-      run("invite", () => api.shares.invite(slug, projectId, email), "Couldn't send the invitation. Check the email address."),
+      run("invite", () => api.shares.invite(slug, projectId, email, branchNodeId), "Couldn't send the invitation. Check the email address."),
     // Optimistic: the row goes at once; run() re-reads the list afterwards, which brings it back if the revoke failed.
     revoke: (item: ShareItem) => {
       if (!busy.current) setState((s) => (s.status === "ready" ? { ...s, items: s.items.filter((i) => i.id !== item.id) } : s));

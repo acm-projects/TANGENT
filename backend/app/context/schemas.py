@@ -23,6 +23,7 @@ class PathNode(BaseModel):
 
     id: str
     chats: list[ChatMessage]
+    model: Optional[str] = None
 
 
 # --- GET /trees/:id, GET /nodes/:id (mirrors frontend/src/api/types.ts) -------------------------
@@ -40,6 +41,8 @@ class NodeMeta(BaseModel):
     status: str
     title: Optional[str] = None
     summary: Optional[str] = None
+    model: Optional[str] = None
+    tokens: int
     created_by_id: UUID
     created_at: datetime
     # a merged node's two source leaves (node_merge_sources); filled in by the tree endpoints only

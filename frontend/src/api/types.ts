@@ -46,6 +46,8 @@ export interface NodeMeta {
   status: NodeStatus;
   title: string | null;
   summary: string | null; // display-only (mind-map hover)
+  model: string | null;
+  tokens: number;
   created_by_id: string;
   created_at: string;
   /** [proposed] Kinds of files attached anywhere in this node, for the mind-map tags. */
@@ -107,6 +109,7 @@ export interface AvailableModel {
   name: string;
   description: string;
   supports_images: boolean;
+  context_length: number;
 }
 
 /** Token counts the provider reports; arrives on the `done` event when available. */

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.auth import get_current_user
+from app.branch_scope import require_visible
 from app.context.flatten import flatten, to_provider_messages
 from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
@@ -36,12 +37,12 @@ router = APIRouter(prefix="/nodes", tags=["Nodes"])
 # in a project the user cannot see comes back empty, exactly like a node that does not exist.
 _PATH_SQL = text("""
     WITH RECURSIVE path AS (
-      SELECT id, parent_id, chats, 0 AS depth FROM nodes WHERE id = :node_id
+      SELECT id, parent_id, chats, model, 0 AS depth FROM nodes WHERE id = :node_id
       UNION ALL
-      SELECT n.id, n.parent_id, n.chats, p.depth + 1
+      SELECT n.id, n.parent_id, n.chats, n.model, p.depth + 1
       FROM nodes n JOIN path p ON n.id = p.parent_id
     )
-    SELECT id::text AS id, chats FROM path ORDER BY depth DESC
+    SELECT id::text AS id, chats, model FROM path ORDER BY depth DESC
 """)
 
 
@@ -72,6 +73,10 @@ class SplitOut(BaseModel):
     tail: NodeMeta  # its new only child: the rest of its messages, and every branch it had
     tangent: Optional[NodeMeta] = None
     fork: Optional[ForkInfo] = None
+
+
+class NodeModelConflict(Exception):
+    """Raised when a concurrent write tries to change a node's already-selected model."""
 
 
 # Replies a user can stop, by (user id, prompted node id). Set by POST .../messages/stop, watched by send_message.
@@ -114,7 +119,7 @@ async def _load_path(
     if flags.has_child:
         # ARCHITECTURE.md §8: only leaves take prompts. The UI hint is not enforcement; this is.
         raise HTTPException(409, "Only a leaf node can be prompted; fork it instead")
-    return [PathNode(id=r.id, chats=r.chats) for r in rows], flags.project_id
+    return [PathNode(id=r.id, chats=r.chats, model=getattr(r, "model", None)) for r in rows], flags.project_id
 
 
 _background_tasks: set = set()
@@ -128,6 +133,8 @@ async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tupl
         await session.execute(
             text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)}
         )
+        # Before anything is copied or sent to the model: a branch sharee may only prompt inside their branch.
+        await require_visible(session, project_id, user_id, node_id)
         _, fork = await get_write_target(session, project_id, user_id)
         if fork is None:
             return node_id, None
@@ -137,11 +144,17 @@ async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tupl
 
 
 async def _persist(
-    user_id: UUID, write_node_id: UUID, user_text: str, assistant_text: str, replace_last: bool = False
+    user_id: UUID,
+    write_node_id: UUID,
+    user_text: str,
+    assistant_text: str,
+    model_id: str,
+    response_tokens: Optional[int],
+    replace_last: bool = False,
 ) -> None:
     """Append the exchange to nodes.chats of the node already resolved by _prepare_write. Own session: the
     request's may already be closed once the stream ends. `||` appends atomically (no read-modify-write);
-    seq is the new array index. `replace_last` (a retry) first drops the last exchange, `- -1` twice."""
+    seq is the new array index. The node's model is set once; only provider-reported usage is added."""
     base = "((chats - -1) - -1)" if replace_last else "chats"
     # a retry must still find the reply it replaces; if it's gone, the save fails rather than eat a question
     guard = "AND jsonb_array_length(chats) >= 2 AND chats->-1->>'role' = 'assistant'" if replace_last else ""
@@ -154,6 +167,8 @@ async def _persist(
             text(f"""
                 UPDATE nodes SET
                   title = COALESCE(title, left(CAST(:user_text AS text), 40)),
+                  model = COALESCE(model, :model_id),
+                  tokens = tokens + CAST(COALESCE(:response_tokens, 0) AS integer),
                   chats = {base}
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'user', 'content', CAST(:user_text AS text),
@@ -161,11 +176,28 @@ async def _persist(
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'assistant', 'content', CAST(:assistant_text AS text),
                          'seq', jsonb_array_length({base}) + 1, 'branch_source', NULL, 'created_at', CAST(:now AS text)))
-                WHERE id = :node_id {guard}
+                WHERE id = :node_id AND (model IS NULL OR model = :model_id) {guard}
             """),
-            {"node_id": write_node_id, "user_text": user_text, "assistant_text": assistant_text, "now": now},
+            {
+                "node_id": write_node_id,
+                "user_text": user_text,
+                "assistant_text": assistant_text,
+                "model_id": model_id,
+                "response_tokens": response_tokens,
+                "now": now,
+            },
         )
         if result.rowcount != 1:
+            current_model = (
+                await session.execute(
+                    text("SELECT model FROM nodes WHERE id = :node_id"),
+                    {"node_id": write_node_id},
+                )
+            ).scalar_one_or_none()
+            if current_model is not None and current_model != model_id:
+                raise NodeModelConflict(
+                    f"This node is locked to model {current_model}; choose that model or create a new node."
+                )
             raise RuntimeError(f"chat save matched {result.rowcount} rows for node {write_node_id}")
 
 
@@ -206,11 +238,12 @@ async def _create_child(
 async def get_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     node = await db.get(Node, node_id)  # RLS: nodes of invisible projects are simply absent
     if node is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
     return node
 
 
@@ -226,6 +259,7 @@ async def fork_node(
     parent = await db.get(Node, node_id)
     if parent is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, parent.project_id, user.id, node_id)
 
     parent_id, tree_id = parent.id, parent.tree_id
     project_id, fork = await get_write_target(db, parent.project_id, user.id)
@@ -257,6 +291,7 @@ async def split_node(
     node = await db.get(Node, node_id)
     if node is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
     project_id, fork = await get_write_target(db, node.project_id, user.id)
     if fork is not None:
         node = await db.get(Node, fork.node_map[node.id])
@@ -281,6 +316,8 @@ async def split_node(
         db, tree_id=node.tree_id, project_id=project_id, parent_id=node.id, user_id=user.id, chats=rest
     )
     tail.title = first_question[:40] if first_question else None
+    # its replies came from the node's model, so it's locked to the same one; the token count stays with the node
+    tail.model = node.model
     await db.execute(
         Node.__table__.update()
         .where(Node.parent_id == node.id, Node.id != tail.id)
@@ -315,6 +352,7 @@ async def join_child(
     node = await db.get(Node, node_id)
     if node is None:
         raise HTTPException(404, "Node not found")
+    await require_visible(db, node.project_id, user.id, node_id)
     _, fork = await get_write_target(db, node.project_id, user.id)
     target_id = fork.node_map[node.id] if fork is not None else node.id
     node = (await db.execute(select(Node).where(Node.id == target_id).with_for_update())).scalar_one()
@@ -324,6 +362,10 @@ async def join_child(
     child = children[0]
     if any(streaming in (node_id, node.id, child.id) for _, streaming in _stops):
         raise HTTPException(409, "Wait for the reply to finish before merging")
+    if node.model and child.model and node.model != child.model:
+        raise HTTPException(409, "These two use different models, so they can't become one node")
+    node.model = node.model or child.model
+    node.tokens += child.tokens
 
     node.chats = [{**m, "seq": i} for i, m in enumerate(_as_list(node.chats) + _as_list(child.chats))]
     # out of the way first: a grandchild moving up may hold the same fork_index under the node
@@ -361,6 +403,7 @@ async def merge_nodes(
     if len({m.tree_id for m in metas}) != 1 or len({m.project_id for m in metas}) != 1:
         raise HTTPException(400, "Both nodes must be in the same tree")
     tree_id, project_id = metas[0].tree_id, metas[0].project_id
+    await require_visible(db, project_id, user.id, a_id, b_id)
 
     has_child = (
         await db.execute(select(Node.id).where(Node.parent_id.in_([a_id, b_id])).limit(1))
@@ -448,6 +491,11 @@ async def send_message(
     `fork`. The pipeline runs detached from the request, so closing the tab does not lose the reply or the fork."""
     get_model_or_400(req.model)
     path, project_id = await _load_path(db, node_id, user.id)
+    if path[-1].model is not None and path[-1].model != req.model:
+        raise HTTPException(
+            409,
+            f"This node is locked to model {path[-1].model}; choose that model or create a new node.",
+        )
     prompt = req.content
     if req.retry:
         chats = path[-1].chats
@@ -529,8 +577,28 @@ async def send_message(
             if not answer:
                 queue.put_nowait(_error({"message": "The model returned an empty reply; nothing was saved."}, fork))
                 return
+            usage = done.get("usage")
+            response_tokens: Optional[int] = None
+            if usage is not None:
+                total_tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
+                if type(total_tokens) is int and total_tokens >= 0:
+                    response_tokens = total_tokens
+                else:
+                    log.warning("Provider returned invalid token usage for node %s", write_node_id)
             try:
-                await _persist(user_id, write_node_id, prompt, answer, replace_last=req.retry)
+                await _persist(
+                    user_id,
+                    write_node_id,
+                    prompt,
+                    answer,
+                    model_id=req.model,
+                    response_tokens=response_tokens,
+                    replace_last=req.retry,
+                )
+            except NodeModelConflict as exc:
+                log.warning("model conflict while saving reply to node %s", write_node_id)
+                queue.put_nowait(_error({"message": str(exc)}, fork))
+                return
             except Exception:
                 log.exception("saving chat to node %s failed", write_node_id)
                 queue.put_nowait(_error({"message": "The reply could not be saved."}, fork))

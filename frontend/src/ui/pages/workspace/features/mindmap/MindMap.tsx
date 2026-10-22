@@ -8,7 +8,7 @@ import { apiErrorMessage } from "@/api";
 import { useShallow } from "zustand/react/shallow";
 import { selectBreadcrumb, useTreeStore } from "@/store/treeStore";
 import { Frame, Loading, Panel, Text } from "@/ui/library";
-import { Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
+import { MapProject, Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { mergeNodes } from "./nodeActions";
 import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
@@ -36,9 +36,10 @@ function traceThread(from: Element, id: string | null) {
   }
 }
 
-type MindMapProps = { projectId: string; className?: string };
+type MindMapProps = { slug: string; projectId: string; className?: string };
 
-export function MindMap({ projectId, className }: MindMapProps) {
+export function MindMap({ slug, projectId, className }: MindMapProps) {
+  const project = useMemo(() => ({ slug, projectId }), [slug, projectId]);
   const load = useMindMap(projectId);
   // Structure slice only -- streamed tokens never re-render the map.
   const structure = useTreeStore(
@@ -107,6 +108,7 @@ export function MindMap({ projectId, className }: MindMapProps) {
         <MotionConfig reducedMotion="user">
         <StaggerPinIn value={stagger}>
         <ReportMapError value={setActionError}>
+        <MapProject value={project}>
         <Merge value={merge}>
         <ReactFlow
           nodes={nodes}
@@ -141,6 +143,7 @@ export function MindMap({ projectId, className }: MindMapProps) {
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
         </ReactFlow>
         </Merge>
+        </MapProject>
         </ReportMapError>
         </StaggerPinIn>
         </MotionConfig>

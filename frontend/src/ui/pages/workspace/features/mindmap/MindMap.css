@@ -220,6 +220,24 @@
   text-shadow: 0 0 0.25px currentColor;
 }
 
+/* A card's token count: tucked in its bottom corner, shown only while the card
+ * is pointed at, focused or picked, so cards at rest stay clean. Absolute, so
+ * showing it never changes the card's height. */
+.mindmap-node-tokens {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-1);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+
+.mindmap-node-wrap:is(:hover, :has(:focus-visible)) .mindmap-node-tokens,
+.mindmap-node[data-state="selected"] .mindmap-node-tokens {
+  opacity: 1;
+}
+
 /* The pin each card hangs from, where its string is wound. A domed head: a
  * highlight up-left, a shadow cast down-right onto the card. Graphite at rest;
  * red on the selected path, since red means connected. */
@@ -333,7 +351,7 @@
     opacity var(--motion-fast) var(--ease-out);
 }
 
-.mindmap-node-wrap:is(:hover, :has(:focus-visible)) .mindmap-node-actions {
+.mindmap-node-wrap:is(:hover, :has(:focus-visible), [data-peeled]) .mindmap-node-actions {
   opacity: 1;
   translate: 0 -25%;
   pointer-events: auto;
@@ -435,6 +453,14 @@
   .mindmap-case-label {
     display: none;
   }
+}
+
+/* Share branch reuses the toolbar's share panel, which is a flyout that sits at the end of its
+ * column. Inside the popup it is the content, so it fills the popup instead. */
+.mindmap-node-wrap dialog .share {
+  align-self: stretch;
+  width: auto;
+  min-width: 20rem;
 }
 
 /* A failed action's reason, and the merge hint: paper slips pinned beside the

@@ -4,7 +4,7 @@ import { UNTITLED, toFlow, type StructureSlice } from "./toFlow";
 
 const meta = (id: string, parent: string | null, fork: number, title: string | null = id): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
-  status: "active", title, summary: null, created_by_id: "u", created_at: "",
+  status: "active", title, summary: null, model: null, tokens: 0, created_by_id: "u", created_at: "",
 });
 
 // r -> (a, b) ; b -> (c)
@@ -40,6 +40,12 @@ describe("toFlow", () => {
 
   it("labels an untitled node", () => {
     expect(toFlow(slice(null)).nodes.find((n) => n.id === "c")?.data.title).toBe(UNTITLED);
+  });
+
+  it("includes each node's saved token count in its card data", () => {
+    const s = slice(null);
+    s.nodesById.c = { ...s.nodesById.c!, tokens: 42 };
+    expect(toFlow(s).nodes.find((n) => n.id === "c")?.data.tokens).toBe(42);
   });
 
   it("numbers nodes like an outline, by sibling order", () => {

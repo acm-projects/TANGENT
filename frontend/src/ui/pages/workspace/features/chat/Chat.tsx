@@ -47,6 +47,10 @@ export function Chat({ className }: ChatProps) {
   const resizeTo = (px: number) => setWidth(Math.round(Math.min(Math.max(px, MIN_WIDTH), window.innerWidth - 88)));
   const currentWidth = () => sheetRef.current?.getBoundingClientRect().width ?? MIN_WIDTH;
   const classes = ["chat", className].filter(Boolean).join(" ");
+  const contextUsagePercentage =
+    chat.usage && chat.usageContextLength
+      ? (chat.usage.total_tokens / chat.usageContextLength) * 100
+      : null;
 
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,13 +224,32 @@ export function Chat({ className }: ChatProps) {
 
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
+        {lastSection && (
+          <Frame
+            direction="row"
+            gap="3"
+            className="chat-token-usage"
+            role="status"
+            aria-label="Saved token usage"
+          >
+            <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
+            <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
+          </Frame>
+        )}
+
         {chat.usage && (
           <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
             <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
             <Frame direction="row" gap="3" className="chat-token-counts">
-              <Text size="xs" content={`Prompt: ${chat.usage.prompt_tokens.toLocaleString()}`} />
-              <Text size="xs" content={`Completion: ${chat.usage.completion_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
               <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
+              {contextUsagePercentage !== null && chat.usageContextLength !== null && (
+                <Text
+                  size="xs"
+                  content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
+                />
+              )}
             </Frame>
           </Frame>
         )}
@@ -239,6 +262,7 @@ export function Chat({ className }: ChatProps) {
           onStop={chat.stop}
           models={chat.models}
           selectedModel={chat.selectedModel}
+          modelLocked={chat.modelLocked}
           modelsLoading={chat.modelsLoading}
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}

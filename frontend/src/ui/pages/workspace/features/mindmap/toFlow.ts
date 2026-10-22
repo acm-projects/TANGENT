@@ -28,6 +28,7 @@ export interface MindMapNodeData extends Record<string, unknown> {
   exhibit: string;
   /** A merged card hangs below it (draw the outgoing dot). Not a child: deleting this card leaves the merge. */
   feedsMerge: boolean;
+  tokens: number;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -96,6 +97,7 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
         exhibit: exhibits[id],
         feedsMerge: feeding.has(id),
+        tokens: meta.tokens,
       },
     });
     const sources = merges.get(id);

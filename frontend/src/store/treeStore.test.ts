@@ -4,7 +4,7 @@ import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "./
 
 const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
-  status: "active", title: null, summary: null, created_by_id: "u", created_at: "",
+  status: "active", title: null, summary: null, model: null, tokens: 0, created_by_id: "u", created_at: "",
 });
 
 describe("tree store", () => {
