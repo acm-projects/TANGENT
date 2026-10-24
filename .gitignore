@@ -8,3 +8,13 @@ __pycache__/
 .claude
 graphify-out/
 .next/
+runs/
+.aws-sam/
+.DS_Store
+runs/
+*.zip
+.env
+.aws-sam/
+samconfig.toml
+__pycache__/
+.pytest_cache/

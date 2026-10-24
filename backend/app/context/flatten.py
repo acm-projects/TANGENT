@@ -37,21 +37,22 @@ class Segment:
 
 
 def _render_branches(branches: dict[str, list[ChatMessage]]) -> str:
+    """branches is keyed by branch_source (the source leaf node id written by nodes_router.merge_nodes), in order of first
+    appearance. merge_nodes copies the first source leaf's messages, then the second's, so they are labelled a, b in that order."""
     parts = ["The user merged two conversation branches into this one. Both transcripts follow."]
-    for key in ("a", "b"):
-        msgs = branches[key]
+    for label, msgs in zip("abcdefgh", branches.values()):
         if not msgs:
             continue
         body = "\n\n".join(f"{m.role.capitalize()}: {m.content}" for m in msgs)
-        parts.append(f"<branch_{key}>\n{body}\n</branch_{key}>")
+        parts.append(f"<branch_{label}>\n{body}\n</branch_{label}>")
     return "\n\n".join(parts)
 
 
 def _serialize_node(chats: Sequence[ChatMessage]) -> tuple[LLMMessage, ...]:
-    branches: dict[str, list[ChatMessage]] = {"a": [], "b": []}
+    branches: dict[str, list[ChatMessage]] = {}
     for m in chats:
         if m.branch_source:
-            branches[m.branch_source].append(m)
+            branches.setdefault(m.branch_source, []).append(m)
 
     out: list[LLMMessage] = []
     branch_block_emitted = False

@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict
 
 Role = Literal["user", "assistant"]
-BranchSource = Literal["a", "b"]
+BranchSource = str  # merge copies are tagged with the source leaf node id (nodes_router.merge_nodes)
 
 
 class ChatMessage(BaseModel):
