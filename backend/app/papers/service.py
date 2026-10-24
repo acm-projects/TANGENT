@@ -151,6 +151,33 @@ def quote_matches(chunk_text: str, quote: str) -> bool:
     return bool(quote.strip()) and norm(quote) in norm(chunk_text)
 
 
+def sources_note(rows) -> str:
+    """Names a project's uploads for the system prompt. search_papers matches only titles and abstracts, and an
+    upload has no abstract, so without this the model can't know an upload exists to search its evidence."""
+    if not rows:
+        return ""
+    listed = "\n".join(f"- p{r['id']}: {r['title']} (full_text: {full_text_state(r)})" for r in rows)
+    return (
+        "\n\nThe user uploaded these sources to this project:\n" + listed + "\n"
+        "When a question could be answered from them, call search_paper_evidence on the relevant ones first, "
+        "before answering or asking the user to clarify."
+    )
+
+
+async def project_sources_note(project_id: UUID) -> str:
+    """sources_note for this project's uploads (at most 20). Best effort: a failed lookup only leaves it out."""
+    try:
+        async with database.AsyncSessionLocal() as db:
+            rows = (await db.execute(text("""
+                SELECT id, title, status, pdf_url, pdf_sha256 FROM papers
+                WHERE source = 'upload' AND project_id = :p ORDER BY created_at, id LIMIT 20
+            """), {"p": project_id})).mappings().all()
+    except Exception:
+        log.exception("listing uploads for project %s failed", project_id)
+        return ""
+    return sources_note(rows)
+
+
 def citations_in(answer: str) -> list[str]:
     return list(dict.fromkeys(_CITATION.findall(answer)))
 
@@ -205,6 +232,32 @@ async def resolve(ref: str, project_id: UUID | None):
         row = await _upsert_s2(db, meta)
         await db.commit()
         return row
+
+
+async def add_to_project(row, project_id: UUID | None) -> None:
+    """A Semantic Scholar paper the agent read in a project joins that project's Sources panel.
+    Best effort: failing to list it must not fail the tool call."""
+    if project_id is None or row["source"] != "s2":
+        return
+    try:
+        async with database.AsyncSessionLocal() as db:
+            await db.execute(text("""
+                INSERT INTO project_papers (project_id, paper_id) VALUES (:p, :id) ON CONFLICT DO NOTHING
+            """), {"p": project_id, "id": row["id"]})
+            await db.commit()
+    except Exception:
+        log.exception("adding p%s to project %s's sources failed", row["id"], project_id)
+
+
+def paper_url(row) -> str | None:
+    """Where to read a Semantic Scholar paper: its open PDF, else its DOI, else its S2 page. Uploads have none."""
+    if row["source"] != "s2":
+        return None
+    if (row["pdf_url"] or "").startswith(("https://", "http://")):  # it is rendered as a link: no javascript: URLs
+        return row["pdf_url"]
+    if row["doi"]:
+        return f"https://doi.org/{row['doi']}"
+    return f"https://www.semanticscholar.org/paper/{row['source_id']}"
 
 
 async def ensure_ingest(row) -> None:
@@ -286,6 +339,7 @@ async def get_paper(paper: str, *, project_id: UUID | None = None) -> dict:
         return {"error": str(exc)}
     if row is None:
         return {"error": f"No paper found for {paper!r}. Use search_papers to find one."}
+    await add_to_project(row, project_id)
     await ensure_ingest(row)
     async with database.AsyncSessionLocal() as db:
         row = await _load(db, row["id"], project_id)
@@ -310,6 +364,7 @@ async def search_paper_evidence(
         return {"error": str(exc)}
     if row is None:
         return {"error": f"No paper found for {paper_id!r}. Use search_papers to find one."}
+    await add_to_project(row, project_id)
     await ensure_ingest(row)
 
     loop = asyncio.get_running_loop()

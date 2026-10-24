@@ -224,7 +224,8 @@ GET  /nodes/:id                           -> Node                          # inc
 POST /nodes/:id/fork                      -> NodeMeta
 POST /nodes/merge  { source_leaf_ids }    -> NodeMeta                      # server derives the LCA
 POST /nodes/:id/messages { content }      -> SSE stream
-GET  /projects/:id/sources                -> Source[]                      # uploaded PDFs; any member
+GET  /projects/:id/sources                -> Source[]                      # uploads + S2 papers an agent read here; any member
+GET  /projects/:id/sources/:sourceId/file -> application/pdf (inline)      # uploads only; any member
 POST /projects/:id/sources  (multipart file) -> Source                     # owner only; PDF <= 40 MB
 ```
 

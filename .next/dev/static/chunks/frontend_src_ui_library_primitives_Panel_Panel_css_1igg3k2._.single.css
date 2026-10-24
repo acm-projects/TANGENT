@@ -2,7 +2,7 @@
 @layer ui {
   [data-ui="panel"] {
     padding: var(--space-4);
-    border-radius: var(--radius-xxl);
+    border-radius: var(--radius-lg);
     background: var(--texture-grain), var(--color-surface);
     color: var(--color-text);
     border: 1px solid #0000;
@@ -23,6 +23,11 @@
 
   [data-ui="panel"][data-elevation="floating"] {
     box-shadow: var(--shadow-floating);
+  }
+
+  [data-ui="panel"]:has( > [data-ui="input"]:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
   }
 }
 

@@ -532,9 +532,8 @@ async def send_message(
         # the stored question, not the client's copy: a retry re-asks exactly what was asked
         prompt = chats[-2].content
         path[-1] = path[-1].model_copy(update={"chats": chats[:-2]})
-    messages = [{"role": "system", "content": paper_service.RESEARCH_SYSTEM_PROMPT}] + to_provider_messages(
-        flatten(path), prompt
-    )
+    system = paper_service.RESEARCH_SYSTEM_PROMPT + await paper_service.project_sources_note(project_id)
+    messages = [{"role": "system", "content": system}] + to_provider_messages(flatten(path), prompt)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 

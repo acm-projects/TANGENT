@@ -66,10 +66,10 @@ grep -rn "TODO(backend)" frontend/src
 | `dashboard/features/board/useBoard.ts` | — (wired) | `api.workspaces.list / create / rename`, `api.projects.list / create / rename / delete` | ✅ done. Workspaces are the folders along the bottom; `POST /workspaces/` returns no id, so the list is read again after it. Project icons are not built: no backend field |
 | `workspace/features/mindmap/useMindMap.ts` | — (wired) | `api.trees.forProject(projectId)` | ✅ done. `GET /projects/:id/tree`; the owner's first visit creates the tree and its empty root |
 | `workspace/features/chat/useChat.ts` (load) | — (wired) | `api.nodes.get(id)` | ✅ done |
-| `workspace/features/chat/useChat.ts` (send) | — (wired) | `streamMessage({...})` from `@/api` | ✅ done. Sends `{content, model}`; attachments are disabled until an upload endpoint exists |
+| `workspace/features/chat/useChat.ts` (send) | — (wired) | `streamMessage({...})` from `@/api` | ✅ done. Sends `{content, model}`. Attached PDFs are first uploaded as project sources (`api.sources.add`), which the server names to the model; image attachments stay disabled |
 | `workspace/features/chat/useChat.ts` (after send) | — (wired) | `api.nodes.get(id)` | ✅ done — refreshes the node's title |
 | `workspace/features/chat/useChat.ts` (branch) | — (wired) | `api.nodes.fork(id)` | ✅ done. Owner only (sharees 403) |
-| `workspace/features/toolbar/useSources.ts` | — (wired) | `api.sources.list / add` | ✅ done. PDFs only, owner-only upload; `status` says whether the research tools can read it yet. `use_count` is always 0 |
+| `workspace/features/toolbar/useSources.ts` | — (wired) | `api.sources.list / add` | ✅ done. PDFs only, owner-only upload; also lists Semantic Scholar papers an agent read in the project. A card opens in a new tab: S2 papers at `url`, uploads via `api.sources.file` (a blob URL). `status` says whether the research tools can read it yet. `use_count` is always 0 |
 | `workspace/features/toolbar/useShares.ts` | — (no mock; already real) | `api.shares.list / invite / revokeShare / revokeInvitation / resend` | ✅ done. Needs a real project's `slug` and `projectId` in the URL, and SMTP on the backend to send invites |
 | `app/page.tsx` | `RootRedirect` → `api.workspaces.list()` | `GET /workspaces/` | ✅ done. Takes the first workspace returned; the endpoint has no ordering, so "most recent" needs `last_used_at` ordering server-side |
 

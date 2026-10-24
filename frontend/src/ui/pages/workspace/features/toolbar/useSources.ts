@@ -39,5 +39,27 @@ export function useSources(projectId: string) {
     }
   }
 
-  return { sources, error, uploading, add };
+  /** Open a source in a new tab: a Semantic Scholar paper at its link, an upload as its PDF. */
+  async function open(source: Source) {
+    if (source.url) {
+      window.open(source.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Open the tab inside the click: one opened after the download finishes is blocked as a pop-up.
+    const tab = window.open("", "_blank");
+    if (!tab) {
+      setError("Allow pop-ups for this site to open sources.");
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(await api.sources.file(projectId, source.id));
+      tab.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000); // the tab has loaded it by then
+    } catch {
+      tab.close();
+      setError("Could not open that source.");
+    }
+  }
+
+  return { sources, error, uploading, add, open };
 }

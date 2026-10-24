@@ -1306,6 +1306,28 @@ body {
   --lightningcss-light: initial;
   --lightningcss-dark: ;
   color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lightningcss-light: ;
+    --lightningcss-dark: initial;
+  }
+}
+
+:root[data-lighting="light"] {
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+  color-scheme: light;
+}
+
+:root[data-lighting="dark"] {
+  --lightningcss-light: ;
+  --lightningcss-dark: initial;
+  color-scheme: dark;
+}
+
+:root {
   --paper-light: #f3f2ef;
   --paper-dark: #2a2826;
   --board-light: #e7e5e0;
@@ -1320,6 +1342,8 @@ body {
   --ink-muted-dark: #a19c95;
   --ink-faint-light: #8f8a84;
   --ink-faint-dark: #6e6a65;
+  --manila-light: #d3cbbd;
+  --manila-dark: #47413a;
   --rule-light: #cfcbc4;
   --rule-dark: #46423e;
   --red-flag: #e5484a;
@@ -1328,6 +1352,11 @@ body {
   --color-surface: var(--lightningcss-light, var(--paper-light)) var(--lightningcss-dark, var(--paper-dark));
   --color-surface-raised: var(--lightningcss-light, var(--paper-raised-light)) var(--lightningcss-dark, var(--paper-raised-dark));
   --color-board: var(--lightningcss-light, var(--board-light)) var(--lightningcss-dark, var(--board-dark));
+  --light-lamp: radial-gradient(ellipse 60% 70% at 32% 42%,
+      var(--lightningcss-light, #fffcf68c) var(--lightningcss-dark, #ffecd21a), transparent 70%);
+  --light-vignette: radial-gradient(ellipse 120% 100% at 40% 45%,
+      transparent 55%, var(--lightningcss-light, #3c2d1e1a) var(--lightningcss-dark, #00000073));
+  --color-folder: var(--lightningcss-light, var(--manila-light)) var(--lightningcss-dark, var(--manila-dark));
   --color-text: var(--lightningcss-light, var(--ink-light)) var(--lightningcss-dark, var(--ink-dark));
   --color-text-secondary: var(--lightningcss-light, var(--ink-soft-light)) var(--lightningcss-dark, var(--ink-soft-dark));
   --color-text-muted: var(--lightningcss-light, var(--ink-muted-light)) var(--lightningcss-dark, var(--ink-muted-dark));
@@ -1340,6 +1369,10 @@ body {
   --color-brand-hover: var(--lightningcss-light, var(--ink-soft-light)) var(--lightningcss-dark, var(--ink-soft-dark));
   --color-string: var(--red-flag);
   --color-danger: var(--lightningcss-light, var(--red-oxblood-light)) var(--lightningcss-dark, var(--red-oxblood-dark));
+  --color-string-shadow: var(--lightningcss-light, #281e1447) var(--lightningcss-dark, #0009);
+  --color-pin-shine: var(--lightningcss-light, #ffffffd9) var(--lightningcss-dark, #ffffff8c);
+  --texture-pin: radial-gradient(circle at 32% 30%, var(--color-pin-shine) 0 18%, transparent 46%);
+  --color-selection: var(--lightningcss-light, #2a282629) var(--lightningcss-dark, #ece9e433);
   --color-focus-ring: var(--lightningcss-light, var(--ink-muted-light)) var(--lightningcss-dark, var(--ink-muted-dark));
   --shadow-floating: 0 1px 1px var(--lightningcss-light, #281e141a) var(--lightningcss-dark, #00000059),
     0 3px 8px -2px var(--lightningcss-light, #281e1424) var(--lightningcss-dark, #00000073);
@@ -1347,13 +1380,6 @@ body {
     0 14px 24px -8px var(--lightningcss-light, #281e1438) var(--lightningcss-dark, #0009);
   --filter-floating: drop-shadow(0 1px 1px var(--lightningcss-light, #281e141f) var(--lightningcss-dark, #00000059))
     drop-shadow(0 8px 12px var(--lightningcss-light, #281e1424) var(--lightningcss-dark, #00000073));
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --lightningcss-light: ;
-    --lightningcss-dark: initial;
-  }
 }
 
 /* [project]/frontend/src/ui/library/tokens/shape.css [app-client] (css) */
@@ -1399,6 +1425,28 @@ body {
   --motion-slow: .4s;
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+  --motion-spring: .6s;
+  --ease-spring: linear(0, .0502, .1694, .3202, .4765, .6218, .7467, .8474, .9238, .9781, 1.0137,
+    1.0344, 1.044, 1.0459, 1.0428, 1.0369, 1.0298, 1.0227, 1.0161, 1.0106, 1.0062, 1.0029, 1.0006, .9991,
+    .9983, .9979, .9979, .9981, .9984, .9987, .999, .9993, 1);
+  --pop-from: 0 .75rem;
+  --pop-rotate: -2deg;
+  --pop-scale: .82;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: var(--pop-scale);
+    translate: var(--pop-from);
+    rotate: var(--pop-rotate);
+  }
+}
+
+@keyframes draw-in {
+  from {
+    stroke-dashoffset: 1px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1406,6 +1454,31 @@ body {
     --motion-fast: 0s;
     --motion-base: 0s;
     --motion-slow: 0s;
+    --motion-spring: 0s;
+  }
+}
+
+::view-transition-old(root) {
+  mix-blend-mode: normal;
+  animation: none;
+}
+
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: lamp-on calc(var(--motion-slow) * 1.5) var(--ease-out);
+}
+
+@keyframes lamp-on {
+  from {
+    clip-path: circle(0 at var(--lamp-x) var(--lamp-y));
+  }
+
+  to {
+    clip-path: circle(150vmax at var(--lamp-x) var(--lamp-y));
   }
 }
 
@@ -1430,6 +1503,15 @@ body {
     font-family: var(--font-content);
     background: var(--color-surface);
     color: var(--color-text);
+  }
+
+  ::selection {
+    background: var(--color-selection);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
   }
 }
 

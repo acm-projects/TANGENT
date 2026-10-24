@@ -292,3 +292,60 @@ def _workspace_id(user_id):
         return str(wid)
 
     return asyncio.run(run())
+
+
+def test_sources_list_uploads_and_read_papers_and_open_them():
+    import hashlib
+
+    import pymupdf
+
+    from app.papers import service
+
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "Submission rules: everything is due at 11:59 PM.")
+    pdf = doc.tobytes()
+    s2_ref = f"tangent-tree-test-{uuid.uuid4().hex[:8]}"
+
+    async def read_s2_paper(project_id):
+        """What the agent does: open a Semantic Scholar paper while chatting in this project."""
+        async with database.AsyncSessionLocal() as db:
+            row = await service._upsert_s2(db, {
+                "source_id": s2_ref, "title": "A Read Paper", "authors": [], "year": 2024, "abstract": None,
+                "doi": "10.1/x", "arxiv_id": None, "pdf_url": None,
+            })
+            await db.commit()
+        await service.search_paper_evidence(f"p{row['id']}", "rules", wait_seconds=0, project_id=uuid.UUID(project_id))
+        return row["id"]
+
+    async def cleanup():
+        async with database.AsyncSessionLocal() as db:
+            await db.execute(text("DELETE FROM papers WHERE source_id = :s"), {"s": s2_ref})
+            await db.execute(text("""DELETE FROM paper_files f WHERE sha256 = :h
+                                     AND NOT EXISTS (SELECT 1 FROM papers p WHERE p.pdf_sha256 = f.sha256)"""),
+                             {"h": hashlib.sha256(pdf).hexdigest()})
+            await db.commit()
+
+    try:
+        with TestClient(app) as c:
+            auth = sign_up(c)
+            me = c.get("/auth/me", headers=auth).json()
+            pid = c.post("/projects/", json={"project_name": "S", "workspace_id": _workspace_id(me["id"])},
+                         headers=auth).json()["id"]
+
+            up = c.post(f"/projects/{pid}/sources", files={"file": ("rules.pdf", pdf, "application/pdf")}, headers=auth)
+            assert up.status_code == 201
+            assert up.json()["origin"] == "upload" and up.json()["url"] is None
+
+            opened = c.get(f"/projects/{pid}/sources/{up.json()['id']}/file", headers=auth)
+            assert opened.status_code == 200 and opened.content == pdf
+            assert opened.headers["content-type"] == "application/pdf"
+            assert opened.headers["content-disposition"].startswith("inline")
+
+            s2_id = asyncio.run(read_s2_paper(pid))
+            listed = c.get(f"/projects/{pid}/sources", headers=auth).json()
+            assert [(s["id"], s["origin"]) for s in listed] == [(up.json()["id"], "upload"), (f"p{s2_id}", "s2")]
+            assert listed[1]["url"] == "https://doi.org/10.1/x" and listed[1]["kind"] == "link"
+            # only uploads have bytes to serve
+            assert c.get(f"/projects/{pid}/sources/p{s2_id}/file", headers=auth).status_code == 404
+    finally:
+        asyncio.run(cleanup())

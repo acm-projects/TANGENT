@@ -99,6 +99,11 @@ def client(monkeypatch):
     monkeypatch.setattr(nodes_router, "_prepare_write", fake_prepare)
     monkeypatch.setattr(nodes_router, "_persist", fake_persist)
     monkeypatch.setattr(nodes_router, "_load_path", fake_path)
+
+    async def no_uploads(project_id):
+        return ""
+
+    monkeypatch.setattr(nodes_router.paper_service, "project_sources_note", no_uploads)
     c = TestClient(app)
     c.persisted = persisted
     c.prepare = prepare
@@ -463,3 +468,28 @@ def test_parallel_tool_calls_are_capped_per_round(client, monkeypatch):
     replies = [m for m in bodies[1]["messages"] if m["role"] == "tool"]
     assert len(replies) == nodes_router.MAX_CALLS_PER_ROUND + 2  # every call answered
     assert "skipped" in replies[-1]["content"]
+
+
+def test_system_prompt_names_project_uploads(client, monkeypatch):
+    """Regression: an uploaded PDF was invisible to the model (search_papers only matches titles/abstracts),
+    so it asked the user to clarify instead of searching the upload's evidence."""
+    asked = []
+
+    async def fake_note(project_id):
+        asked.append(project_id)
+        return nodes_router.paper_service.sources_note([
+            {"id": 38, "title": "00 Assignment Submit Policy and Rules.pdf", "status": "ready",
+             "pdf_url": None, "pdf_sha256": "abc"},
+        ])
+
+    monkeypatch.setattr(nodes_router.paper_service, "project_sources_note", fake_note)
+    transport, seen = provider([chunk("ok"), "data: [DONE]"])
+    use_provider(monkeypatch, transport)
+
+    client.post(f"/nodes/{NODE}/messages", json={"content": "What are the rules for my submissions?"})
+
+    assert asked == [PROJECT]
+    system = seen["body"]["messages"][0]
+    assert system["role"] == "system" and system["content"].startswith(nodes_router.paper_service.RESEARCH_SYSTEM_PROMPT)
+    assert "- p38: 00 Assignment Submit Policy and Rules.pdf (full_text: ready)" in system["content"]
+    assert "search_paper_evidence" in system["content"].split("p38", 1)[1]

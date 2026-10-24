@@ -11,6 +11,9 @@ export function createSourcesApi({ http }: ApiClient) {
       form.append("file", file);
       return http.post<Source>(`/projects/${projectId}/sources`, form).then((r) => r.data);
     },
+    /** An upload's PDF, fetched with the session's token (a plain link can't carry it). */
+    file: (projectId: string, sourceId: string) =>
+      http.get<Blob>(`/projects/${projectId}/sources/${sourceId}/file`, { responseType: "blob" }).then((r) => r.data),
   };
 }
 
