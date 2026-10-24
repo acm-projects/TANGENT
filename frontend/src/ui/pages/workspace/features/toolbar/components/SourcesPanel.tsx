@@ -35,6 +35,7 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
         <Input
           ref={picker}
           type="file"
+          accept="application/pdf"
           multiple
           hidden
           onChange={(e) => {

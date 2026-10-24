@@ -10,3 +10,5 @@ cryptography
 httpx
 pydantic[email]
 jinja2
+pymupdf
+python-multipart

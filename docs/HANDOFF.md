@@ -16,8 +16,7 @@ the real backend.
 
 ## 1. What exists
 
-Every screen in the Figma wireframe works against the real backend, except the
-Sources panel, which still runs on an in-memory fake (`src/mocks/`). You need the
+Every screen in the Figma wireframe works against the real backend. You need the
 backend running (see DEVELOPMENT.md) and a signed-in user; a fresh account starts
 with no projects, so use the dashboard's *New project* form.
 
@@ -70,7 +69,7 @@ grep -rn "TODO(backend)" frontend/src
 | `workspace/features/chat/useChat.ts` (send) | — (wired) | `streamMessage({...})` from `@/api` | ✅ done. Sends `{content, model}`; attachments are disabled until an upload endpoint exists |
 | `workspace/features/chat/useChat.ts` (after send) | — (wired) | `api.nodes.get(id)` | ✅ done — refreshes the node's title |
 | `workspace/features/chat/useChat.ts` (branch) | — (wired) | `api.nodes.fork(id)` | ✅ done. Owner only (sharees 403) |
-| `workspace/features/toolbar/useSources.ts` | `mockApi.sources.list / add` | — | ❌ no table, no router |
+| `workspace/features/toolbar/useSources.ts` | — (wired) | `api.sources.list / add` | ✅ done. PDFs only, owner-only upload; `status` says whether the research tools can read it yet. `use_count` is always 0 |
 | `workspace/features/toolbar/useShares.ts` | — (no mock; already real) | `api.shares.list / invite / revokeShare / revokeInvitation / resend` | ✅ done. Needs a real project's `slug` and `projectId` in the URL, and SMTP on the backend to send invites |
 | `app/page.tsx` | `RootRedirect` → `api.workspaces.list()` | `GET /workspaces/` | ✅ done. Takes the first workspace returned; the endpoint has no ordering, so "most recent" needs `last_used_at` ordering server-side |
 
@@ -103,7 +102,6 @@ delete them and the UI that reads them:
 | `ChatMessage.attachments` | "Uploaded x.png" / "Viewed x.png" | `chats` is JSONB, so adding a key is cheap. Needs an upload endpoint |
 | `ChatMessage.thought_seconds` | "Thought for 1m 4s" | Provider-dependent |
 | `NodeMeta.attachment_kinds` | PDF / image tags on a mind-map node | Could be derived server-side from `chats` |
-| `Source` | Sources panel cards | Needs a table and a router |
 
 ## 4. Backend gaps found while building this
 

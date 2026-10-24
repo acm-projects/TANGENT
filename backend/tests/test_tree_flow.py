@@ -75,7 +75,7 @@ def sign_up(c):
 
 
 def test_tree_fork_and_prompt(monkeypatch):
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         seen.append(messages)
         yield {"text": "pong"}
 
@@ -162,7 +162,7 @@ def test_simultaneous_forks_get_distinct_indexes():
 def test_split_moves_the_rest_and_the_branches_down(monkeypatch):
     replies = iter(["one", "two", "three"])
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -203,7 +203,7 @@ def test_split_moves_the_rest_and_the_branches_down(monkeypatch):
 def test_join_undoes_a_split_and_merge_reads_back(monkeypatch):
     replies = iter(["one", "two", "three", "four"])
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -246,7 +246,7 @@ def test_merge_sources_follow_a_split_and_a_join(monkeypatch):
     m2's source must follow the conversation's end: the tail after the split, m again after the join."""
     replies = iter(f"r{i}" for i in range(20))
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)

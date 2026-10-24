@@ -224,7 +224,19 @@ GET  /nodes/:id                           -> Node                          # inc
 POST /nodes/:id/fork                      -> NodeMeta
 POST /nodes/merge  { source_leaf_ids }    -> NodeMeta                      # server derives the LCA
 POST /nodes/:id/messages { content }      -> SSE stream
+GET  /projects/:id/sources                -> Source[]                      # uploaded PDFs; any member
+POST /projects/:id/sources  (multipart file) -> Source                     # owner only; PDF <= 40 MB
 ```
+
+**Research tools [built, backend only]:** the prompt endpoint offers the model
+three tools (`app/papers/service.py`: `search_papers`, `get_paper`,
+`search_paper_evidence`), runs at most 4 tool rounds, and streams a `tool {name}`
+event per call. Papers come from a Postgres registry first, then Semantic
+Scholar; full text is ingested in the background by `app/papers/worker.py`
+(a Postgres job queue, run inside the API process) and served only as ranked,
+token-capped chunks with ids like `p12:c7`. `done` carries `citations` (ids a tool
+returned this turn) and `unverified_citations` (ids the model cited without one).
+`call_tool()` is the shared entry point for Debate Mode.
 
 `NodeMeta` (no chats) vs `Node` (with chats) is intentional: the whole tree loads
 cheaply for the mind map, and chat bodies load on demand.
@@ -257,8 +269,7 @@ standalone `/model_call*` spikes are gone. Also built: `GET /projects/:id/tree`
 - The Figma screens are built: `/[slug]/dashboard` and `/[slug]/[projectId]`
   (the workspace: mind map, chat, toolbar). `/` redirects to the user's first
   workspace. `/login`, `/signup`, `/onboarding` and `/invite/[token]` are real.
-- **The screens run on the real backend**, except the Sources panel, which
-  still calls `src/mocks/mockApi.ts` (no sources table yet).
+- **The screens run on the real backend**, the Sources panel included.
   [HANDOFF.md](HANDOFF.md) maps each hook to its endpoint;
   `grep -rn "TODO(backend)" frontend/src` lists what is left.
 

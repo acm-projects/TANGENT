@@ -254,7 +254,7 @@ TypeScript to an exact version.
 
 - Wire the frontend skeleton to the backend: every `TODO(backend)` in
   `frontend/src`, mapped endpoint by endpoint in [HANDOFF.md](HANDOFF.md) §2.
-  Then delete `frontend/src/mocks/`
+  (`frontend/src/mocks/` is gone: Sources was the last mock.)
 - `backend/app/routers/nodes_router.py` defines no routes yet (an empty
   `APIRouter`, mounted by `app/main.py`), and `chats_router.py` is imported but
   never mounted. The node/chat endpoints the frontend's `api.nodes` expects don't
