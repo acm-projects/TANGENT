@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Tangent debate mode - SQS FIFO queue, worker Lambda, sweeper Lambda
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: Same value as the backend's DATABASE_URL (jdbc-style is accepted)
+  DbUser:
+    Type: String
+    Default: ""
+  DbPassword:
+    Type: String
+    NoEcho: true
+    Default: ""
+  OpenRouterDebateApiKey:
+    Type: String
+    NoEcho: true
+  S2ApiKey:
+    Type: String
+    NoEcho: true
+  AppUrl:
+    Type: String
+    Default: ""
+  MaxCostUsd:
+    Type: String
+    Default: "2.00"
+    Description: Per-debate spending cap; the debate stops and judges with what it has
+  ReasoningEffort:
+    Type: String
+    Default: low
+    AllowedValues: [low, medium, high]
+    Description: Reasoning effort sent to OpenRouter (matches DEBATE_REASONING_EFFORT locally)
+  WorkerMaxConcurrency:
+    Type: Number
+    Default: 5
+    MinValue: 2
+    MaxValue: 1000
+    Description: Max debates running at once (SQS event source scaling limit, minimum 2). Each debate holds one Lambda while it works. Works on accounts whose Lambda concurrency quota is only 10, unlike reserved concurrency.
+
+Globals:
+  Function:
+    MemorySize: 1024
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        DB_USER: !Ref DbUser
+        DB_PASSWORD: !Ref DbPassword
+        OPENROUTER_DEBATE_API_KEY: !Ref OpenRouterDebateApiKey
+        S2_API_KEY: !Ref S2ApiKey
+        APP_URL: !Ref AppUrl
+        DEBATE_MAX_COST_USD: !Ref MaxCostUsd
+        DEBATE_QUEUE_URL: !Ref DebateQueue
+        DEBATE_DB_DRIVER: psycopg
+        DEBATE_REASONING_EFFORT: !Ref ReasoningEffort
+
+Resources:
+  DebateDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600
+
+  DebateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      ContentBasedDeduplication: false
+      # AWS advises at least 6x the function timeout for a Lambda event source
+      VisibilityTimeout: 5400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DebateDlq.Arn
+        maxReceiveCount: 5
+
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: ..
+      Dockerfile: deploy/Dockerfile
+      DockerTag: worker
+    Properties:
+      PackageType: Image
+      Timeout: 900
+      ImageConfig:
+        Command: ["debate.pg.handler.handler"]
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DebateQueue.QueueName
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DebateQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes: [ReportBatchItemFailures]
+            ScalingConfig:
+              MaximumConcurrency: !Ref WorkerMaxConcurrency
+
+  SweeperFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: ..
+      Dockerfile: deploy/Dockerfile
+      DockerTag: sweeper
+    Properties:
+      PackageType: Image
+      Timeout: 120
+      ImageConfig:
+        Command: ["debate.pg.handler.sweeper"]
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DebateQueue.QueueName
+      Events:
+        Every2Minutes:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 minutes)
+
+Outputs:
+  DebateQueueUrl:
+    Value: !Ref DebateQueue
+  DebateQueueArn:
+    Value: !GetAtt DebateQueue.Arn
+  BackendEnqueuePolicyHint:
+    Description: The backend needs sqs:SendMessage on this queue (IAM user/role of the EC2 instance)
+    Value: !GetAtt DebateQueue.Arn

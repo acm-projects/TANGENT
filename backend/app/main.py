@@ -20,6 +20,7 @@ from app.routers import (
     nodes_router,
     chats_router,
     trees_router,
+    debates_router,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -61,3 +62,4 @@ app.include_router(shares_router.router)
 app.include_router(nodes_router.router)
 app.include_router(chats_router.router)
 app.include_router(trees_router.router)
+app.include_router(debates_router.router)
