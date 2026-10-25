@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 WEIGHTS = {"evidence": 0.40, "scope": 0.25, "engagement": 0.25, "fidelity": 0.10}
-MARGIN = 1.0  # totals must differ by at least this much for there to be a winner
+MARGIN = 0.5  # totals must differ by at least this much for there to be a winner (confidence still reflects how close it was)
 GAP_FOR_FULL_CREDIT = 3.0  # a lead this large earns the full 0.5 of the confidence for "how far ahead"
 MIN_COVERAGE = 0.8  # share of claims the judge must label before the evidence score is trusted
 LABEL_CREDIT = {"supported": 1.0, "partly_supported": 0.5, "unsupported": 0.0}

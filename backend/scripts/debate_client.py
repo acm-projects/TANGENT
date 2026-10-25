@@ -21,6 +21,7 @@ import os
 import shutil
 import sys
 import textwrap
+import threading
 import time
 from typing import Any, Callable, Iterator, Optional
 
@@ -100,80 +101,212 @@ def ask_questions(questions: list[dict[str, Any]], auto: bool, read: Callable[[s
 
 # ------------------------------------------------------------------ live text
 class Live:
-    """Shows the debaters writing, FOR on the left and AGAINST on the right, and the judge across the full width.
+    """The stage: one debater speaks at a time, and both debaters' working notes show at the same time.
 
-    Only the last `max_lines` lines of each box are shown while it is being written; when a turn finishes, its box goes
-    away and the normal summary prints above. Nothing is drawn unless the output is a terminal. All other printing
-    must happen between erase() and redraw() so the boxes are never torn."""
+    The server lets FOR and AGAINST write in parallel (that is faster), so text for both arrives interleaved. A person
+    can only read one, so this class plays the turns back one after another, in the order their first text arrived. The
+    speaker's text is shown as it arrives (never faster than TYPE_CPS, and faster when a large backlog has built up);
+    the other side's text waits, already written, until its turn. A turn's finished summary, and every other line that
+    would print after it, waits until the turn has been spoken, so the log reads in speaking order.
 
-    def __init__(self, out: Any = None, *, enabled: Optional[bool] = None, max_lines: int = 12, width: Optional[int] = None) -> None:
+    Nothing is drawn unless the output is a terminal. All printing goes through turn_done() / after() so the stage is
+    erased and redrawn around it. Everything is guarded by one lock because tick() runs on a background thread."""
+
+    TYPE_CPS = 400.0       # characters per second when the speaker is replaying text that is already there
+    CATCH_UP_CPS = 1500.0  # when more than BIG_BACKLOG characters are waiting
+    BIG_BACKLOG = 1500
+
+    def __init__(self, out: Any = None, *, enabled: Optional[bool] = None, max_lines: int = 12,
+                 width: Optional[int] = None, rows: Optional[int] = None, clock: Callable[[], float] = time.monotonic) -> None:
         self.out = out or sys.stdout
         self.enabled = self.out.isatty() if enabled is None else enabled
-        self.max_lines = max_lines
-        self.width = width
+        self.max_lines, self.width, self.rows, self.clock = max_lines, width, rows, clock
+        self.lock = threading.RLock()
         self.turns: dict[str, dict[str, Any]] = {}
-        self.done: set[str] = set()
+        self.order: list[str] = []   # turn ids in the order their first text arrived; the head is the speaker
+        self.done: set[str] = set()  # turns already spoken and printed (replayed tokens for them are ignored)
+        self.notes: dict[str, str] = {}
+        self.barriers: list[tuple[set[str], Callable[[], None]]] = []
         self.drawn = 0
-        self._last = 0.0
+        self._last: list[str] = []
+        self._tick_at = clock()
+        self._thread: Optional[threading.Thread] = None
+        self._stop = threading.Event()
 
+    # ---- feeding
     def token(self, p: dict[str, Any]) -> None:
         tid = p.get("turn_id")
-        if not self.enabled or not tid or tid in self.done:
+        if not self.enabled or not tid:
             return
-        t = self.turns.setdefault(tid, {"side": p.get("side"), "phase": p.get("phase"), "round": p.get("round"), "text": ""})
-        if p.get("reset"):
-            t["text"] = ""
-        t["text"] += p.get("text") or ""
-        if time.monotonic() - self._last >= 0.08:
-            self.redraw()
+        with self.lock:
+            if tid in self.done:
+                return
+            t = self.turns.get(tid)
+            if t is None:
+                t = self.turns[tid] = {"side": p.get("side"), "phase": p.get("phase"), "round": p.get("round"),
+                                       "got": "", "shown": 0.0, "final": None, "cb": None}
+                self.order.append(tid)
+            if p.get("reset"):
+                t["got"], t["shown"] = "", 0.0
+            t["got"] += p.get("text") or ""
 
-    def complete(self, turn_id: Optional[str]) -> None:
-        if turn_id:
-            self.done.add(turn_id)
-            self.turns.pop(turn_id, None)
+    def note(self, side: Optional[str], text: Any) -> None:
+        if self.enabled and side and text:
+            with self.lock:
+                self.notes[str(side)] = str(text)
 
+    def turn_done(self, tid: Optional[str], final: Optional[str], cb: Callable[[], None]) -> None:
+        """The turn's finished event arrived. cb prints its summary; it runs once the turn has been spoken."""
+        with self.lock:
+            t = self.turns.get(tid) if tid else None
+            if not self.enabled or t is None:
+                self._run(cb)
+                return
+            if final is not None:
+                t["final"] = final
+                t["shown"] = min(t["shown"], float(len(final)))
+            else:
+                t["final"] = t["got"]
+            t["cb"] = cb
+            self.notes.pop(str(t["side"]), None)
+
+    def after(self, cb: Callable[[], None]) -> None:
+        """Run cb after every turn already on the stage has been spoken and printed (at once if the stage is empty)."""
+        with self.lock:
+            waits = set(self.turns)
+            if not self.enabled or (not waits and not self.barriers):
+                self._run(cb)
+            else:
+                self.barriers.append((waits, cb))
+
+    def drain(self) -> None:
+        """Skip the animation: print everything that is waiting, in speaking order. Used before a question and at the end."""
+        with self.lock:
+            for tid in list(self.order):
+                t = self.turns[tid]
+                if t["cb"] is None:
+                    t["final"] = t["got"]
+                    t["cb"] = lambda: None
+                t["shown"] = float(len(t["final"] or ""))
+                self._finish(tid)
+            self._run_barriers()
+            self.erase()
+
+    # ---- playing
+    def tick(self) -> None:
+        with self.lock:
+            if not self.enabled:
+                return
+            now = self.clock()
+            dt = min(0.5, max(0.0, now - self._tick_at))
+            self._tick_at = now
+            changed = False
+            cur = self.order[0] if self.order else None
+            if cur is not None:
+                t = self.turns[cur]
+                text = t["final"] if t["final"] is not None else t["got"]
+                backlog = len(text) - int(t["shown"])
+                if backlog > 0:
+                    cps = self.CATCH_UP_CPS if backlog > self.BIG_BACKLOG else self.TYPE_CPS
+                    t["shown"] = min(float(len(text)), t["shown"] + max(1.0, cps * dt))
+                    changed = True
+                if t["final"] is not None and int(t["shown"]) >= len(t["final"]):
+                    self._finish(cur)
+                    changed = True
+            if self._run_barriers():
+                changed = True
+            lines = self.frame()
+            if (lines != self._last and (lines or self.drawn)) or (lines and not self.drawn) or changed and lines:
+                self.redraw()
+
+    def _finish(self, tid: str) -> None:
+        t = self.turns.pop(tid)
+        self.order.remove(tid)
+        self.done.add(tid)
+        self._run(t["cb"] or (lambda: None))
+
+    def _run_barriers(self) -> bool:
+        ran = False
+        while self.barriers and not (self.barriers[0][0] & set(self.turns)):
+            _, cb = self.barriers.pop(0)
+            self._run(cb)
+            ran = True
+        return ran
+
+    def _run(self, cb: Callable[[], None]) -> None:
+        with self.lock:
+            self.erase()
+            cb()
+
+    # ---- drawing
     def _cols(self) -> int:
         return self.width or shutil.get_terminal_size((100, 24)).columns
 
-    def _box(self, t: dict[str, Any], width: int) -> list[str]:
-        head = f"{str(t['side']).upper()} | {t['phase']} {t['round']}"
-        lines: list[str] = []
-        for para in (t["text"] or "").split("\n"):
-            lines += textwrap.wrap(para, width) or [""]
-        body = lines[-self.max_lines:]
-        body += [""] * (self.max_lines - len(body))
-        return [head[:width].ljust(width), "-" * width] + [ln.ljust(width) for ln in body]
+    def _rows(self) -> int:
+        return self.rows or shutil.get_terminal_size((100, 24)).lines
 
     def frame(self) -> list[str]:
         cols = self._cols()
-        by_side = {t["side"]: t for t in self.turns.values()}
+        body_n = max(3, min(self.max_lines, self._rows() - 8))  # the stage must always fit on the screen
         out: list[str] = []
-        left, right = by_side.get("for"), by_side.get("against")
-        if left or right:
-            w = max(20, (cols - 3) // 2)
-            a = self._box(left, w) if left else [" " * w] * (self.max_lines + 2)
-            b = self._box(right, w) if right else [" " * w] * (self.max_lines + 2)
-            out += [x + " | " + y for x, y in zip(a, b)]
-        if "judge" in by_side:
-            out += self._box(by_side["judge"], cols - 1)
+        if self.order:
+            t = self.turns[self.order[0]]
+            label = "JUDGE" if t["side"] == "judge" else f"{str(t['side']).upper()} | {t['phase']} {t['round']}"
+            head = f"{label} is speaking"
+            waiting = [self.turns[x] for x in self.order[1:]]
+            if waiting:
+                head += "    next: " + ", ".join(f"{str(w['side']).upper()} ({len(w['got'])} chars ready)" for w in waiting)
+            text = (t["final"] if t["final"] is not None else t["got"])[: int(t["shown"])]
+            lines: list[str] = []
+            for para in text.split("\n"):
+                lines += textwrap.wrap(para, cols - 1) or [""]
+            body = lines[-body_n:]
+            out += [head, "-" * (cols - 1)] + body + [""] * (body_n - len(body))
+        for side in ("for", "against"):
+            if side in self.notes:
+                out.append(f"{side.upper():8}thinking: {self.notes[side]}")
         return [ln[: cols - 1] for ln in out]
 
     def erase(self) -> None:
-        if self.enabled and self.drawn:
-            self.out.write(f"\x1b[{self.drawn}A\x1b[J")
-            self.out.flush()
-        self.drawn = 0
+        with self.lock:
+            if self.enabled and self.drawn:
+                self.out.write(f"\x1b[{self.drawn}A\x1b[J")
+                self.out.flush()
+            self.drawn = 0
 
     def redraw(self) -> None:
-        if not self.enabled:
+        with self.lock:
+            if not self.enabled:
+                return
+            self.erase()
+            lines = self.frame()
+            if lines:
+                self.out.write("\n".join(lines) + "\n")
+                self.out.flush()
+            self.drawn = len(lines)
+            self._last = lines
+
+    # ---- the background clock
+    def start(self) -> None:
+        if not self.enabled or self._thread is not None:
             return
+
+        def loop() -> None:
+            while not self._stop.wait(0.06):
+                try:
+                    self.tick()
+                except Exception:  # drawing must never take the client down
+                    pass
+
+        self._thread = threading.Thread(target=loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1)
+            self._thread = None
         self.erase()
-        lines = self.frame()
-        if lines:
-            self.out.write("\n".join(lines) + "\n")
-            self.out.flush()
-        self.drawn = len(lines)
-        self._last = time.monotonic()
 
 
 # --------------------------------------------------------------------- output
@@ -327,6 +460,7 @@ def run(a: argparse.Namespace, read: Callable[[str], str] = input) -> int:
 
         last_id = a.after
         live = Live(enabled=False if getattr(a, "no_stream", False) else None)
+        live.start()
         turns: list[dict[str, Any]] = []
         answered: set[str] = set()
         retries = 0
@@ -348,22 +482,34 @@ def run(a: argparse.Namespace, read: Callable[[str], str] = input) -> int:
                             pq = st.get("pending_questions")
                             if pq and st.get("status") == "awaiting_input":
                                 if not answer(c, base, headers, did, pq, a.auto_answer, answered, read):
+                                    live.stop()
                                     return 1
                             continue
-                        if ev["event"] == "token":
-                            live.token(ev["data"].get("payload", {}))
+                        kind = ev["event"]
+                        payload = ev["data"].get("payload", {}) if isinstance(ev["data"], dict) else {}
+                        if kind == "token":
+                            live.token(payload)
                             continue
-                        live.erase()
-                        if ev["event"] in ("turn_completed", "verdict_ready"):
-                            live.complete(ev["data"].get("payload", {}).get("turn_id"))
-                        show(ev, a.verbose)
-                        if ev["event"] == "turn_completed":
-                            turns.append(ev["data"].get("payload", {}))
-                        if ev["event"] == "question_requested":
-                            qs = ev["data"]["payload"]["questions"]
-                            if not answer(c, base, headers, did, qs, a.auto_answer, answered, read):
+                        if kind == "thinking":
+                            live.note(payload.get("side"), payload.get("text"))
+                        if kind in ("question_requested", "done", "failed", "cancelled"):
+                            live.drain()  # nothing may still be "speaking" while we ask, or finish
+                        if kind == "turn_completed":
+                            live.turn_done(payload.get("turn_id"), payload.get("argument"), lambda e=ev: show(e, a.verbose))
+                            turns.append(payload)
+                        elif kind == "verdict_ready":
+                            live.turn_done(payload.get("turn_id"), payload.get("final_output"), lambda: None)
+                        else:
+                            live.after(lambda e=ev: show(e, a.verbose))
+                        if kind == "question_requested":
+                            with live.lock:
+                                live.erase()
+                                ok = answer(c, base, headers, did, payload["questions"], a.auto_answer, answered, read)
+                            if not ok:
+                                live.stop()
                                 return 1
-                        elif ev["event"] == "done":
+                        elif kind == "done":
+                            live.stop()
                             st = ev["data"]
                             print(f"\nFinished: {st.get('status')} ({st.get('end_reason')}), {round((st.get('wall_ms') or 0) / 1000)} s wall time")
                             res = fetch_result(c, base, headers, st["result_node_id"]) if st.get("result_node_id") else None
@@ -374,7 +520,6 @@ def run(a: argparse.Namespace, read: Callable[[str], str] = input) -> int:
                             if not res and st.get("error_code"):
                                 print(f"Error code: {st['error_code']}")
                             return 0 if st.get("status") == "completed" else 1
-                        live.redraw()
             except (httpx.ReadError, httpx.RemoteProtocolError, httpx.ConnectError) as e:
                 retries += 1
                 if retries > 5:
@@ -382,6 +527,7 @@ def run(a: argparse.Namespace, read: Callable[[str], str] = input) -> int:
                 print(f"(connection dropped, reconnecting {retries}/5)")
                 time.sleep(2)
             except KeyboardInterrupt:
+                live.stop()
                 print(f"\nStopped watching. The debate keeps running on the server. Rejoin with:  --resume {did}")
                 return 130
             # The stream ended without a 'done' event: reconnect from the last event seen.

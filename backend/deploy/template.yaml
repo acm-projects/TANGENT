@@ -32,15 +32,17 @@ Parameters:
     Default: low
     AllowedValues: [low, medium, high]
     Description: Reasoning effort sent to OpenRouter (matches DEBATE_REASONING_EFFORT locally)
-  WorkerReservedConcurrency:
+  WorkerMaxConcurrency:
     Type: Number
     Default: 5
-    Description: Max debates running at once. Each debate holds one Lambda while it works.
+    MinValue: 2
+    MaxValue: 1000
+    Description: Max debates running at once (SQS event source scaling limit, minimum 2). Each debate holds one Lambda while it works. Works on accounts whose Lambda concurrency quota is only 10, unlike reserved concurrency.
 
 Globals:
   Function:
     MemorySize: 1024
-    Architectures: [x86_64]
+    Architectures: [arm64]
     Environment:
       Variables:
         DATABASE_URL: !Ref DatabaseUrl
@@ -81,7 +83,6 @@ Resources:
     Properties:
       PackageType: Image
       Timeout: 900
-      ReservedConcurrentExecutions: !Ref WorkerReservedConcurrency
       ImageConfig:
         Command: ["debate.pg.handler.handler"]
       Policies:
@@ -94,6 +95,8 @@ Resources:
             Queue: !GetAtt DebateQueue.Arn
             BatchSize: 1
             FunctionResponseTypes: [ReportBatchItemFailures]
+            ScalingConfig:
+              MaximumConcurrency: !Ref WorkerMaxConcurrency
 
   SweeperFunction:
     Type: AWS::Serverless::Function
@@ -104,7 +107,6 @@ Resources:
     Properties:
       PackageType: Image
       Timeout: 120
-      ReservedConcurrentExecutions: 1
       ImageConfig:
         Command: ["debate.pg.handler.sweeper"]
       Policies:

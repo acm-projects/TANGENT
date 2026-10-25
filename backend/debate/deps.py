@@ -83,4 +83,4 @@ class Deps:
     ask_cap: int = 2
     search_cap: int = 4
     search_batch_max: int = 2  # queries per search call, so one search is always left to follow up on what came back
-    turn_step_cap: int = 6
+    turn_step_cap: int = 12  # counts thoughts and search results: 4 searches in 2 batches use 6, plus up to 2 asks

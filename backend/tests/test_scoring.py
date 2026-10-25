@@ -60,8 +60,11 @@ def test_a_lead_exactly_at_the_margin_wins():
     r = score_rubric(rubric(checks, a=(8, 8, 5), b=(4, 4, 5), leaning="A"), CLAIMS, STATS)
     assert r["gap"] == 2.0
     assert r["winner"] == "A"
-    r2 = score_rubric(rubric(checks, a=(8, 8, 5), b=(7, 7, 5), leaning="none"), CLAIMS, STATS)
-    assert r2["gap"] == 0.5 and r2["winner"] == "none"
+    r2 = score_rubric(rubric(checks, a=(8, 8, 5), b=(7.5, 7.5, 5), leaning="none"), CLAIMS, STATS)
+    assert r2["gap"] == 0.25 and r2["winner"] == "none"
+    r3 = score_rubric(rubric(checks, a=(8, 8, 5), b=(7, 7, 5), leaning="A"), CLAIMS, STATS)
+    assert r3["gap"] == 0.5 and r3["winner"] == "A"  # a lead exactly at the margin wins, with low confidence
+    assert r3["confidence"] < 0.7
 
 
 def test_an_uncited_claim_cannot_be_supported_even_if_the_model_says_so():
