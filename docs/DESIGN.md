@@ -130,7 +130,6 @@ frontend/src/
           mindmap/             ← React Flow; toFlow.ts is pure and tested (layout: store/layout.ts)
           chat/
           toolbar/
-  mocks/                       ← TEMPORARY fake backend; see HANDOFF.md
   api/                         ← the backend seam
     client.ts                  ← transport: auth header, single-flight refresh
     stream.ts                  ← transport: SSE over fetch

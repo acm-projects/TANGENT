@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
+import { api } from "@/api";
 import type { Source } from "@/api/types";
-import { mockApi } from "@/mocks/mockApi";
 
-/* The project's uploaded files, for the Sources panel. [proposed] -- the
- * backend has no sources/files table yet; see docs/HANDOFF.md. */
+/* The project's uploaded PDFs, for the Sources panel. */
 
 export function useSources(projectId: string) {
   const [sources, setSources] = useState<Source[] | null>(null);
@@ -12,8 +11,7 @@ export function useSources(projectId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    // TODO(backend): replace with the real list call (no endpoint exists yet).
-    mockApi.sources
+    api.sources
       .list(projectId)
       .then((list) => {
         if (!cancelled) setSources(list);
@@ -31,8 +29,7 @@ export function useSources(projectId: string) {
     setError(null);
     try {
       for (const file of files) {
-        // TODO(backend): replace with the real upload (likely multipart POST /projects/:id/sources).
-        const source = await mockApi.sources.add(projectId, file);
+        const source = await api.sources.add(projectId, file);
         setSources((prev) => [...(prev ?? []), source]);
       }
     } catch {
@@ -42,5 +39,27 @@ export function useSources(projectId: string) {
     }
   }
 
-  return { sources, error, uploading, add };
+  /** Open a source in a new tab: a Semantic Scholar paper at its link, an upload as its PDF. */
+  async function open(source: Source) {
+    if (source.url) {
+      window.open(source.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Open the tab inside the click: one opened after the download finishes is blocked as a pop-up.
+    const tab = window.open("", "_blank");
+    if (!tab) {
+      setError("Allow pop-ups for this site to open sources.");
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(await api.sources.file(projectId, source.id));
+      tab.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000); // the tab has loaded it by then
+    } catch {
+      tab.close();
+      setError("Could not open that source.");
+    }
+  }
+
+  return { sources, error, uploading, add, open };
 }

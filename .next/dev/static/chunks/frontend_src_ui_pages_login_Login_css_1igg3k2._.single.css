@@ -2,7 +2,8 @@
 .login {
   min-height: 100dvh;
   padding: var(--space-4);
-  background: radial-gradient(color-mix(in srgb, var(--color-text-faint) 45%, transparent) .75px, transparent 1px) 0 0 / 16px 16px,
+  background: var(--light-vignette),
+    radial-gradient(color-mix(in srgb, var(--color-text-faint) 45%, transparent) .75px, transparent 1px) 0 0 / 16px 16px,
     var(--texture-grain),
     var(--color-board);
   justify-content: center;

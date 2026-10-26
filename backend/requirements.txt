@@ -11,6 +11,10 @@ httpx
 pydantic[email]
 jinja2
 
+# research papers: PDF extraction and uploads
+pymupdf
+python-multipart
+
 # agent debate mode
 langgraph>=1.2
 langgraph-checkpoint-postgres>=3.1

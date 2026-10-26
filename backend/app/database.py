@@ -60,6 +60,68 @@ AsyncSessionLocal = async_sessionmaker(
 _ADDED_COLUMNS = [
     "ALTER TABLE invitations ADD COLUMN IF NOT EXISTS branch_node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
     "ALTER TABLE shares ADD COLUMN IF NOT EXISTS branch_node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
+    # Research papers (app/papers/). Raw SQL only, no ORM models, so warm_pool doesn't read them.
+    """CREATE TABLE IF NOT EXISTS papers (
+        id bigserial PRIMARY KEY,
+        source text NOT NULL,                  -- 's2' | 'upload'
+        source_id text NOT NULL,               -- S2 paperId, or '{project_id}:{sha256}' for uploads
+        project_id uuid REFERENCES projects(id) ON DELETE CASCADE,  -- uploads only; S2 papers are global
+        title text NOT NULL,
+        authors jsonb NOT NULL DEFAULT '[]'::jsonb,
+        year int,
+        abstract text,
+        doi text,
+        arxiv_id text,
+        pdf_url text,
+        status text NOT NULL DEFAULT 'metadata_only',
+        pdf_sha256 text,
+        page_count int,
+        pipeline_version int,
+        error text,
+        search_tsv tsvector GENERATED ALWAYS AS
+            (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, ''))) STORED,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (source, source_id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS papers_search_tsv_idx ON papers USING gin (search_tsv)",
+    """CREATE TABLE IF NOT EXISTS paper_files (
+        sha256 text PRIMARY KEY,
+        bytes bytea NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS paper_chunks (
+        paper_id bigint NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
+        idx int NOT NULL,
+        section text,
+        page_start int NOT NULL,
+        page_end int NOT NULL,
+        text text NOT NULL,
+        tsv tsvector GENERATED ALWAYS AS
+            (to_tsvector('english', coalesce(section, '') || ' ' || text)) STORED,
+        PRIMARY KEY (paper_id, idx)
+    )""",
+    "CREATE INDEX IF NOT EXISTS paper_chunks_tsv_idx ON paper_chunks USING gin (tsv)",
+    """CREATE TABLE IF NOT EXISTS ingestion_jobs (
+        id bigserial PRIMARY KEY,
+        paper_id bigint NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
+        pipeline_version int NOT NULL,
+        status text NOT NULL DEFAULT 'pending',  -- pending | running | done | failed
+        attempts int NOT NULL DEFAULT 0,
+        error text,
+        locked_at timestamptz,
+        run_after timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (paper_id, pipeline_version)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ingestion_jobs_pending_idx ON ingestion_jobs (run_after) WHERE status = 'pending'",
+    # Semantic Scholar papers an agent read in a project, so they show in its Sources panel next to uploads.
+    """CREATE TABLE IF NOT EXISTS project_papers (
+        project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        paper_id bigint NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (project_id, paper_id)
+    )""",
 ]
 
 

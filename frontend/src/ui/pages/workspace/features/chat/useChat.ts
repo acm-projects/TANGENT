@@ -4,6 +4,7 @@ import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, str
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "@/store/treeStore";
 import { forkNode, isPending, redirectToCopy, splitNode, switchToFork } from "../mindmap/nodeActions";
+import { uploadAttachments } from "./attachments";
 
 /**
  * Everything the chat panel does, with no UI in it (DESIGN.md Rule 5).
@@ -114,9 +115,14 @@ export function useChat() {
     const text = content.trim();
     if (!nodeId || blocker || nodeId in useTreeStore.getState().streaming || !text) return;
     if (files.length > 0) {
-      // The endpoint takes {content, model} only; there is no upload step yet (docs/HANDOFF.md).
-      setError("Attachments aren't supported yet. Remove them to send.");
-      return;
+      const projectId = useTreeStore.getState().nodesById[nodeId]?.project_id;
+      if (!projectId) return;
+      try {
+        await uploadAttachments(api.sources, projectId, files);
+      } catch (e) {
+        setError(apiErrorMessage(e, "Could not attach the file; nothing was sent."));
+        return;
+      }
     }
     await ask(nodeId, text, false);
   }

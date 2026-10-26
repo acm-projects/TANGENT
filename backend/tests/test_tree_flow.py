@@ -75,7 +75,7 @@ def sign_up(c):
 
 
 def test_tree_fork_and_prompt(monkeypatch):
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         seen.append(messages)
         yield {"text": "pong"}
 
@@ -162,7 +162,7 @@ def test_simultaneous_forks_get_distinct_indexes():
 def test_split_moves_the_rest_and_the_branches_down(monkeypatch):
     replies = iter(["one", "two", "three"])
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -203,7 +203,7 @@ def test_split_moves_the_rest_and_the_branches_down(monkeypatch):
 def test_join_undoes_a_split_and_merge_reads_back(monkeypatch):
     replies = iter(["one", "two", "three", "four"])
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -246,7 +246,7 @@ def test_merge_sources_follow_a_split_and_a_join(monkeypatch):
     m2's source must follow the conversation's end: the tail after the split, m again after the join."""
     replies = iter(f"r{i}" for i in range(20))
 
-    async def fake_llm(messages, model):
+    async def fake_llm(messages, model, **_):
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -292,3 +292,101 @@ def _workspace_id(user_id):
         return str(wid)
 
     return asyncio.run(run())
+
+
+def test_sources_list_uploads_and_read_papers_and_open_them():
+    import hashlib
+
+    import httpx
+    import pymupdf
+
+    from app.papers import s2, service
+
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "Submission rules: everything is due at 11:59 PM.")
+    pdf = doc.tobytes()
+    s2_ref = f"tangent-tree-test-{uuid.uuid4().hex[:8]}"
+
+    async def read_s2_paper(project_id):
+        """What the agent does: open a Semantic Scholar paper while chatting in this project."""
+        async with database.AsyncSessionLocal() as db:
+            row = await service._upsert_s2(db, {
+                "source_id": s2_ref, "title": "A Read Paper", "authors": [], "year": 2024, "abstract": None,
+                "doi": "10.1/x", "arxiv_id": None, "pdf_url": None,
+            })
+            await db.commit()
+        await service.search_paper_evidence(f"p{row['id']}", "rules", wait_seconds=0, project_id=uuid.UUID(project_id))
+        return row["id"]
+
+    async def set_chats(node_id, chats):
+        import json
+
+        async with database.AsyncSessionLocal() as db:
+            await db.execute(text("UPDATE nodes SET chats = CAST(:c AS jsonb) WHERE id = :n"),
+                             {"c": json.dumps(chats), "n": node_id})
+            await db.commit()
+
+    async def cleanup():
+        async with database.AsyncSessionLocal() as db:
+            await db.execute(text("DELETE FROM papers WHERE source_id LIKE :s"), {"s": s2_ref + "%"})
+            await db.execute(text("""DELETE FROM paper_files f WHERE sha256 = :h
+                                     AND NOT EXISTS (SELECT 1 FROM papers p WHERE p.pdf_sha256 = f.sha256)"""),
+                             {"h": hashlib.sha256(pdf).hexdigest()})
+            await db.commit()
+
+    try:
+        with TestClient(app) as c:
+            auth = sign_up(c)
+            me = c.get("/auth/me", headers=auth).json()
+            pid = c.post("/projects/", json={"project_name": "S", "workspace_id": _workspace_id(me["id"])},
+                         headers=auth).json()["id"]
+
+            up = c.post(f"/projects/{pid}/sources", files={"file": ("rules.pdf", pdf, "application/pdf")}, headers=auth)
+            assert up.status_code == 201
+            assert up.json()["origin"] == "upload" and up.json()["url"] is None
+
+            opened = c.get(f"/projects/{pid}/sources/{up.json()['id']}/file", headers=auth)
+            assert opened.status_code == 200 and opened.content == pdf
+            assert opened.headers["content-type"] == "application/pdf"
+            assert opened.headers["content-disposition"].startswith("inline")
+
+            assert c.get(f"/projects/{pid}/sources", headers=auth).json()[0]["use_count"] == 0
+            root = c.get(f"/projects/{pid}/tree", headers=auth).json()["tree"]["root_node_id"]
+            msg = lambda role, text_, seq: {"role": role, "content": text_, "seq": seq, "branch_source": None,
+                                           "created_at": "2026-01-01T00:00:00Z"}
+            up_id = up.json()["id"]
+            chats = [msg("user", f"what does {up_id} say? p9", 0),  # the user's own text never counts
+                     msg("assistant", f"Per [{up_id}:c0] and [{up_id}:c1], due at 11:59.", 1),  # one reply, two cites
+                     msg("assistant", f"As the document ({up_id}) says.", 2),  # a plain mention counts too
+                     msg("assistant", f"Unrelated: p{up_id[1:]}0 and xp{up_id[1:]}.", 3)]  # other ids don't
+            asyncio.run(set_chats(root, chats))
+            assert c.get(f"/projects/{pid}/sources", headers=auth).json()[0]["use_count"] == 2
+
+            s2_id = asyncio.run(read_s2_paper(pid))
+            listed = c.get(f"/projects/{pid}/sources", headers=auth).json()
+            assert [(s["id"], s["origin"]) for s in listed] == [(up.json()["id"], "upload"), (f"p{s2_id}", "s2")]
+            assert listed[1]["url"] == "https://doi.org/10.1/x" and listed[1]["kind"] == "link"
+            # only uploads have bytes to serve
+            assert c.get(f"/projects/{pid}/sources/p{s2_id}/file", headers=auth).status_code == 404
+
+            # a search: the readable paper is preferred when only one fits, and an abstract-only result joins
+            # the project's sources (as "unavailable") once it is actually returned
+            topic = f"zyzzogeton{uuid.uuid4().hex[:6]}"
+            hits = lambda: httpx.Response(200, json={"data": [
+                {"paperId": s2_ref + "-abs", "title": f"{topic} abstract only", "authors": [], "year": 2024,
+                 "abstract": "a", "externalIds": {}, "openAccessPdf": None},
+                {"paperId": s2_ref + "-open", "title": f"{topic} open access", "authors": [], "year": 2024,
+                 "abstract": "b", "externalIds": {}, "openAccessPdf": {"url": "https://x.test/o.pdf"}}]})
+            s2.transport = httpx.MockTransport(lambda request: hits())
+            one = asyncio.run(service.search_papers(topic, limit=1, project_id=uuid.UUID(pid)))
+            assert [r["title"] for r in one["results"]] == [f"{topic} open access"]
+            names = lambda: [x["name"] for x in c.get(f"/projects/{pid}/sources", headers=auth).json()]
+            assert f"{topic} abstract only" not in names()
+            both = asyncio.run(service.search_papers(topic, limit=2, project_id=uuid.UUID(pid)))
+            assert {r["title"] for r in both["results"]} == {f"{topic} abstract only", f"{topic} open access"}
+            by_name = {x["name"]: x for x in c.get(f"/projects/{pid}/sources", headers=auth).json()}
+            assert by_name[f"{topic} abstract only"]["status"] == "unavailable"
+            assert f"{topic} open access" not in by_name  # readable papers join only once read
+    finally:
+        s2.transport = None
+        asyncio.run(cleanup())

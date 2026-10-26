@@ -63,13 +63,21 @@ async def stream_openrouter(
     messages: list[dict],
     model: str,
     transport: httpx.AsyncBaseTransport | None = None,
+    tools: list[dict] | None = None,
+    tool_choice: str | None = None,
 ) -> AsyncIterator[dict]:
     """Yield {"text": str} per token, then {"usage": {...}, "model": str} if the provider sent
-    usage, or a single {"error": ...} and stop. `transport` exists so tests can fake the provider."""
+    usage, or a single {"error": ...} and stop. `transport` exists so tests can fake the provider.
+    With `tools`, a reply that calls tools also yields {"tool_calls": [...]} (OpenAI format) before usage."""
     headers = {"Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}"}
     body = {"model": model, "messages": messages, "stream": True}
+    if tools:
+        body["tools"] = tools
+    if tool_choice:
+        body["tool_choice"] = tool_choice
     final_model = model
     usage = None
+    calls: dict[int, dict] = {}  # tool calls arrive as fragments, keyed by index
 
     async with httpx.AsyncClient(timeout=120, transport=transport) as client:
         async with client.stream("POST", OPENROUTER_URL, json=body, headers=headers) as r:
@@ -93,11 +101,22 @@ async def stream_openrouter(
                 final_model = chunk.get("model", final_model)
                 choices = chunk.get("choices") or []
                 if choices:
-                    text = choices[0].get("delta", {}).get("content")
+                    delta = choices[0].get("delta") or {}
+                    text = delta.get("content")
                     if text:
                         yield {"text": text}
+                    for tc in delta.get("tool_calls") or []:
+                        call = calls.setdefault(
+                            tc.get("index", 0), {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
+                        )
+                        call["id"] = tc.get("id") or call["id"]
+                        fn = tc.get("function") or {}
+                        call["function"]["name"] += fn.get("name") or ""
+                        call["function"]["arguments"] += fn.get("arguments") or ""
                 if chunk.get("usage"):
                     usage = chunk["usage"]
 
+    if calls:
+        yield {"tool_calls": [calls[i] for i in sorted(calls)]}
     if usage:
         yield {"usage": usage, "model": final_model}

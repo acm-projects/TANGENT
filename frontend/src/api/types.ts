@@ -165,15 +165,23 @@ export interface ProjectSummary {
 /** GET /projects/:id */
 export type ProjectDetail = ProjectSummary & { tree_count: number };
 
-/** [proposed] A file in a project's Sources panel (Figma "Workspace Source"). No backend table yet. */
+/** A card in a project's Sources panel (Figma "Workspace Source"): an uploaded PDF, or a Semantic Scholar
+ * paper an agent read in this project. sources_router.py SourceOut. */
 export interface Source {
+  /** The paper id the research tools use, e.g. "p12". */
   id: string;
   name: string;
+  /** "pdf", or "link" for a Semantic Scholar paper with no open PDF. */
   kind: AttachmentKind;
+  origin: "upload" | "s2";
+  /** Where a Semantic Scholar paper opens. Null for uploads: their bytes come from `api.sources.file`. */
+  url: string | null;
   /** Thumbnail URL, or null to show the kind's icon instead. */
   thumbnail_url: string | null;
-  /** How many messages reference it ("Used 1 time"). */
+  /** How many messages reference it ("Used 1 time"). Always 0 for now. */
   use_count: number;
+  /** Whether the research tools can read its full text yet. */
+  status?: "ready" | "processing" | "on_demand" | "unavailable";
 }
 
 /** shares_router.py: status of a row in a project's member list. */

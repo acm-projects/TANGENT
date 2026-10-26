@@ -47,7 +47,8 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
 
   // a fork still being confirmed only holds Send back for a moment; typing can start straight away
   const disabled = blocker !== null && blocker !== "pending";
-  const canSend = blocker === null && !modelsLoading && Boolean(selectedModel) && (text.trim().length > 0 || files.length > 0);
+  // text is required: the server takes no attachment-only message, and submit() clears the attached files
+  const canSend = blocker === null && !modelsLoading && Boolean(selectedModel) && text.trim().length > 0;
 
   function submit() {
     if (!canSend) return;
@@ -132,11 +133,11 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
             {modelLocked && <Text as="span" size="xxs" hierarchy="tertiary" content="Locked for this node" />}
             <Button
               hierarchy="tertiary"
-              label="Attach file (not available yet)"
+              label="Attach PDF"
               icon="attach_file"
               showIcon
               showLabel={false}
-              disabled // the server takes text only until an upload step exists (docs/HANDOFF.md)
+              disabled={disabled}
               onClick={() => fileInput.current?.click()}
             />
             <Button
@@ -145,7 +146,7 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
               icon="image"
               showIcon
               showLabel={false}
-              disabled
+              disabled // images have no upload path: sources take PDFs only
               onClick={() => imageInput.current?.click()}
             />
           </Frame>
@@ -183,6 +184,7 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
       <Input
         ref={fileInput}
         type="file"
+        accept="application/pdf"
         multiple
         hidden
         onChange={(e) => {
