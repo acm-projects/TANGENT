@@ -29,9 +29,11 @@ RESEARCH_SYSTEM_PROMPT = (
     "You can look up research papers with the tools search_papers, get_paper and search_paper_evidence. "
     "When a claim depends on a paper, use search_paper_evidence to read the relevant passages and cite each "
     "one inline by its evidence id in square brackets, e.g. [p12:c7]. Cite only evidence ids a tool returned "
-    "in this conversation; never invent a paper, id, page or quote. If a paper's full text is unavailable or "
-    "still processing, say so and rely only on its abstract, labelled as such. If the evidence is missing, "
-    "thin or conflicting, say that plainly instead of guessing."
+    "in this conversation; never invent a paper, id, page or quote. Prefer papers whose full_text is ready, "
+    "processing or on_demand, since only those can be quoted; use an abstract-only paper (full_text: "
+    "unavailable) when it is clearly more relevant or the only one, and say its claims come from the abstract. "
+    "If a paper's full text is still processing, say so. If the evidence is missing, thin or conflicting, say "
+    "that plainly instead of guessing."
 )
 
 TOOLS = [
@@ -109,6 +111,16 @@ def full_text_state(row) -> str:
     if status == "metadata_only" and (row["pdf_url"] or row["pdf_sha256"]):
         return "on_demand"
     return "unavailable"
+
+
+ACCESS_BONUS = 3  # a readable paper outranks an abstract-only one up to this many places more relevant
+
+
+def prefer_accessible(rows: list, limit: int) -> list:
+    """rows in relevance order -> the top `limit`, with papers whose full text can be read moved ahead of
+    abstract-only ones, but only by ACCESS_BONUS places: a much more relevant abstract-only paper still wins."""
+    ranked = sorted(enumerate(rows), key=lambda ir: ir[0] - (ACCESS_BONUS if full_text_state(ir[1]) != "unavailable" else 0))
+    return [r for _, r in ranked[:limit]]
 
 
 def _summary(row) -> dict:
@@ -320,6 +332,19 @@ async def ensure_ingest(row) -> None:
 
 # --- tools ----------------------------------------------------------------------------------------------
 
+async def _list_abstract_only(db, rows, project_id: UUID | None) -> None:
+    """Abstract-only papers returned by a search join the project's Sources panel (in its own section) because
+    the model may draw on their abstracts. Readable ones join only once read. Caller commits."""
+    if project_id is None:
+        return
+    ids = [r["id"] for r in rows if r["source"] == "s2" and full_text_state(r) == "unavailable"]
+    if ids:
+        await db.execute(text("""
+            INSERT INTO project_papers (project_id, paper_id) SELECT :p, unnest(CAST(:ids AS bigint[]))
+            ON CONFLICT DO NOTHING
+        """), {"p": project_id, "ids": ids})
+
+
 async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID | None = None) -> dict:
     query = (query or "").strip()
     if not query:
@@ -332,22 +357,28 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
             WHERE search_tsv @@ q
               AND (project_id IS NULL OR project_id = CAST(:pid AS uuid))
               AND (CAST(:year AS int) IS NULL OR year >= CAST(:year AS int))
-            ORDER BY ts_rank_cd(search_tsv, q) DESC LIMIT :limit
+            ORDER BY ts_rank_cd(search_tsv, q)
+                     * CASE WHEN pdf_url IS NOT NULL OR pdf_sha256 IS NOT NULL THEN 1.5 ELSE 1 END DESC
+            LIMIT :limit
         """), {"q": query, "pid": str(project_id) if project_id else None, "year": year, "limit": limit})).mappings())
         if len(rows) >= limit:
             log.info("papers search cache hit q=%r local=%d", query, len(rows))
+            await _list_abstract_only(db, rows, project_id)
+            await db.commit()
             return {"results": [_summary(r) for r in rows]}
         log.info("papers search cache miss q=%r local=%d; asking Semantic Scholar", query, len(rows))
         try:
-            found = await s2.search(query, limit, year)
+            found = await s2.search(query, min(limit * 2, 20), year)  # extra candidates to prefer readable ones from
         except s2.S2Error as exc:
             return {"results": [_summary(r) for r in rows], "warning": str(exc) + "; showing cached papers only"}
         seen = {r["id"] for r in rows}
         for meta in found:
             row = await _upsert_s2(db, meta)
-            if row["id"] not in seen and len(rows) < limit:
+            if row["id"] not in seen:
                 rows.append(row)
                 seen.add(row["id"])
+        rows = prefer_accessible(rows, limit)
+        await _list_abstract_only(db, rows, project_id)
         await db.commit()
     return {"results": [_summary(r) for r in rows]}
 

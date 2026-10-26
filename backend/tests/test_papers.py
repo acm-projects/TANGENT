@@ -6,7 +6,7 @@ _added = [k for k in _dummies if k not in os.environ]
 os.environ.update({k: _dummies[k] for k in _added})
 
 from app.papers import s2
-from app.papers.service import citations_in, fill_budget, full_text_state, quote_matches
+from app.papers.service import citations_in, fill_budget, full_text_state, parse_leaked_tool_calls, prefer_accessible, quote_matches
 
 for _k in _added:
     del os.environ[_k]
@@ -50,3 +50,22 @@ def test_s2_normalize_falls_back_to_arxiv_pdf():
                          "externalIds": {"ArXiv": "2001.00001", "DOI": "10.1/x"}, "openAccessPdf": None})
     assert meta["pdf_url"] == "https://arxiv.org/pdf/2001.00001"
     assert meta["authors"] == ["Ada"] and meta["doi"] == "10.1/x"
+
+
+def test_prefer_accessible_reorders_slightly_but_keeps_a_far_more_relevant_abstract():
+    paper = lambda name, url=None: {"name": name, "status": "metadata_only", "pdf_url": url, "pdf_sha256": None}
+    abstract_first = paper("abstract-1")
+    ranked = [abstract_first, paper("abstract-2"), paper("open-3", "u"), paper("open-4", "u")]
+    # an open paper two places down overtakes the first abstract-only one, within the bonus
+    assert [r["name"] for r in prefer_accessible(ranked, 3)] == ["open-3", "abstract-1", "open-4"]
+    far = [paper(f"abstract-{i}") for i in range(6)] + [paper("open-late", "u")]
+    assert prefer_accessible(far, 2)[0]["name"] == "abstract-0"  # far more relevant: not displaced
+    assert [r["name"] for r in prefer_accessible([paper("a"), paper("b")], 5)] == ["a", "b"]  # only abstracts: still returned
+
+
+def test_parse_leaked_tool_calls():
+    calls = parse_leaked_tool_calls("<tool_call> <function=search_papers> <parameter=query> a b </parameter> "
+                                    "<parameter=limit> 10 </parameter> </function> </tool_call>")
+    assert [(c["function"]["name"], c["function"]["arguments"]) for c in calls] == [
+        ("search_papers", '{"query": "a b", "limit": 10}')]
+    assert parse_leaked_tool_calls("<tool_call>no function here") == []

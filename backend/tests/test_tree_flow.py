@@ -297,9 +297,10 @@ def _workspace_id(user_id):
 def test_sources_list_uploads_and_read_papers_and_open_them():
     import hashlib
 
+    import httpx
     import pymupdf
 
-    from app.papers import service
+    from app.papers import s2, service
 
     doc = pymupdf.open()
     doc.new_page().insert_text((72, 72), "Submission rules: everything is due at 11:59 PM.")
@@ -327,7 +328,7 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
 
     async def cleanup():
         async with database.AsyncSessionLocal() as db:
-            await db.execute(text("DELETE FROM papers WHERE source_id = :s"), {"s": s2_ref})
+            await db.execute(text("DELETE FROM papers WHERE source_id LIKE :s"), {"s": s2_ref + "%"})
             await db.execute(text("""DELETE FROM paper_files f WHERE sha256 = :h
                                      AND NOT EXISTS (SELECT 1 FROM papers p WHERE p.pdf_sha256 = f.sha256)"""),
                              {"h": hashlib.sha256(pdf).hexdigest()})
@@ -367,5 +368,25 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
             assert listed[1]["url"] == "https://doi.org/10.1/x" and listed[1]["kind"] == "link"
             # only uploads have bytes to serve
             assert c.get(f"/projects/{pid}/sources/p{s2_id}/file", headers=auth).status_code == 404
+
+            # a search: the readable paper is preferred when only one fits, and an abstract-only result joins
+            # the project's sources (as "unavailable") once it is actually returned
+            topic = f"zyzzogeton{uuid.uuid4().hex[:6]}"
+            hits = lambda: httpx.Response(200, json={"data": [
+                {"paperId": s2_ref + "-abs", "title": f"{topic} abstract only", "authors": [], "year": 2024,
+                 "abstract": "a", "externalIds": {}, "openAccessPdf": None},
+                {"paperId": s2_ref + "-open", "title": f"{topic} open access", "authors": [], "year": 2024,
+                 "abstract": "b", "externalIds": {}, "openAccessPdf": {"url": "https://x.test/o.pdf"}}]})
+            s2.transport = httpx.MockTransport(lambda request: hits())
+            one = asyncio.run(service.search_papers(topic, limit=1, project_id=uuid.UUID(pid)))
+            assert [r["title"] for r in one["results"]] == [f"{topic} open access"]
+            names = lambda: [x["name"] for x in c.get(f"/projects/{pid}/sources", headers=auth).json()]
+            assert f"{topic} abstract only" not in names()
+            both = asyncio.run(service.search_papers(topic, limit=2, project_id=uuid.UUID(pid)))
+            assert {r["title"] for r in both["results"]} == {f"{topic} abstract only", f"{topic} open access"}
+            by_name = {x["name"]: x for x in c.get(f"/projects/{pid}/sources", headers=auth).json()}
+            assert by_name[f"{topic} abstract only"]["status"] == "unavailable"
+            assert f"{topic} open access" not in by_name  # readable papers join only once read
     finally:
+        s2.transport = None
         asyncio.run(cleanup())
