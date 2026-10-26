@@ -493,3 +493,48 @@ def test_system_prompt_names_project_uploads(client, monkeypatch):
     assert system["role"] == "system" and system["content"].startswith(nodes_router.paper_service.RESEARCH_SYSTEM_PROMPT)
     assert "- p38: 00 Assignment Submit Policy and Rules.pdf (full_text: ready)" in system["content"]
     assert "search_paper_evidence" in system["content"].split("p38", 1)[1]
+
+
+def test_provider_5xx_before_any_text_is_retried_once(client, monkeypatch):
+    err = "data: " + json.dumps({"error": {"message": "Provider returned error", "code": 502}})
+    transport, bodies = scripted_provider([[err], [chunk("hello"), "data: [DONE]"]])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert [e[0] for e in events(r)] == ["token", "done"] and len(bodies) == 2
+
+
+def test_persistent_provider_5xx_is_a_plain_message_not_raw_json(client, monkeypatch):
+    err = "data: " + json.dumps({"error": {"message": "Provider returned error", "code": 502, "metadata": {"raw": "x"}}})
+    transport, bodies = scripted_provider([[err], [err]])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert events(r) == [("error", {"message": "The model provider failed (Provider returned error). Try again."})]
+    assert len(bodies) == 2 and client.persisted == []
+
+
+def test_tool_call_written_as_text_is_run_not_shown(client, monkeypatch):
+    leaked = ("<tool_call> <function=search_papers> <parameter=query> polar bear pollution </parameter> "
+              "<parameter=limit> 10 </parameter> </function> </tool_call>")
+    transport, bodies = scripted_provider([
+        [chunk("<tool_"), chunk(leaked[6:]), "data: [DONE]"],
+        [chunk("Found one."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+    calls = []
+
+    async def fake_tool(name, args, project_id):
+        calls.append((name, args))
+        return {"results": []}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "find a paper"})
+
+    shown = "".join(d["text"] for name, d in events(r) if name == "token")
+    assert shown == "Found one." and "tool_call" not in shown
+    assert calls == [("search_papers", {"query": "polar bear pollution", "limit": 10})]
+    assert client.persisted[0][3] == "Found one."

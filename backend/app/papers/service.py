@@ -178,6 +178,26 @@ async def project_sources_note(project_id: UUID) -> str:
     return sources_note(rows)
 
 
+_LEAKED_CALL = re.compile(r"<function=(\w+)>(.*?)(?:</function>|$)", re.DOTALL)
+_LEAKED_PARAM = re.compile(r"<parameter=(\w+)>\s*(.*?)\s*(?:</parameter>|$)", re.DOTALL)
+LEAK_MARKER = "<tool_call>"
+
+
+def parse_leaked_tool_calls(text: str) -> list[dict]:
+    """Some models write a tool call as plain text (<tool_call><function=NAME><parameter=K>V...) instead of a
+    structured one. Parse that into OpenAI-format tool calls; [] when it isn't one."""
+    calls = []
+    for i, (name, body) in enumerate(_LEAKED_CALL.findall(text)):
+        args = {}
+        for key, raw in _LEAKED_PARAM.findall(body):
+            try:
+                args[key] = json.loads(raw)
+            except ValueError:
+                args[key] = raw
+        calls.append({"id": f"leaked-{i}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}})
+    return calls
+
+
 def citations_in(answer: str) -> list[str]:
     return list(dict.fromkeys(_CITATION.findall(answer)))
 

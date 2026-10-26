@@ -31,15 +31,15 @@ class SourceOut(BaseModel):
     # Semantic Scholar papers open here; an upload has none and opens through GET .../sources/{id}/file.
     url: Optional[str] = None
     thumbnail_url: Optional[str] = None
-    use_count: int = 0  # shortcut: always 0 until messages record which sources they cite
+    use_count: int = 0  # assistant replies in this project that cite it
     status: str  # ready | processing | on_demand | unavailable
 
 
-def _out(row) -> SourceOut:
+def _out(row, cited: int = 0) -> SourceOut:
     has_pdf = row["source"] == "upload" or bool(row["pdf_url"])
     return SourceOut(
         id=f"p{row['id']}", name=row["title"], kind="pdf" if has_pdf else "link",
-        status=full_text_state(row), origin=row["source"], url=paper_url(row),
+        status=full_text_state(row), origin=row["source"], url=paper_url(row), use_count=cited,
     )
 
 
@@ -53,7 +53,18 @@ async def list_sources(
         WHERE (p.source = 'upload' AND p.project_id = :p) OR pp.project_id IS NOT NULL
         ORDER BY coalesce(pp.created_at, p.created_at), p.id
     """), {"p": project_id})
-    return [_out(r) for r in rows.mappings()]
+    sources = list(rows.mappings())
+    # A reply cites a source by id: "[p38:c0]" or just "p38". One count per reply, whatever the number of mentions.
+    # shortcut: scans every saved reply in the project on each list; cache the counts if a project gets huge.
+    cited = dict((await db.execute(text("""
+        SELECT r[1]::bigint AS paper_id, count(DISTINCT (n.id, m.ord)) AS n
+        FROM nodes n,
+             jsonb_array_elements(n.chats) WITH ORDINALITY AS m(msg, ord),
+             regexp_matches(m.msg->>'content', '\mp(\d+)\M', 'g') AS r
+        WHERE n.project_id = :p AND m.msg->>'role' = 'assistant'
+        GROUP BY 1
+    """), {"p": project_id})).all())
+    return [_out(r, cited.get(r["id"], 0)) for r in sources]
 
 
 @router.get("/{project_id}/sources/{source_id}/file")

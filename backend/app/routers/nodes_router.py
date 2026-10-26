@@ -567,24 +567,60 @@ async def send_message(
                 """Relay the provider's tokens, running research tools when it calls them (bounded by
                 MAX_TOOL_ROUNDS); returns its error message, or None once it finishes."""
                 convo = list(messages)
-                for round_no in range(MAX_TOOL_ROUNDS + 1):
+                retried = False
+                round_no = 0
+                while round_no <= MAX_TOOL_ROUNDS:
                     calls, said = None, len(reply)
                     last = round_no == MAX_TOOL_ROUNDS
+                    held, mode = "", None  # mode: None = undecided, "stream", or "hold" (a tool call written as text)
+                    failed = None
                     async for ev in stream_openrouter(
                         convo, req.model, tools=paper_service.TOOLS, tool_choice="none" if last else None
                     ):
                         if "error" in ev:
-                            err = ev["error"]
-                            return err if isinstance(err, str) else json.dumps(err)
+                            failed = ev["error"]
+                            break
                         if "text" in ev:
-                            reply.append(ev["text"])
-                            queue.put_nowait(_sse("token", {"text": ev["text"]}))
+                            if mode == "stream":
+                                reply.append(ev["text"])
+                                queue.put_nowait(_sse("token", {"text": ev["text"]}))
+                                continue
+                            # decide from the first characters whether this reply is really a tool call in text
+                            held += ev["text"]
+                            if mode == "hold":
+                                continue
+                            head, marker = held.lstrip(), paper_service.LEAK_MARKER
+                            if marker.startswith(head) and len(head) < len(marker):
+                                continue  # still could be the marker
+                            if head.startswith(marker):
+                                mode = "hold"
+                                continue
+                            mode = "stream"
+                            reply.append(held)
+                            queue.put_nowait(_sse("token", {"text": held}))
                         elif "tool_calls" in ev:
                             calls = ev["tool_calls"]
                         else:
                             done.update(ev)
+                    if failed is not None:
+                        transient = isinstance(failed, dict) and type(failed.get("code")) is int and failed["code"] >= 500
+                        if transient and not retried and len(reply) == said:
+                            retried = True  # a provider hiccup before anything was shown: ask again once
+                            continue
+                        if isinstance(failed, dict):
+                            return f"The model provider failed ({failed.get('message') or 'unknown error'}). Try again."
+                        return failed
+                    if mode is None and held:  # a short reply that never reached the marker's length
+                        reply.append(held)
+                        queue.put_nowait(_sse("token", {"text": held}))
+                    elif mode == "hold":
+                        calls = paper_service.parse_leaked_tool_calls(held)
+                        if not calls:  # it only looked like one: show it
+                            reply.append(held)
+                            queue.put_nowait(_sse("token", {"text": held}))
                     if not calls or last:
                         return None
+                    round_no += 1
                     convo.append({"role": "assistant", "content": "".join(reply[said:]) or None, "tool_calls": calls})
                     for i, call in enumerate(calls):
                         if i >= MAX_CALLS_PER_ROUND:  # every call still needs a reply, or the provider rejects the turn

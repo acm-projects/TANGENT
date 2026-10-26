@@ -80,7 +80,7 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
                     <Text size="m" className="source-name" content={s.name} title={s.name} />
                     <Frame direction="row" gap="2" align="center" className="source-usage">
                       <Icon icon={s.kind === "pdf" ? "picture_as_pdf" : s.kind === "link" ? "link" : "image"} size="s" />
-                      <Text as="span" size="s" content={s.origin === "s2" ? "Found on Semantic Scholar" : s.use_count === 0 ? "Not cited yet" : `Cited ${s.use_count} ${s.use_count === 1 ? "time" : "times"}`} />
+                      <Text as="span" size="s" content={s.use_count > 0 ? `Cited ${s.use_count} ${s.use_count === 1 ? "time" : "times"}` : s.origin === "s2" ? "Found on Semantic Scholar" : "Not cited yet"} />
                       <Icon icon="chevron_right" size="s" className="source-usage-more" />
                     </Frame>
                   </Frame>

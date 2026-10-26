@@ -317,6 +317,14 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
         await service.search_paper_evidence(f"p{row['id']}", "rules", wait_seconds=0, project_id=uuid.UUID(project_id))
         return row["id"]
 
+    async def set_chats(node_id, chats):
+        import json
+
+        async with database.AsyncSessionLocal() as db:
+            await db.execute(text("UPDATE nodes SET chats = CAST(:c AS jsonb) WHERE id = :n"),
+                             {"c": json.dumps(chats), "n": node_id})
+            await db.commit()
+
     async def cleanup():
         async with database.AsyncSessionLocal() as db:
             await db.execute(text("DELETE FROM papers WHERE source_id = :s"), {"s": s2_ref})
@@ -340,6 +348,18 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
             assert opened.status_code == 200 and opened.content == pdf
             assert opened.headers["content-type"] == "application/pdf"
             assert opened.headers["content-disposition"].startswith("inline")
+
+            assert c.get(f"/projects/{pid}/sources", headers=auth).json()[0]["use_count"] == 0
+            root = c.get(f"/projects/{pid}/tree", headers=auth).json()["tree"]["root_node_id"]
+            msg = lambda role, text_, seq: {"role": role, "content": text_, "seq": seq, "branch_source": None,
+                                           "created_at": "2026-01-01T00:00:00Z"}
+            up_id = up.json()["id"]
+            chats = [msg("user", f"what does {up_id} say? p9", 0),  # the user's own text never counts
+                     msg("assistant", f"Per [{up_id}:c0] and [{up_id}:c1], due at 11:59.", 1),  # one reply, two cites
+                     msg("assistant", f"As the document ({up_id}) says.", 2),  # a plain mention counts too
+                     msg("assistant", f"Unrelated: p{up_id[1:]}0 and xp{up_id[1:]}.", 3)]  # other ids don't
+            asyncio.run(set_chats(root, chats))
+            assert c.get(f"/projects/{pid}/sources", headers=auth).json()[0]["use_count"] == 2
 
             s2_id = asyncio.run(read_s2_paper(pid))
             listed = c.get(f"/projects/{pid}/sources", headers=auth).json()
