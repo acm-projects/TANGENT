@@ -9,6 +9,7 @@
  * barrel -- that would be a cycle.
  */
 
+import { createAgentApi } from "./endpoints/agent";
 import { createAuthApi } from "./endpoints/auth";
 import { createChatsApi } from "./endpoints/chats";
 import { createNodesApi } from "./endpoints/nodes";
@@ -20,6 +21,7 @@ import { createWorkspacesApi } from "./endpoints/workspaces";
 import { apiClient } from "./session";
 
 export const api = {
+  agent: createAgentApi(apiClient),
   auth: createAuthApi(apiClient),
   chats: createChatsApi(apiClient),
   nodes: createNodesApi(apiClient),

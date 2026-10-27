@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
+import { AgentWindow } from "../agent/AgentWindow";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
@@ -30,6 +31,7 @@ type ChatProps = { className?: string };
 export function Chat({ className }: ChatProps) {
   const chat = useChat();
   const [layout, setLayout] = useState<Layout>("docked");
+  const [agentOpen, setAgentOpen] = useState(false);
 
   // Selecting a node brings a collapsed chat back (adjusting state during render, not in an effect).
   const [shownNodeId, setShownNodeId] = useState(chat.activeNodeId);
@@ -79,23 +81,44 @@ export function Chat({ className }: ChatProps) {
     };
   }, [scrollKey]);
 
+  // After the panels in both layouts, so the conversation survives opening and collapsing the chat.
+  const agentWindow = agentOpen && <AgentWindow onClose={() => setAgentOpen(false)} />;
+
   if (layout === "collapsed") {
     return (
-      <Frame as="aside" className={classes} data-layout="collapsed" aria-label="Chat">
-        <Button
-          elevation="floating"
-          label="Open chat"
-          icon="chevron_left"
-          showIcon
-          showLabel={false}
-          size="l"
-          onClick={() => setLayout("docked")}
-        />
-      </Frame>
+      <>
+        <Frame as="aside" className={classes} data-layout="collapsed" aria-label="Chat">
+          <Frame direction="row" gap="2">
+            <Button
+              elevation="floating"
+              label="Open chat"
+              icon="chevron_left"
+              showIcon
+              showLabel={false}
+              size="l"
+              onClick={() => setLayout("docked")}
+            />
+            {/* a stand-in for the future agent: drives the agent tools so we can see they work */}
+            <Button
+              elevation="floating"
+              label="Open agent"
+              icon="smart_toy"
+              showIcon
+              showLabel={false}
+              size="l"
+              pressed={agentOpen}
+              onClick={() => setAgentOpen((open) => !open)}
+              className="agent-launch"
+            />
+          </Frame>
+        </Frame>
+        {agentWindow}
+      </>
     );
   }
 
   return (
+    <>
     <Panel
       as="aside"
       ref={sheetRef}
@@ -271,5 +294,7 @@ export function Chat({ className }: ChatProps) {
         />
       </Frame>
     </Panel>
+    {agentWindow}
+    </>
   );
 }

@@ -213,3 +213,22 @@ export interface AcceptInviteResponse {
   project_id: string;
   workspace_slug: string;
 }
+
+/** POST /projects/:id/agent -- app/agent/router.py. The client keeps the conversation and sends it all each time. */
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** A tool the agent ran; `result.error` is set when it failed. */
+export interface AgentToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+  result: Record<string, unknown> & { error?: string };
+}
+
+export interface AgentReply {
+  reply: string;
+  tool_calls: AgentToolCall[];
+  model: string;
+}

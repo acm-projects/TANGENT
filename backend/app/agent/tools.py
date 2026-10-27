@@ -110,6 +110,18 @@ _SUBTREE_SQL = text("""
 """)
 
 
+async def outline(project_id: UUID, user_id: UUID, limit: int = 100) -> str:
+    """One line per node (id, parent, title) for the agent's system prompt, so it can name nodes the user points at."""
+    async with _session(user_id) as db:
+        visible = await visible_to(db, project_id, user_id)
+        rows = (await db.execute(
+            select(Node.id, Node.parent_id, Node.title).where(Node.project_id == project_id).order_by(Node.created_at, Node.id)
+        )).all()
+    rows = [r for r in rows if visible is None or r.id in visible]
+    lines = [f"- {r.id} (parent {r.parent_id or 'none, the root'}): {r.title or 'Untitled'}" for r in rows[:limit]]
+    return "\n".join(lines) + (f"\n(+{len(rows) - limit} more; use search_nodes)" if len(rows) > limit else "")
+
+
 async def get_node(node_id, *, project_id: UUID, user_id: UUID) -> dict:
     async with _session(user_id) as db:
         node = await _node(db, node_id, project_id, user_id)
