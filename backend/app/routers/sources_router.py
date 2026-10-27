@@ -1,5 +1,5 @@
 """A project's Sources panel: its uploaded PDFs, which the research tools can search, plus the Semantic Scholar
-papers an agent read in it."""
+papers its replies cite."""
 
 import hashlib
 from typing import Literal, Optional
@@ -15,7 +15,7 @@ from app.auth import get_current_user
 from app.database import get_db_session
 from app.models import User
 from app.papers.extract import MAX_PDF_BYTES
-from app.papers.service import ensure_ingest, full_text_state, paper_url
+from app.papers.service import ensure_ingest, full_text_state, paper_url, project_sources
 from app.routers.projects_router import get_project_with_role, require_owner
 
 router = APIRouter(prefix="/projects", tags=["Sources"], dependencies=[Depends(get_current_user)])
@@ -48,22 +48,7 @@ async def list_sources(
     project_id: UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db_session)
 ):
     await get_project_with_role(db, project_id, user)
-    rows = await db.execute(text("""
-        SELECT p.* FROM papers p LEFT JOIN project_papers pp ON pp.paper_id = p.id AND pp.project_id = :p
-        WHERE (p.source = 'upload' AND p.project_id = :p) OR pp.project_id IS NOT NULL
-        ORDER BY coalesce(pp.created_at, p.created_at), p.id
-    """), {"p": project_id})
-    sources = list(rows.mappings())
-    # A reply cites a source by id: "[p38:c0]" or just "p38". One count per reply, whatever the number of mentions.
-    # shortcut: scans every saved reply in the project on each list; cache the counts if a project gets huge.
-    cited = dict((await db.execute(text("""
-        SELECT r[1]::bigint AS paper_id, count(DISTINCT (n.id, m.ord)) AS n
-        FROM nodes n,
-             jsonb_array_elements(n.chats) WITH ORDINALITY AS m(msg, ord),
-             regexp_matches(m.msg->>'content', '\mp(\d+)\M', 'g') AS r
-        WHERE n.project_id = :p AND m.msg->>'role' = 'assistant'
-        GROUP BY 1
-    """), {"p": project_id})).all())
+    sources, cited = await project_sources(db, project_id)
     return [_out(r, cited.get(r["id"], 0)) for r in sources]
 
 

@@ -291,11 +291,7 @@ async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000,
     async with _session(user_id) as db:
         if await db.get(Project, project_id) is None:
             return {"error": "Project not found"}
-        # the project's sources, as the Sources panel lists them
-        sources = list((await db.execute(text("""
-            SELECT p.* FROM papers p LEFT JOIN project_papers pp ON pp.paper_id = p.id AND pp.project_id = :p
-            WHERE (p.source = 'upload' AND p.project_id = :p) OR pp.project_id IS NOT NULL
-        """), {"p": project_id})).mappings())
+        sources, _ = await paper_service.project_sources(db, project_id)  # as the Sources panel lists them
         if wanted is not None:
             unknown = wanted - {s["id"] for s in sources}
             if unknown:

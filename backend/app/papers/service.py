@@ -266,19 +266,25 @@ async def resolve(ref: str, project_id: UUID | None):
         return row
 
 
-async def add_to_project(row, project_id: UUID | None) -> None:
-    """A Semantic Scholar paper the agent read in a project joins that project's Sources panel.
-    Best effort: failing to list it must not fail the tool call."""
-    if project_id is None or row["source"] != "s2":
-        return
-    try:
-        async with database.AsyncSessionLocal() as db:
-            await db.execute(text("""
-                INSERT INTO project_papers (project_id, paper_id) VALUES (:p, :id) ON CONFLICT DO NOTHING
-            """), {"p": project_id, "id": row["id"]})
-            await db.commit()
-    except Exception:
-        log.exception("adding p%s to project %s's sources failed", row["id"], project_id)
+async def project_sources(db, project_id: UUID) -> tuple[list, dict[int, int]]:
+    """A project's sources: its uploads, and each Semantic Scholar paper that an assistant reply in the project
+    mentions. Searching or reading a paper does not list it; being referenced does. Also returns, per paper id,
+    the number of replies that mention it (a reply cites a source as "[p38:c0]" or just "p38"; once however often).
+    shortcut: scans every saved reply in the project on each call; cache the counts if a project gets huge."""
+    cited = dict((await db.execute(text("""
+        SELECT r[1]::bigint AS paper_id, count(DISTINCT (n.id, m.ord)) AS n
+        FROM nodes n,
+             jsonb_array_elements(n.chats) WITH ORDINALITY AS m(msg, ord),
+             regexp_matches(m.msg->>'content', '\mp(\d+)\M', 'g') AS r
+        WHERE n.project_id = :p AND m.msg->>'role' = 'assistant'
+        GROUP BY 1
+    """), {"p": project_id})).all())
+    rows = (await db.execute(text("""
+        SELECT * FROM papers
+        WHERE (source = 'upload' AND project_id = :p) OR (source = 's2' AND id = ANY(CAST(:ids AS bigint[])))
+        ORDER BY created_at, id
+    """), {"p": project_id, "ids": list(cited)})).mappings().all()
+    return list(rows), cited
 
 
 def paper_url(row) -> str | None:
@@ -332,19 +338,6 @@ async def ensure_ingest(row) -> None:
 
 # --- tools ----------------------------------------------------------------------------------------------
 
-async def _list_abstract_only(db, rows, project_id: UUID | None) -> None:
-    """Abstract-only papers returned by a search join the project's Sources panel (in its own section) because
-    the model may draw on their abstracts. Readable ones join only once read. Caller commits."""
-    if project_id is None:
-        return
-    ids = [r["id"] for r in rows if r["source"] == "s2" and full_text_state(r) == "unavailable"]
-    if ids:
-        await db.execute(text("""
-            INSERT INTO project_papers (project_id, paper_id) SELECT :p, unnest(CAST(:ids AS bigint[]))
-            ON CONFLICT DO NOTHING
-        """), {"p": project_id, "ids": ids})
-
-
 async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID | None = None) -> dict:
     query = (query or "").strip()
     if not query:
@@ -363,7 +356,6 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
         """), {"q": query, "pid": str(project_id) if project_id else None, "year": year, "limit": limit})).mappings())
         if len(rows) >= limit:
             log.info("papers search cache hit q=%r local=%d", query, len(rows))
-            await _list_abstract_only(db, rows, project_id)
             await db.commit()
             return {"results": [_summary(r) for r in rows]}
         log.info("papers search cache miss q=%r local=%d; asking Semantic Scholar", query, len(rows))
@@ -378,7 +370,6 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
                 rows.append(row)
                 seen.add(row["id"])
         rows = prefer_accessible(rows, limit)
-        await _list_abstract_only(db, rows, project_id)
         await db.commit()
     return {"results": [_summary(r) for r in rows]}
 
@@ -390,7 +381,6 @@ async def get_paper(paper: str, *, project_id: UUID | None = None) -> dict:
         return {"error": str(exc)}
     if row is None:
         return {"error": f"No paper found for {paper!r}. Use search_papers to find one."}
-    await add_to_project(row, project_id)
     await ensure_ingest(row)
     async with database.AsyncSessionLocal() as db:
         row = await _load(db, row["id"], project_id)
@@ -415,7 +405,6 @@ async def search_paper_evidence(
         return {"error": str(exc)}
     if row is None:
         return {"error": f"No paper found for {paper_id!r}. Use search_papers to find one."}
-    await add_to_project(row, project_id)
     await ensure_ingest(row)
 
     loop = asyncio.get_running_loop()

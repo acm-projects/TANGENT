@@ -115,7 +115,7 @@ _ADDED_COLUMNS = [
         UNIQUE (paper_id, pipeline_version)
     )""",
     "CREATE INDEX IF NOT EXISTS ingestion_jobs_pending_idx ON ingestion_jobs (run_after) WHERE status = 'pending'",
-    # Semantic Scholar papers an agent read in a project, so they show in its Sources panel next to uploads.
+    # Legacy: no longer written. The Sources panel lists uploads and the Semantic Scholar papers a reply cites (papers.service.project_sources).
     """CREATE TABLE IF NOT EXISTS project_papers (
         project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         paper_id bigint NOT NULL REFERENCES papers(id) ON DELETE CASCADE,

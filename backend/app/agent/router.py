@@ -40,7 +40,7 @@ branch, merge and delete nodes, write a message inside a leaf node with ask_node
 parent of real work, so leave it and say so. Delete them in one go (several calls in one turn), then summarise.
 - The paper tools (search_papers, get_paper, search_paper_evidence) and search_sources are for when the user asks \
 you to find, read or quote research. Never use them to create, title, fill or choose nodes: branching, merging and \
-deleting need no literature search, and reading a paper adds it to the project's Sources.
+deleting need no literature search.
 
 The user currently has this node selected: {active}
 
