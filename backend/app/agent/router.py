@@ -85,10 +85,11 @@ async def agent_chat(
 ):
     get_model_or_400(req.model)
     await get_project_with_role(db, project_id, user)
+    user_id = user.id  # read before rollback: it expires `user`, and a lazy reload here raises MissingGreenlet
     await db.rollback()  # release the request's connection before the model call
     active = str(req.active_node_id) if req.active_node_id else "none"
     convo: list[dict] = [
-        {"role": "system", "content": SYSTEM_PROMPT.format(active=active, outline=await tools.outline(project_id, user.id))},
+        {"role": "system", "content": SYSTEM_PROMPT.format(active=active, outline=await tools.outline(project_id, user_id))},
         *({"role": m.role, "content": m.content} for m in req.messages),
     ]
     logged: list[ToolCallLog] = []
@@ -113,7 +114,7 @@ async def agent_chat(
             if i >= MAX_CALLS_PER_ROUND:
                 args, result = {}, {"error": f"At most {MAX_CALLS_PER_ROUND} tool calls at once; this one was skipped."}
             else:
-                args, result = await _run(call, project_id, user.id)
+                args, result = await _run(call, project_id, user_id)
             logged.append(ToolCallLog(name=call["function"]["name"], arguments=args, result=result))
             convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, default=str)})
 
