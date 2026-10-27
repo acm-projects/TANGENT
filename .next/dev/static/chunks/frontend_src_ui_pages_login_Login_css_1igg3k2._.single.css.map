@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/pages/login/Login.css"],"sourcesContent":["/* Page-level layout only, unlayered (DESIGN.md §2). */\r\n\r\n.login {\r\n  min-height: 100dvh;\r\n  justify-content: center;\r\n  padding: var(--space-4);\r\n  /* the board, with the map's dot grid, so the paper card stands off it */\r\n  background:\r\n    var(--light-vignette),\r\n    radial-gradient(color-mix(in srgb, var(--color-text-faint) 45%, transparent) 0.75px, transparent 1px) 0 0 / 16px 16px,\r\n    var(--texture-grain),\r\n    var(--color-board);\r\n}\r\n"],"names":[],"mappings":"AAEA"}}]
-}

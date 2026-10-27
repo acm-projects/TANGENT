@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/library/primitives/Link/Link.css"],"sourcesContent":["/* Link — see DESIGN.md §4. */\r\n\r\n@layer ui {\r\n  [data-ui=\"link\"] {\r\n    display: block;\r\n    color: inherit;\r\n    text-decoration: none;\r\n    border-radius: var(--radius-lg);\r\n  }\r\n\r\n  [data-ui=\"link\"]:focus-visible {\r\n    outline: 2px solid var(--color-focus-ring);\r\n    outline-offset: 2px;\r\n  }\r\n}\r\n"],"names":[],"mappings":"AAEA;EACE;;;;;;;EAOA"}}]
-}
