@@ -15,6 +15,8 @@ from sqlalchemy.future import select
 
 from app import database
 from app.branch_scope import require_visible, visible_to
+from app.context.flatten import flatten, to_provider_messages
+from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.models import Node, NodeMergeSource, Project, User
 from app.papers import service as paper_service
 from app.routers import nodes_router
@@ -52,6 +54,12 @@ GRAPH_TOOLS = [
     _tool("delete_node",
           "Permanently delete a node and every branch below it. The root can't be deleted. Project owner only.",
           {"node_id": _NODE_ID}, ["node_id"]),
+    _tool("ask_node",
+          "Write inside a leaf node: send it a message as the user, get the model's reply, and save both in that "
+          "node. Only a leaf (a node with no branches) takes a message. Uses the whole conversation above it as "
+          "context. Project owner only.",
+          {"node_id": _NODE_ID, "message": {"type": "string", "description": "What to ask in that node"}},
+          ["node_id", "message"]),
     _tool("search_sources",
           "Search the full text of the project's uploaded and read papers at once; returns passages to cite by "
           "evidence_id with section and pages. Reports sources that are not indexed yet.",
@@ -111,14 +119,22 @@ _SUBTREE_SQL = text("""
 
 
 async def outline(project_id: UUID, user_id: UUID, limit: int = 100) -> str:
-    """One line per node (id, parent, title) for the agent's system prompt, so it can name nodes the user points at."""
+    """One line per node (id, parent, whether it is empty, branch count, title) for the agent's system prompt, so it
+    can name the nodes the user points at and pick out empty ones without a call per node."""
     async with _session(user_id) as db:
         visible = await visible_to(db, project_id, user_id)
-        rows = (await db.execute(
-            select(Node.id, Node.parent_id, Node.title).where(Node.project_id == project_id).order_by(Node.created_at, Node.id)
-        )).all()
+        rows = (await db.execute(text("""
+            SELECT n.id, n.parent_id, n.title,
+                   CASE WHEN jsonb_typeof(n.chats) = 'array' THEN jsonb_array_length(n.chats) ELSE 0 END AS messages,
+                   (SELECT count(*) FROM nodes c WHERE c.parent_id = n.id) AS branches
+            FROM nodes n WHERE n.project_id = :p ORDER BY n.created_at, n.id
+        """), {"p": project_id})).all()
     rows = [r for r in rows if visible is None or r.id in visible]
-    lines = [f"- {r.id} (parent {r.parent_id or 'none, the root'}): {r.title or 'Untitled'}" for r in rows[:limit]]
+    lines = [
+        f"- {r.id} (parent {r.parent_id or 'none, the root'}; "
+        f"{'empty' if not r.messages else f'{r.messages} messages'}; {r.branches} branches): {r.title or 'Untitled'}"
+        for r in rows[:limit]
+    ]
     return "\n".join(lines) + (f"\n(+{len(rows) - limit} more; use search_nodes)" if len(rows) > limit else "")
 
 
@@ -232,6 +248,34 @@ async def delete_node(node_id, *, project_id: UUID, user_id: UUID) -> dict:
                 "merge_nodes_detached": [str(i) for i in detached]}
 
 
+ASK_SYSTEM_PROMPT = "You are answering inside one node of a research tree. Reply directly and concisely to the latest message."
+
+
+async def ask_node(node_id, message, *, project_id: UUID, user_id: UUID, default_model: str | None = None) -> dict:
+    message = (message or "").strip()
+    if not message or len(message) > 20_000:
+        return {"error": "message must be 1 to 20000 characters"}
+    async with _session(user_id) as db:
+        node = await _node(db, node_id, project_id, user_id)
+        await _require_owner(db, project_id, user_id)
+        path, _ = await nodes_router._load_path(db, node.id, user_id)  # 409 unless it is a leaf
+        model_id = node.model or default_model or DEFAULT_MODEL_ID  # a node keeps the model it started with
+        get_model_or_400(model_id)
+        messages = [{"role": "system", "content": ASK_SYSTEM_PROMPT}, *to_provider_messages(flatten(path), message)]
+        node_pk = node.id
+    reply, usage = "", None  # the session is closed: no connection is held for the length of the model call
+    async for event in stream_openrouter(messages, model_id):
+        if "error" in event:
+            return {"error": f"The model failed: {event['error']}"}
+        reply += event.get("text", "")
+        usage = event.get("usage", usage)
+    if not reply.strip():
+        return {"error": "The model returned an empty reply; nothing was saved."}
+    total = usage.get("total_tokens") if isinstance(usage, dict) else None
+    await nodes_router._persist(user_id, node_pk, message, reply.strip(), model_id, total if type(total) is int and total >= 0 else None)
+    return {"node_id": str(node_pk), "model": model_id, "reply": reply.strip()}
+
+
 async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000, *, project_id: UUID, user_id: UUID) -> dict:
     query = (query or "").strip()
     if not query:
@@ -292,18 +336,20 @@ async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000,
     return result
 
 
-_HANDLERS = {f.__name__: f for f in (get_node, search_nodes, branch_node, merge_nodes, delete_node, search_sources)}
+_HANDLERS = {f.__name__: f for f in (get_node, search_nodes, branch_node, merge_nodes, delete_node, ask_node, search_sources)}
 
 
-async def call_tool(name: str, args: dict, project_id: UUID, user_id: UUID) -> dict:
-    """Run one agent tool: graph tools here, anything else is a node tool and goes to papers.service."""
+async def call_tool(name: str, args: dict, project_id: UUID, user_id: UUID, model: str | None = None) -> dict:
+    """Run one agent tool: graph tools here, anything else is a node tool and goes to papers.service.
+    `model` is the one the agent runs on; ask_node uses it for a node that has none yet."""
     handler = _HANDLERS.get(name)
     if handler is None:
         return await paper_service.call_tool(name, args, project_id)
     if not isinstance(args, dict):
         return {"error": "Tool arguments must be a JSON object"}
     try:
-        return await handler(**args, project_id=project_id, user_id=user_id)
+        extra = {"default_model": model} if name == "ask_node" else {}
+        return await handler(**args, project_id=project_id, user_id=user_id, **extra)
     except HTTPException as exc:
         return {"error": exc.detail}
     except TypeError as exc:

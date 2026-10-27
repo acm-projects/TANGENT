@@ -30,6 +30,7 @@ def test_graph_tools_end_to_end(monkeypatch):
         yield {"text": "pong"}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
+    monkeypatch.setattr(tools, "stream_openrouter", fake_llm)
 
     with TestClient(app) as c:
         auth = sign_up(c)
@@ -46,6 +47,9 @@ def test_graph_tools_end_to_end(monkeypatch):
         d = run("branch_node", node_id=root)
         assert (a["fork_index"], b["fork_index"]) == (1, 2) and a["parent_id"] == root and a["title"] == "Alpha"
         assert "error" in run("branch_node", node_id=str(uuid.uuid4()))
+        listing = asyncio.run(tools.outline(UUID(pid), UUID(me["id"])))
+        assert f"{a['node_id']} (parent {root}; empty; 0 branches): Alpha" in listing
+        assert f"{root} (parent none, the root; empty; 3 branches)" in listing
         for n, q in ((a, "pingA"), (b, "pingB"), (d, "pingC")):
             ask(n["node_id"], q)
 
@@ -82,6 +86,15 @@ def test_graph_tools_end_to_end(monkeypatch):
         assert "error" in run("get_node", node_id=child["node_id"])
         assert len(run("get_node", node_id=m["node_id"])["merge_source_ids"]) == 2
         assert "error" in run("delete_node", node_id=root)
+
+        # ask_node: a leaf takes the message and keeps the exchange; a node with branches refuses
+        x = run("branch_node", node_id=root)["node_id"]
+        asked = run("ask_node", node_id=x, message="hello")
+        assert asked["reply"] == "pong" and asked["node_id"] == x
+        assert [m["content"] for m in run("get_node", node_id=x)["messages"]] == ["hello", "pong"]
+        assert run("get_node", node_id=x)["title"] == "hello"
+        assert "error" in run("ask_node", node_id=root, message="hi")
+        assert "error" in run("ask_node", node_id=x, message="  ")
 
         # sources: none, then an upload still processing, then a ready one with an indexed passage
         assert run("search_sources", query="entropy")["passages"] == []

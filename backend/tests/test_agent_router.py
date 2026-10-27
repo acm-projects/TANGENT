@@ -47,8 +47,8 @@ def agent(monkeypatch):
         for event in script.pop(0):
             yield event
 
-    async def fake_call(name, args, project_id, user_id):
-        ran.append((name, args, project_id, user_id))
+    async def fake_call(name, args, project_id, user_id, model=None):
+        ran.append((name, args, project_id, user_id, model))
         return {"node_id": "new"} if name == "branch_node" else {"error": "boom"}
 
     async def fake_access(db, project_id, user):
@@ -85,7 +85,7 @@ def test_tool_loop_runs_calls_then_answers(agent):
     assert body["reply"] == "Added a branch, then it failed to delete."
     assert [(t["name"], t["result"]) for t in body["tool_calls"]] == [
         ("branch_node", {"node_id": "new"}), ("delete_node", {"error": "boom"})]
-    assert ran[0] == ("branch_node", {"node_id": NODE, "title": "T"}, PROJECT, USER.id)
+    assert ran[0] == ("branch_node", {"node_id": NODE, "title": "T"}, PROJECT, USER.id, agent_router.DEFAULT_MODEL_ID)
     # the model sees the agent tools, the node outline and the selection, and gets each result back
     first = requests[0]
     assert {"branch_node", "merge_nodes", "search_paper_evidence"} <= {t["function"]["name"] for t in first["tools"]}

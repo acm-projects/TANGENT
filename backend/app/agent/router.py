@@ -25,15 +25,22 @@ router = APIRouter(prefix="/projects", tags=["Agent"])
 MAX_ROUNDS = 6  # model turns that may call tools; the next one must answer
 MAX_CALLS_PER_ROUND = 5
 TOOL_TIMEOUT = 30
+ASK_TIMEOUT = 120  # ask_node waits for a whole model reply
 
 SYSTEM_PROMPT = """You are Tangent's research agent. You work on the user's project tree through tools: you can read, search, \
-branch, merge and delete nodes, and search the project's sources. Do what the user asks with the tools, then say briefly what you did.
+branch, merge and delete nodes, write a message inside a leaf node with ask_node, and search the project's sources. Do what the user asks with the tools, then say briefly what you did.
 
 - Use the node ids below. Never invent an id; if a node the user names is not listed, call search_nodes.
 - Calls run in order. When one needs the result of another (merge the node you just created), make it in a later turn.
+- ask_node puts the user's question into a node and saves the reply there; pass the user's wording. It only works on leaves, so branch first when the node already has branches.
 - "that" and "it" mean the node you most recently created or discussed in this conversation.
 - A tool error is information: report it plainly and do not retry the same call.
-- Deleting is permanent. Delete exactly the node asked for, nothing else.
+- Deleting is permanent, and it also deletes every branch below the node. Delete exactly what was asked for.
+  "Empty" nodes are the ones listed as empty. Delete those with 0 branches; an empty node that has branches is the \
+parent of real work, so leave it and say so. Delete them in one go (several calls in one turn), then summarise.
+- The paper tools (search_papers, get_paper, search_paper_evidence) and search_sources are for when the user asks \
+you to find, read or quote research. Never use them to create, title, fill or choose nodes: branching, merging and \
+deleting need no literature search, and reading a paper adds it to the project's Sources.
 
 The user currently has this node selected: {active}
 
@@ -64,14 +71,16 @@ class AgentReply(BaseModel):
     model: str
 
 
-async def _run(call: dict, project_id: UUID, user_id: UUID) -> tuple[dict, dict]:
+async def _run(call: dict, project_id: UUID, user_id: UUID, model: str) -> tuple[dict, dict]:
     """One tool call from the model -> (its arguments, its result). Failures become results the model can read."""
     try:
         args = json.loads(call["function"]["arguments"] or "{}")
     except ValueError:
         return {}, {"error": "The tool arguments were not valid JSON."}
     try:
-        return args, await asyncio.wait_for(tools.call_tool(call["function"]["name"], args, project_id, user_id), TOOL_TIMEOUT)
+        name = call["function"]["name"]
+        timeout = ASK_TIMEOUT if name == "ask_node" else TOOL_TIMEOUT
+        return args, await asyncio.wait_for(tools.call_tool(name, args, project_id, user_id, model), timeout)
     except asyncio.TimeoutError:
         return args, {"error": "The tool timed out."}
 
@@ -114,7 +123,7 @@ async def agent_chat(
             if i >= MAX_CALLS_PER_ROUND:
                 args, result = {}, {"error": f"At most {MAX_CALLS_PER_ROUND} tool calls at once; this one was skipped."}
             else:
-                args, result = await _run(call, project_id, user_id)
+                args, result = await _run(call, project_id, user_id, req.model)
             logged.append(ToolCallLog(name=call["function"]["name"], arguments=args, result=result))
             convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, default=str)})
 

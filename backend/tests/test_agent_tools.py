@@ -57,3 +57,45 @@ def test_excerpt_centres_on_the_match():
     out = tools._excerpt("NEEDLE", None, text)
     assert "needle" in out and len(out) <= tools.EXCERPT_CHARS + 2
     assert tools._excerpt("zzz", "title", "body") == ""
+
+
+def test_ask_node_prompts_the_leaf_and_saves_the_exchange(monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    node, saved, sent = uuid.uuid4(), [], []
+
+    @asynccontextmanager
+    async def session(user_id):
+        yield object()
+
+    async def find(db, node_id, project_id, user_id):
+        return SimpleNamespace(id=node, model=None)
+
+    async def owner(db, project_id, user_id):
+        return None
+
+    async def path(db, node_id, user_id):
+        return [nodes_router.PathNode(id="root", chats=[])], P
+
+    async def stream(messages, model):
+        sent.append((messages, model))
+        yield {"text": "an "}
+        yield {"text": "answer"}
+        yield {"usage": {"total_tokens": 7}, "model": model}
+
+    async def persist(*args):
+        saved.append(args)
+
+    monkeypatch.setattr(tools, "_session", session)
+    monkeypatch.setattr(tools, "_node", find)
+    monkeypatch.setattr(tools, "_require_owner", owner)
+    monkeypatch.setattr(nodes_router, "_load_path", path)
+    monkeypatch.setattr(nodes_router, "_persist", persist)
+    monkeypatch.setattr(tools, "stream_openrouter", stream)
+
+    out = asyncio.run(tools.call_tool("ask_node", {"node_id": str(node), "message": " hi "}, P, U, model=tools.DEFAULT_MODEL_ID))
+    assert out == {"node_id": str(node), "model": tools.DEFAULT_MODEL_ID, "reply": "an answer"}
+    assert sent[0][0][-1] == {"role": "user", "content": "hi"} and sent[0][1] == tools.DEFAULT_MODEL_ID
+    assert saved == [(U, node, "hi", "an answer", tools.DEFAULT_MODEL_ID, 7)]
+    assert "error" in asyncio.run(tools.call_tool("ask_node", {"node_id": str(node), "message": " "}, P, U))
