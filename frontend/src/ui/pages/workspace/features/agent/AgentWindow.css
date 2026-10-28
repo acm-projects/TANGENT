@@ -1,0 +1,133 @@
+/* Agent test window and its launch button — placeholder blue, to be restyled when the real agent lands. */
+
+:root {
+  --agent-blue: #2563eb;
+  --agent-blue-soft: #dbeafe;
+}
+
+/* the launch button sits beside "Open chat" while the chat is collapsed */
+[data-ui="panel"][data-component="button"].agent-launch,
+[data-ui="panel"][data-component="button"].agent-send {
+  background: var(--agent-blue);
+  border-color: var(--agent-blue);
+  color: #fff;
+}
+
+[data-ui="panel"][data-component="button"].agent-launch :is(span, svg),
+[data-ui="panel"][data-component="button"].agent-send :is(span, svg) {
+  color: inherit;
+}
+
+[data-ui="panel"][data-component="button"].agent-send:disabled {
+  opacity: 0.5;
+}
+
+.agent-window {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(26rem, calc(100vw - 2 * var(--space-4)));
+  height: min(34rem, calc(100vh - 2 * var(--space-4)));
+  border: 2px solid var(--agent-blue);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+.agent-header {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  background: var(--agent-blue);
+  color: #fff;
+}
+
+.agent-header :is(h2, span, svg) {
+  color: inherit;
+}
+
+.agent-turns {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-3);
+  overflow-y: auto;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agent-hint {
+  color: var(--color-text-secondary);
+}
+
+.agent-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 90%;
+}
+
+.agent-turn[data-role="user"] {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.agent-text {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-turn[data-role="user"] .agent-text {
+  background: var(--agent-blue-soft);
+  color: #1e3a8a;
+}
+
+/* one line per tool the agent ran; open it for the arguments and result */
+.agent-call {
+  font-size: var(--font-size-xs);
+  color: #1d4ed8;
+}
+
+.agent-call[data-failed] {
+  color: var(--color-danger);
+}
+
+.agent-call summary {
+  cursor: pointer;
+}
+
+.agent-call pre {
+  max-height: 10rem;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+}
+
+.agent-error {
+  flex: none;
+  padding-inline: var(--space-3);
+  color: var(--color-danger);
+}
+
+.agent-field {
+  flex: none;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.agent-model {
+  max-width: 14rem;
+}

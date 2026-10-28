@@ -55,7 +55,7 @@ class MessageRequest(BaseModel):
 
 
 class MergeRequest(BaseModel):
-    source_leaf_ids: list[UUID] = Field(min_length=2, max_length=2)
+    source_leaf_ids: list[UUID] = Field(min_length=2, max_length=8)  # 8 = labels flatten() renders (a-h)
 
 
 class ForkNodeOut(NodeMeta):
@@ -413,51 +413,50 @@ async def merge_nodes(
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ):
-    """Merge two leaves of one tree into a new node. The new node hangs off the nearest common ancestor and
-    carries both branches (everything below that ancestor) in its own chats, tagged with branch_source = the
-    source leaf id, so the merge never needs to walk its sources. node_merge_sources records the two leaves.
+    """Merge two or more leaves of one tree into a new node. The new node hangs off the nearest common ancestor and
+    carries every branch (everything below that ancestor) in its own chats, tagged with branch_source "a", "b", ...
+    in request order, so the merge never needs to walk its sources. node_merge_sources records the leaves.
     A non-owner's first write forks the project, exactly like fork_node."""
-    a_id, b_id = req.source_leaf_ids
-    if a_id == b_id:
-        raise HTTPException(400, "Pick two different leaf nodes")
+    ids = req.source_leaf_ids
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "Pick different leaf nodes")
 
     metas = (
         await db.execute(
-            select(Node.id, Node.tree_id, Node.project_id).where(Node.id.in_([a_id, b_id]))
+            select(Node.id, Node.tree_id, Node.project_id).where(Node.id.in_(ids))
         )
     ).all()
-    if len(metas) != 2:
+    if len(metas) != len(ids):
         raise HTTPException(404, "Node not found")
     if len({m.tree_id for m in metas}) != 1 or len({m.project_id for m in metas}) != 1:
-        raise HTTPException(400, "Both nodes must be in the same tree")
+        raise HTTPException(400, "All nodes must be in the same tree")
     tree_id, project_id = metas[0].tree_id, metas[0].project_id
-    await require_visible(db, project_id, user.id, a_id, b_id)
+    await require_visible(db, project_id, user.id, *ids)
 
     has_child = (
-        await db.execute(select(Node.id).where(Node.parent_id.in_([a_id, b_id])).limit(1))
+        await db.execute(select(Node.id).where(Node.parent_id.in_(ids)).limit(1))
     ).scalar_one_or_none()
     if has_child is not None:
         raise HTTPException(409, "Only leaf nodes can be merged")
 
-    path_a = (await db.execute(_PATH_SQL, {"node_id": a_id})).all()
-    path_b = (await db.execute(_PATH_SQL, {"node_id": b_id})).all()
+    paths = [(await db.execute(_PATH_SQL, {"node_id": i})).all() for i in ids]
     shared = 0
-    while shared < min(len(path_a), len(path_b)) and path_a[shared].id == path_b[shared].id:
+    while shared < min(map(len, paths)) and len({p[shared].id for p in paths}) == 1:
         shared += 1
     if shared == 0:
-        raise HTTPException(400, "Both nodes must be in the same tree")
-    ancestor_id = UUID(path_a[shared - 1].id)
+        raise HTTPException(400, "All nodes must be in the same tree")
+    ancestor_id = UUID(paths[0][shared - 1].id)
 
     chats: list[dict] = []
-    # tagged "a" / "b" by branch, which is what ChatMessage and flatten() read
-    for key, rows in (("a", path_a), ("b", path_b)):
+    # tagged "a", "b", ... by branch, which is what ChatMessage and flatten() read
+    for key, rows in zip("abcdefgh", paths):
         for row in rows[shared:]:
             for message in _as_list(row.chats):
                 chats.append({**message, "branch_source": key})
     for seq, message in enumerate(chats):
         message["seq"] = seq
 
-    sources = [a_id, b_id]
+    sources = list(ids)
     project_id, fork = await get_write_target(db, project_id, user.id)
     if fork is not None:
         tree_id = fork.tree_map[tree_id]

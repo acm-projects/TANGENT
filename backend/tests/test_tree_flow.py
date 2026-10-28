@@ -363,14 +363,17 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
             assert c.get(f"/projects/{pid}/sources", headers=auth).json()[0]["use_count"] == 2
 
             s2_id = asyncio.run(read_s2_paper(pid))
+            # reading a paper does not list it; a reply that cites it does
+            assert [s["id"] for s in c.get(f"/projects/{pid}/sources", headers=auth).json()] == [up_id]
+            asyncio.run(set_chats(root, chats + [msg("assistant", f"See [p{s2_id}:c0].", 4)]))
             listed = c.get(f"/projects/{pid}/sources", headers=auth).json()
-            assert [(s["id"], s["origin"]) for s in listed] == [(up.json()["id"], "upload"), (f"p{s2_id}", "s2")]
+            assert [(s["id"], s["origin"]) for s in listed] == [(up_id, "upload"), (f"p{s2_id}", "s2")]
             assert listed[1]["url"] == "https://doi.org/10.1/x" and listed[1]["kind"] == "link"
             # only uploads have bytes to serve
             assert c.get(f"/projects/{pid}/sources/p{s2_id}/file", headers=auth).status_code == 404
 
-            # a search: the readable paper is preferred when only one fits, and an abstract-only result joins
-            # the project's sources (as "unavailable") once it is actually returned
+            # a search: the readable paper is preferred when only one fits. Results are not listed as sources
+            # until a reply refers to them
             topic = f"zyzzogeton{uuid.uuid4().hex[:6]}"
             hits = lambda: httpx.Response(200, json={"data": [
                 {"paperId": s2_ref + "-abs", "title": f"{topic} abstract only", "authors": [], "year": 2024,
@@ -381,12 +384,14 @@ def test_sources_list_uploads_and_read_papers_and_open_them():
             one = asyncio.run(service.search_papers(topic, limit=1, project_id=uuid.UUID(pid)))
             assert [r["title"] for r in one["results"]] == [f"{topic} open access"]
             names = lambda: [x["name"] for x in c.get(f"/projects/{pid}/sources", headers=auth).json()]
-            assert f"{topic} abstract only" not in names()
             both = asyncio.run(service.search_papers(topic, limit=2, project_id=uuid.UUID(pid)))
             assert {r["title"] for r in both["results"]} == {f"{topic} abstract only", f"{topic} open access"}
+            assert not {f"{topic} abstract only", f"{topic} open access"} & set(names())
+            abs_id = next(r["paper_id"] for r in both["results"] if r["title"] == f"{topic} abstract only")
+            asyncio.run(set_chats(root, chats + [msg("assistant", f"See [p{s2_id}:c0] and {abs_id}.", 4)]))
             by_name = {x["name"]: x for x in c.get(f"/projects/{pid}/sources", headers=auth).json()}
             assert by_name[f"{topic} abstract only"]["status"] == "unavailable"
-            assert f"{topic} open access" not in by_name  # readable papers join only once read
+            assert f"{topic} open access" not in by_name
     finally:
         s2.transport = None
         asyncio.run(cleanup())

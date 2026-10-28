@@ -13,6 +13,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from app.agent import router as agent_router
 from app.database import ensure_columns, warm_pool
 from app.papers import worker as paper_worker
 from app.routers import (
@@ -72,3 +73,4 @@ app.include_router(chats_router.router)
 app.include_router(trees_router.router)
 app.include_router(debates_router.router)
 app.include_router(sources_router.router)
+app.include_router(agent_router.router)
