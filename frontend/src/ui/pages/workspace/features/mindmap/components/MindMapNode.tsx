@@ -179,6 +179,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           className="mindmap-node nopan"
           data-state={data.state}
           data-root={!data.hasParent || undefined}
+          data-debate={data.debate || undefined}
           data-thinking={thinking || undefined}
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
@@ -202,14 +203,18 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             )}
           </AnimatePresence>
           {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
+          {data.debate && (
+            <>
+              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Judgment" />
+              {/* the court's seal pressed into the corner: this card is a debate's verdict */}
+              <span className="mindmap-node-seal" aria-label="A debate's verdict" role="img">
+                <Icon icon="gavel" size="m" />
+              </span>
+            </>
+          )}
           <Frame direction="row" gap="2" align="center">
             <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
             <Text as="span" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
-            {data.debate && (
-              <Panel elevation="floating" className="mindmap-node-tag" aria-label="A debate's verdict">
-                <Icon icon="gavel" size="s" />
-              </Panel>
-            )}
             {data.tags.map((tag) => (
               <Panel key={tag} elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
                 <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />
