@@ -39,7 +39,7 @@ class Segment:
 def _render_branches(branches: dict[str, list[ChatMessage]]) -> str:
     """branches is keyed by branch_source (the source leaf node id written by nodes_router.merge_nodes), in order of first
     appearance. merge_nodes copies the first source leaf's messages, then the second's, so they are labelled a, b in that order."""
-    parts = ["The user merged two conversation branches into this one. Both transcripts follow."]
+    parts = ["The user merged conversation branches into this one. The transcripts follow."]
     for label, msgs in zip("abcdefgh", branches.values()):
         if not msgs:
             continue

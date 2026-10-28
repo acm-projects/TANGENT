@@ -2,6 +2,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import asyncio
+import contextlib
 import os
 from contextlib import asynccontextmanager
 
@@ -11,7 +13,9 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from app.agent import router as agent_router
 from app.database import ensure_columns, warm_pool
+from app.papers import worker as paper_worker
 from app.routers import (
     auth_router,
     workspace_router,
@@ -21,6 +25,7 @@ from app.routers import (
     chats_router,
     trees_router,
     debates_router,
+    sources_router,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -30,7 +35,11 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(_: FastAPI):
     await ensure_columns()  # before warm_pool: it reads every model column
     await warm_pool()
+    ingest = asyncio.create_task(paper_worker.run_forever())  # PDF ingestion runs in this process
     yield
+    ingest.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await ingest
 
 
 app = FastAPI(title="Tangent", lifespan=lifespan)
@@ -63,3 +72,5 @@ app.include_router(nodes_router.router)
 app.include_router(chats_router.router)
 app.include_router(trees_router.router)
 app.include_router(debates_router.router)
+app.include_router(sources_router.router)
+app.include_router(agent_router.router)

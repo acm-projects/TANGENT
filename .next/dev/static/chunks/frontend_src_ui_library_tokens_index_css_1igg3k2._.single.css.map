@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/frontend/src/ui/library/tokens/index.css"],"sourcesContent":["/* Every token file, one per kind of value. See DESIGN.md Rule 1.\r\n * Each file is self-contained (its tier-2 tokens reference only its own\r\n * tier-1 values), so order between files doesn't matter. */\r\n\r\n@import \"./colors.css\";\r\n@import \"./shape.css\";\r\n@import \"./text.css\";\r\n@import \"./motion.css\";\r\n"],"names":[],"mappings":""}}]
-}

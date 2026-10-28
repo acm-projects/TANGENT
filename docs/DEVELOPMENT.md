@@ -83,7 +83,9 @@ machine whose global `~/.npmrc` points elsewhere should install with
     the server starts but every database query fails, including the Google callback),
     `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
   - Optional: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (invite
-    emails; sharing returns 500 without them), `OPENROUTER_API_KEY` (chat).
+    emails; sharing returns 500 without them), `OPENROUTER_API_KEY` (chat),
+    `BRIGHTDATA_API_KEY` + `BRIGHTDATA_SERP_ZONE` (the `web_search` tool: Google through Bright Data's SERP
+    API; the zone is the name of a SERP API zone on that account; without them the tool answers "not configured").
     `IS_PRODUCTION`, `BACKEND_URL` and `FRONTEND_URL` matter only in production:
     locally the code defaults to `http://localhost:8000` and `http://localhost:5173`.
   - The Google OAuth client needs `http://localhost:8000/auth/callback/google`
@@ -254,7 +256,7 @@ TypeScript to an exact version.
 
 - Wire the frontend skeleton to the backend: every `TODO(backend)` in
   `frontend/src`, mapped endpoint by endpoint in [HANDOFF.md](HANDOFF.md) §2.
-  Then delete `frontend/src/mocks/`
+  (`frontend/src/mocks/` is gone: Sources was the last mock.)
 - `backend/app/routers/nodes_router.py` defines no routes yet (an empty
   `APIRouter`, mounted by `app/main.py`), and `chats_router.py` is imported but
   never mounted. The node/chat endpoints the frontend's `api.nodes` expects don't

@@ -22,6 +22,7 @@ from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.database import AsyncSessionLocal, get_db_session
 from app.models import Node, NodeMergeSource, Project, User
+from app.papers import service as paper_service
 from app.project_forking import (
     ForkInfo,
     build_fork_info,
@@ -54,7 +55,7 @@ class MessageRequest(BaseModel):
 
 
 class MergeRequest(BaseModel):
-    source_leaf_ids: list[UUID] = Field(min_length=2, max_length=2)
+    source_leaf_ids: list[UUID] = Field(min_length=2, max_length=8)  # 8 = labels flatten() renders (a-h)
 
 
 class ForkNodeOut(NodeMeta):
@@ -82,6 +83,24 @@ class NodeModelConflict(Exception):
 # Replies a user can stop, by (user id, prompted node id). Set by POST .../messages/stop, watched by send_message.
 # shortcut: in-process only, so a stop must reach the worker that runs the stream; move to Redis pub/sub when scaling out.
 _stops: dict[tuple[UUID, UUID], asyncio.Event] = {}
+
+MAX_TOOL_ROUNDS = 4  # model turns that may call research tools; the next one must answer
+MAX_CALLS_PER_ROUND = 5
+TOOL_TIMEOUT = 30  # seconds per tool call; search_paper_evidence waits up to 25 for a PDF
+
+
+async def _run_tool(call: dict, project_id: UUID) -> dict:
+    """One tool call from the model -> its result. Failures become results the model can read, not errors."""
+    name = call["function"]["name"]
+    try:
+        args = json.loads(call["function"]["arguments"] or "{}")
+    except ValueError:
+        return {"error": "The tool arguments were not valid JSON."}
+    try:
+        return await asyncio.wait_for(paper_service.call_tool(name, args, project_id), TOOL_TIMEOUT)
+    except asyncio.TimeoutError:
+        log.warning("tool %s timed out", name)
+        return {"error": "The tool timed out; continue without it and say so."}
 
 
 def _sse(event: str, data: dict) -> str:
@@ -394,51 +413,50 @@ async def merge_nodes(
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ):
-    """Merge two leaves of one tree into a new node. The new node hangs off the nearest common ancestor and
-    carries both branches (everything below that ancestor) in its own chats, tagged with branch_source = the
-    source leaf id, so the merge never needs to walk its sources. node_merge_sources records the two leaves.
+    """Merge two or more leaves of one tree into a new node. The new node hangs off the nearest common ancestor and
+    carries every branch (everything below that ancestor) in its own chats, tagged with branch_source "a", "b", ...
+    in request order, so the merge never needs to walk its sources. node_merge_sources records the leaves.
     A non-owner's first write forks the project, exactly like fork_node."""
-    a_id, b_id = req.source_leaf_ids
-    if a_id == b_id:
-        raise HTTPException(400, "Pick two different leaf nodes")
+    ids = req.source_leaf_ids
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "Pick different leaf nodes")
 
     metas = (
         await db.execute(
-            select(Node.id, Node.tree_id, Node.project_id).where(Node.id.in_([a_id, b_id]))
+            select(Node.id, Node.tree_id, Node.project_id).where(Node.id.in_(ids))
         )
     ).all()
-    if len(metas) != 2:
+    if len(metas) != len(ids):
         raise HTTPException(404, "Node not found")
     if len({m.tree_id for m in metas}) != 1 or len({m.project_id for m in metas}) != 1:
-        raise HTTPException(400, "Both nodes must be in the same tree")
+        raise HTTPException(400, "All nodes must be in the same tree")
     tree_id, project_id = metas[0].tree_id, metas[0].project_id
-    await require_visible(db, project_id, user.id, a_id, b_id)
+    await require_visible(db, project_id, user.id, *ids)
 
     has_child = (
-        await db.execute(select(Node.id).where(Node.parent_id.in_([a_id, b_id])).limit(1))
+        await db.execute(select(Node.id).where(Node.parent_id.in_(ids)).limit(1))
     ).scalar_one_or_none()
     if has_child is not None:
         raise HTTPException(409, "Only leaf nodes can be merged")
 
-    path_a = (await db.execute(_PATH_SQL, {"node_id": a_id})).all()
-    path_b = (await db.execute(_PATH_SQL, {"node_id": b_id})).all()
+    paths = [(await db.execute(_PATH_SQL, {"node_id": i})).all() for i in ids]
     shared = 0
-    while shared < min(len(path_a), len(path_b)) and path_a[shared].id == path_b[shared].id:
+    while shared < min(map(len, paths)) and len({p[shared].id for p in paths}) == 1:
         shared += 1
     if shared == 0:
-        raise HTTPException(400, "Both nodes must be in the same tree")
-    ancestor_id = UUID(path_a[shared - 1].id)
+        raise HTTPException(400, "All nodes must be in the same tree")
+    ancestor_id = UUID(paths[0][shared - 1].id)
 
     chats: list[dict] = []
-    # tagged "a" / "b" by branch, which is what ChatMessage and flatten() read
-    for key, rows in (("a", path_a), ("b", path_b)):
+    # tagged "a", "b", ... by branch, which is what ChatMessage and flatten() read
+    for key, rows in zip("abcdefgh", paths):
         for row in rows[shared:]:
             for message in _as_list(row.chats):
                 chats.append({**message, "branch_source": key})
     for seq, message in enumerate(chats):
         message["seq"] = seq
 
-    sources = [a_id, b_id]
+    sources = list(ids)
     project_id, fork = await get_write_target(db, project_id, user.id)
     if fork is not None:
         tree_id = fork.tree_map[tree_id]
@@ -513,7 +531,8 @@ async def send_message(
         # the stored question, not the client's copy: a retry re-asks exactly what was asked
         prompt = chats[-2].content
         path[-1] = path[-1].model_copy(update={"chats": chats[:-2]})
-    messages = to_provider_messages(flatten(path), prompt)
+    system = paper_service.RESEARCH_SYSTEM_PROMPT + await paper_service.project_sources_note(project_id)
+    messages = [{"role": "system", "content": system}] + to_provider_messages(flatten(path), prompt)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 
@@ -541,18 +560,76 @@ async def send_message(
 
             reply: list[str] = []
             done: dict = {}
+            evidence: dict[str, dict] = {}  # evidence ids the tools returned this turn -> {title, pages}
 
             async def pump() -> Optional[str]:
-                """Relay the provider's tokens; returns its error message, or None once it finishes."""
-                async for ev in stream_openrouter(messages, req.model):
-                    if "error" in ev:
-                        err = ev["error"]
-                        return err if isinstance(err, str) else json.dumps(err)
-                    if "text" in ev:
-                        reply.append(ev["text"])
-                        queue.put_nowait(_sse("token", {"text": ev["text"]}))
-                    else:
-                        done.update(ev)
+                """Relay the provider's tokens, running research tools when it calls them (bounded by
+                MAX_TOOL_ROUNDS); returns its error message, or None once it finishes."""
+                convo = list(messages)
+                retried = False
+                round_no = 0
+                while round_no <= MAX_TOOL_ROUNDS:
+                    calls, said = None, len(reply)
+                    last = round_no == MAX_TOOL_ROUNDS
+                    held, mode = "", None  # mode: None = undecided, "stream", or "hold" (a tool call written as text)
+                    failed = None
+                    async for ev in stream_openrouter(
+                        convo, req.model, tools=paper_service.TOOLS, tool_choice="none" if last else None
+                    ):
+                        if "error" in ev:
+                            failed = ev["error"]
+                            break
+                        if "text" in ev:
+                            if mode == "stream":
+                                reply.append(ev["text"])
+                                queue.put_nowait(_sse("token", {"text": ev["text"]}))
+                                continue
+                            # decide from the first characters whether this reply is really a tool call in text
+                            held += ev["text"]
+                            if mode == "hold":
+                                continue
+                            head, marker = held.lstrip(), paper_service.LEAK_MARKER
+                            if marker.startswith(head) and len(head) < len(marker):
+                                continue  # still could be the marker
+                            if head.startswith(marker):
+                                mode = "hold"
+                                continue
+                            mode = "stream"
+                            reply.append(held)
+                            queue.put_nowait(_sse("token", {"text": held}))
+                        elif "tool_calls" in ev:
+                            calls = ev["tool_calls"]
+                        else:
+                            done.update(ev)
+                    if failed is not None:
+                        transient = isinstance(failed, dict) and type(failed.get("code")) is int and failed["code"] >= 500
+                        if transient and not retried and len(reply) == said:
+                            retried = True  # a provider hiccup before anything was shown: ask again once
+                            continue
+                        if isinstance(failed, dict):
+                            return f"The model provider failed ({failed.get('message') or 'unknown error'}). Try again."
+                        return failed
+                    if mode is None and held:  # a short reply that never reached the marker's length
+                        reply.append(held)
+                        queue.put_nowait(_sse("token", {"text": held}))
+                    elif mode == "hold":
+                        calls = paper_service.parse_leaked_tool_calls(held)
+                        if not calls:  # it only looked like one: show it
+                            reply.append(held)
+                            queue.put_nowait(_sse("token", {"text": held}))
+                    if not calls or last:
+                        return None
+                    round_no += 1
+                    convo.append({"role": "assistant", "content": "".join(reply[said:]) or None, "tool_calls": calls})
+                    for i, call in enumerate(calls):
+                        if i >= MAX_CALLS_PER_ROUND:  # every call still needs a reply, or the provider rejects the turn
+                            result = {"error": f"At most {MAX_CALLS_PER_ROUND} tool calls at once; this one was skipped."}
+                        else:
+                            queue.put_nowait(_sse("tool", {"name": call["function"]["name"]}))
+                            result = await _run_tool(call, project_id)
+                        for ev in result.get("evidence") or []:
+                            evidence[ev["evidence_id"]] = {"title": result.get("title"), "pages": ev["pages"]}
+                        convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
                 return None
 
             # Race the provider against a stop: stopping cancels it at once, even before its first token.
@@ -586,6 +663,14 @@ async def send_message(
             if not answer:
                 queue.put_nowait(_error({"message": "The model returned an empty reply; nothing was saved."}, fork))
                 return
+            cited = paper_service.citations_in(answer)
+            if cited:
+                done["citations"] = [{"evidence_id": e, **evidence[e]} for e in cited if e in evidence]
+                unverified = [e for e in cited if e not in evidence]
+                if unverified:
+                    # the model cited passages no tool gave it this turn: flag them rather than vouch for them
+                    log.warning("node %s: reply cites evidence no tool returned: %s", write_node_id, unverified)
+                    done["unverified_citations"] = unverified
             usage = done.get("usage")
             response_tokens: Optional[int] = None
             if usage is not None:

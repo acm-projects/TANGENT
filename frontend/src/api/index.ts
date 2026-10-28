@@ -9,21 +9,25 @@
  * barrel -- that would be a cycle.
  */
 
+import { createAgentApi } from "./endpoints/agent";
 import { createAuthApi } from "./endpoints/auth";
 import { createChatsApi } from "./endpoints/chats";
 import { createNodesApi } from "./endpoints/nodes";
 import { createProjectsApi } from "./endpoints/projects";
 import { createSharesApi } from "./endpoints/shares";
+import { createSourcesApi } from "./endpoints/sources";
 import { createTreesApi } from "./endpoints/trees";
 import { createWorkspacesApi } from "./endpoints/workspaces";
 import { apiClient } from "./session";
 
 export const api = {
+  agent: createAgentApi(apiClient),
   auth: createAuthApi(apiClient),
   chats: createChatsApi(apiClient),
   nodes: createNodesApi(apiClient),
   projects: createProjectsApi(apiClient),
   shares: createSharesApi(apiClient),
+  sources: createSourcesApi(apiClient),
   trees: createTreesApi(apiClient),
   workspaces: createWorkspacesApi(apiClient),
 };

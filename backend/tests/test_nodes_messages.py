@@ -99,6 +99,11 @@ def client(monkeypatch):
     monkeypatch.setattr(nodes_router, "_prepare_write", fake_prepare)
     monkeypatch.setattr(nodes_router, "_persist", fake_persist)
     monkeypatch.setattr(nodes_router, "_load_path", fake_path)
+
+    async def no_uploads(project_id):
+        return ""
+
+    monkeypatch.setattr(nodes_router.paper_service, "project_sources_note", no_uploads)
     c = TestClient(app)
     c.persisted = persisted
     c.prepare = prepare
@@ -109,7 +114,7 @@ def client(monkeypatch):
 def use_provider(monkeypatch, transport):
     real = openrouter.stream_openrouter
     monkeypatch.setattr(
-        nodes_router, "stream_openrouter", lambda msgs, model: real(msgs, model, transport=transport)
+        nodes_router, "stream_openrouter", lambda msgs, model, **kw: real(msgs, model, transport=transport, **kw)
     )
 
 
@@ -134,7 +139,7 @@ def test_streams_tokens_sends_history_and_persists(client, monkeypatch):
         ("token", {"text": "lo"}),
         ("done", {"usage": usage, "model": "m"}),
     ]
-    assert [m["content"] for m in seen["body"]["messages"]] == ["earlier q", "earlier a", "hi"]
+    assert [m["content"] for m in seen["body"]["messages"] if m["role"] != "system"] == ["earlier q", "earlier a", "hi"]
     assert client.persisted == [
         (USER.id, NODE, "hi", "Hello", openrouter.DEFAULT_MODEL_ID, 7)
     ]
@@ -276,7 +281,7 @@ def anyio_backend():
     return "asyncio"
 
 def test_stop_saves_what_arrived_and_ends_with_done_stopped(client, monkeypatch):
-    async def slow(msgs, model):
+    async def slow(msgs, model, **_):
         yield {"text": "Hel"}
         nodes_router._stops[(USER.id, NODE)].set()  # the user presses Stop mid-reply
         await asyncio.sleep(10)
@@ -294,7 +299,7 @@ def test_stop_saves_what_arrived_and_ends_with_done_stopped(client, monkeypatch)
 
 
 def test_stop_before_any_token_saves_nothing(client, monkeypatch):
-    async def silent(msgs, model):
+    async def silent(msgs, model, **_):
         nodes_router._stops[(USER.id, NODE)].set()
         await asyncio.sleep(10)
         yield {"text": "never"}
@@ -319,7 +324,7 @@ def test_retry_reasks_the_last_question_without_the_old_reply_and_replaces_it(cl
 
     assert events(r) == [("token", {"text": "Again"}), ("done", {})]
     # the stored question is re-asked, and the reply being replaced isn't in the context
-    assert [m["content"] for m in seen["body"]["messages"]] == ["earlier q"]
+    assert [m["content"] for m in seen["body"]["messages"] if m["role"] != "system"] == ["earlier q"]
     assert client.persisted == [
         (USER.id, NODE, "earlier q", "Again", openrouter.DEFAULT_MODEL_ID, None, "replace")
     ]
@@ -354,3 +359,182 @@ def test_retry_with_no_reply_to_replace_is_refused(client, monkeypatch):
 
     assert r.status_code == 409
     assert client.persisted == []
+
+
+def tool_chunk(id=None, name=None, args=""):
+    fn = {"arguments": args, **({"name": name} if name else {})}
+    call = {"index": 0, "function": fn, **({"id": id} if id else {})}
+    return "data: " + json.dumps({"model": "m", "choices": [{"delta": {"tool_calls": [call]}}]})
+
+
+def scripted_provider(responses):
+    """Fake OpenRouter that answers each request with the next response; records every request body."""
+    bodies, replies = [], iter(responses)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, text="\n\n".join(next(replies)) + "\n\n")
+
+    return httpx.MockTransport(handler), bodies
+
+
+EVIDENCE = {"paper_id": "p1", "title": "T", "truncated": False,
+            "evidence": [{"evidence_id": "p1:c0", "section": "2 Method", "pages": "3", "text": "We rank with BM25."}]}
+
+
+def test_tool_call_round_then_cited_answer(client, monkeypatch):
+    transport, bodies = scripted_provider([
+        [tool_chunk("call_1", "search_paper_evidence", '{"paper_id": "p1", '), tool_chunk(args='"query": "rank"}'),
+         "data: [DONE]"],
+        [chunk("Ranks with BM25 [p1:c0], see also [p9:c9]."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+    calls = []
+
+    async def fake_tool(name, args, project_id):
+        calls.append((name, args, project_id))
+        return EVIDENCE
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "how do they rank?"})
+
+    evs = events(r)
+    assert evs[0] == ("tool", {"name": "search_paper_evidence"})
+    assert evs[-1] == ("done", {
+        "citations": [{"evidence_id": "p1:c0", "title": "T", "pages": "3"}],
+        "unverified_citations": ["p9:c9"],  # cited, but no tool returned it this turn
+    })
+    assert calls == [("search_paper_evidence", {"paper_id": "p1", "query": "rank"}, PROJECT)]
+    assert bodies[0]["tools"] and bodies[0]["messages"][0]["role"] == "system"
+    sent = bodies[1]["messages"]
+    assert sent[-2]["tool_calls"][0]["function"] == {
+        "name": "search_paper_evidence", "arguments": '{"paper_id": "p1", "query": "rank"}'}
+    assert sent[-1]["role"] == "tool" and sent[-1]["tool_call_id"] == "call_1"
+    assert json.loads(sent[-1]["content"]) == EVIDENCE
+    assert client.persisted[0][3] == "Ranks with BM25 [p1:c0], see also [p9:c9]."
+
+
+def test_tool_rounds_are_bounded(client, monkeypatch):
+    forever = [tool_chunk("c", "search_papers", '{"query": "x"}'), "data: [DONE]"]
+    transport, bodies = scripted_provider([forever] * (nodes_router.MAX_TOOL_ROUNDS + 1))
+    use_provider(monkeypatch, transport)
+    calls = []
+
+    async def fake_tool(name, args, project_id):
+        calls.append(name)
+        return {"results": []}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "loop"})
+
+    assert len(calls) == nodes_router.MAX_TOOL_ROUNDS
+    assert len(bodies) == nodes_router.MAX_TOOL_ROUNDS + 1
+    assert bodies[-1]["tool_choice"] == "none" and "tool_choice" not in bodies[0]
+    assert events(r)[-1][0] == "error"  # never answered: nothing saved
+    assert client.persisted == []
+
+
+def test_bad_tool_arguments_go_back_to_the_model(client, monkeypatch):
+    transport, bodies = scripted_provider([
+        [tool_chunk("c", "get_paper", "{not json"), "data: [DONE]"],
+        [chunk("Sorry."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "x"})
+
+    assert events(r)[-1][0] == "done"
+    assert "not valid JSON" in bodies[1]["messages"][-1]["content"]
+
+
+def test_parallel_tool_calls_are_capped_per_round(client, monkeypatch):
+    many = [tool_chunk(f"c{i}", "search_papers", '{"query": "x"}').replace('"index": 0', f'"index": {i}')
+            for i in range(nodes_router.MAX_CALLS_PER_ROUND + 2)]
+    transport, bodies = scripted_provider([many + ["data: [DONE]"], [chunk("ok"), "data: [DONE]"]])
+    use_provider(monkeypatch, transport)
+    calls = []
+
+    async def fake_tool(name, args, project_id):
+        calls.append(name)
+        return {"results": []}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "x"})
+
+    assert events(r)[-1][0] == "done" and len(calls) == nodes_router.MAX_CALLS_PER_ROUND
+    replies = [m for m in bodies[1]["messages"] if m["role"] == "tool"]
+    assert len(replies) == nodes_router.MAX_CALLS_PER_ROUND + 2  # every call answered
+    assert "skipped" in replies[-1]["content"]
+
+
+def test_system_prompt_names_project_uploads(client, monkeypatch):
+    """Regression: an uploaded PDF was invisible to the model (search_papers only matches titles/abstracts),
+    so it asked the user to clarify instead of searching the upload's evidence."""
+    asked = []
+
+    async def fake_note(project_id):
+        asked.append(project_id)
+        return nodes_router.paper_service.sources_note([
+            {"id": 38, "title": "00 Assignment Submit Policy and Rules.pdf", "status": "ready",
+             "pdf_url": None, "pdf_sha256": "abc"},
+        ])
+
+    monkeypatch.setattr(nodes_router.paper_service, "project_sources_note", fake_note)
+    transport, seen = provider([chunk("ok"), "data: [DONE]"])
+    use_provider(monkeypatch, transport)
+
+    client.post(f"/nodes/{NODE}/messages", json={"content": "What are the rules for my submissions?"})
+
+    assert asked == [PROJECT]
+    system = seen["body"]["messages"][0]
+    assert system["role"] == "system" and system["content"].startswith(nodes_router.paper_service.RESEARCH_SYSTEM_PROMPT)
+    assert "- p38: 00 Assignment Submit Policy and Rules.pdf (full_text: ready)" in system["content"]
+    assert "search_paper_evidence" in system["content"].split("p38", 1)[1]
+
+
+def test_provider_5xx_before_any_text_is_retried_once(client, monkeypatch):
+    err = "data: " + json.dumps({"error": {"message": "Provider returned error", "code": 502}})
+    transport, bodies = scripted_provider([[err], [chunk("hello"), "data: [DONE]"]])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert [e[0] for e in events(r)] == ["token", "done"] and len(bodies) == 2
+
+
+def test_persistent_provider_5xx_is_a_plain_message_not_raw_json(client, monkeypatch):
+    err = "data: " + json.dumps({"error": {"message": "Provider returned error", "code": 502, "metadata": {"raw": "x"}}})
+    transport, bodies = scripted_provider([[err], [err]])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hi"})
+
+    assert events(r) == [("error", {"message": "The model provider failed (Provider returned error). Try again."})]
+    assert len(bodies) == 2 and client.persisted == []
+
+
+def test_tool_call_written_as_text_is_run_not_shown(client, monkeypatch):
+    leaked = ("<tool_call> <function=search_papers> <parameter=query> polar bear pollution </parameter> "
+              "<parameter=limit> 10 </parameter> </function> </tool_call>")
+    transport, bodies = scripted_provider([
+        [chunk("<tool_"), chunk(leaked[6:]), "data: [DONE]"],
+        [chunk("Found one."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+    calls = []
+
+    async def fake_tool(name, args, project_id):
+        calls.append((name, args))
+        return {"results": []}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "find a paper"})
+
+    shown = "".join(d["text"] for name, d in events(r) if name == "token")
+    assert shown == "Found one." and "tool_call" not in shown
+    assert calls == [("search_papers", {"query": "polar bear pollution", "limit": 10})]
+    assert client.persisted[0][3] == "Found one."
