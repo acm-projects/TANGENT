@@ -1,5 +1,3 @@
-import copy
-import json
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
@@ -13,21 +11,6 @@ from sqlalchemy.future import select
 
 from app.branch_scope import visible_to
 from app.models import Node, NodeMergeSource, Project, Share, Tree, Workspace
-
-
-def remap_branch_sources(chats, node_map):
-    if isinstance(chats, str):
-        chats = json.loads(chats)
-    remapped = copy.deepcopy(chats or [])
-    for message in remapped:
-        source = message.get("branch_source")
-        if source:
-            try:
-                message["branch_source"] = str(node_map.get(UUID(source), source))
-            except ValueError:
-                pass
-    return remapped
-
 
 @dataclass
 class ForkResult:
@@ -160,7 +143,7 @@ async def _copy_project(
                 summary=n.summary,
                 model=n.model,
                 tokens=n.tokens,
-                chats=remap_branch_sources(n.chats, node_map),
+                chats=n.chats,
                 created_by_id=new_owner_id,
                 created_at=n.created_at,
             )

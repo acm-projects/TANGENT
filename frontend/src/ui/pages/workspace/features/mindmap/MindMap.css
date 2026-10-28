@@ -219,6 +219,13 @@
   font-family: var(--font-heading);
 }
 
+.mindmap-node-subtitle {
+  display: block;
+  padding-left: var(--space-3);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A card's token count: tucked in its bottom corner, shown only while the card
  * is pointed at, focused or picked, so cards at rest stay clean. Absolute, so
  * showing it never changes the card's height. */

@@ -135,20 +135,33 @@ export const useTreeStore = create<TreeState>()((set) => ({
       const stack = [nodeId];
       while (stack.length) {
         const id = stack.pop()!;
+        if (gone.has(id)) continue;
         gone.add(id);
         stack.push(...(s.childrenByParent[id] ?? []));
+        for (const candidate of Object.values(s.nodesById)) {
+          if (candidate.merge_source_ids?.includes(id)) stack.push(candidate.id);
+        }
       }
       const keep = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => !gone.has(k)));
-      const childrenByParent = keep(s.childrenByParent);
+      const childrenByParent = Object.fromEntries(
+        Object.entries(keep(s.childrenByParent)).map(([parentId, childIds]) => [
+          parentId,
+          childIds.filter((id) => !gone.has(id)),
+        ]),
+      );
       if (node.parent_id && childrenByParent[node.parent_id]) {
         childrenByParent[node.parent_id] = childrenByParent[node.parent_id]!.filter((id) => id !== nodeId);
+      }
+      let nextActive = node.parent_id;
+      while (nextActive && gone.has(nextActive)) {
+        nextActive = s.nodesById[nextActive]?.parent_id ?? null;
       }
       return {
         nodesById: keep(s.nodesById),
         childrenByParent,
         chatsByNode: keep(s.chatsByNode),
         unread: keep(s.unread),
-        activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? node.parent_id : s.activeNodeId,
+        activeNodeId: s.activeNodeId && gone.has(s.activeNodeId) ? nextActive : s.activeNodeId,
       };
     }),
 
@@ -181,17 +194,17 @@ export const useTreeStore = create<TreeState>()((set) => ({
       const head = s.chatsByNode[nodeId];
       const rest = childId ? s.chatsByNode[childId] : undefined;
       if (!childId || others.length || !head || !rest) return s;
+      if (
+        s.nodesById[childId]?.merge_source_ids?.length ||
+        Object.values(s.nodesById).some((n) => n.merge_source_ids?.includes(nodeId))
+      ) {
+        return s;
+      }
       const moved = s.childrenByParent[childId] ?? [];
       const nodesById = { ...s.nodesById };
-      const child = nodesById[childId]!;
       delete nodesById[childId];
       for (const id of moved) nodesById[id] = { ...nodesById[id]!, parent_id: nodeId };
       moveSources(nodesById, childId, nodeId);
-      // a merged child makes the node the merge (its merged messages are the node's now)
-      if (child.merge_source_ids?.length) {
-        const own = nodesById[nodeId]!.merge_source_ids ?? [];
-        nodesById[nodeId] = { ...nodesById[nodeId]!, merge_source_ids: [...own, ...child.merge_source_ids] };
-      }
       const childrenByParent = { ...s.childrenByParent, [nodeId]: moved };
       delete childrenByParent[childId];
       const chatsByNode = { ...s.chatsByNode, [nodeId]: [...head, ...rest].map((m, i) => ({ ...m, seq: i })) };
@@ -266,8 +279,21 @@ export const useTreeStore = create<TreeState>()((set) => ({
 
 // ---- Pure selectors (structure only). Usage: useTreeStore((s) => selectBreadcrumb(s, id)) with useShallow. ----
 
-export const selectIsLeaf = (s: Pick<TreeState, "childrenByParent">, id: string): boolean =>
-  !(s.childrenByParent[id]?.length);
+export const selectIsLeaf = (s: Pick<TreeState, "childrenByParent" | "nodesById">, id: string): boolean =>
+  !(s.childrenByParent[id]?.length) &&
+  !Object.values(s.nodesById).some((node) => node.merge_source_ids?.includes(id));
+
+export function parentsOf(s: Pick<TreeState, "nodesById">, id: string): string[] {
+  const node = s.nodesById[id];
+  if (!node) return [];
+  const sources = node.merge_source_ids ?? [];
+  if (sources.length) {
+    return node.parent_id
+      ? [node.parent_id, ...sources.filter((source) => source !== node.parent_id).sort()]
+      : [...sources].sort();
+  }
+  return node.parent_id ? [node.parent_id] : [];
+}
 
 /** root -> node. Guards against cycles from corrupt data. */
 export function selectBreadcrumb(s: Pick<TreeState, "nodesById">, id: string): NodeMeta[] {
@@ -282,8 +308,7 @@ export function selectBreadcrumb(s: Pick<TreeState, "nodesById">, id: string): N
   return out.reverse();
 }
 
-/** Every node whose conversation `id` carries: its ancestors and, through a merged node, both branches it
- * merged, back up to the root. The map's selected path and hover trace (the chat's history is selectBreadcrumb). */
+/** The ancestor set through every parent link. */
 export function selectThread(s: Pick<TreeState, "nodesById">, id: string): Set<string> {
   const out = new Set<string>();
   const stack = [id];
@@ -291,21 +316,74 @@ export function selectThread(s: Pick<TreeState, "nodesById">, id: string): Set<s
     const n = s.nodesById[stack.pop()!];
     if (!n || out.has(n.id)) continue;
     out.add(n.id);
-    const sources = (n.merge_source_ids ?? []).filter((source) => s.nodesById[source]);
-    stack.push(...(sources.length ? sources : n.parent_id ? [n.parent_id] : []));
+    stack.push(...parentsOf(s, n.id));
   }
   return out;
 }
 
-/** Outline numbers, like a case file's exhibits: the root is "1", its children
- * "1.1", "1.2", theirs "1.2.1". By sibling order, so they stay gapless after a delete. */
-export function selectExhibits(s: Pick<TreeState, "rootId" | "childrenByParent">): Record<string, string> {
+export type ThreadPlanItem = string | { merge: { from: string; plan: ThreadPlanItem[] }[] };
+
+/** Same deterministic graph walk the backend uses; display only. */
+export function selectThreadPlan(s: Pick<TreeState, "nodesById">, id: string): ThreadPlanItem[] {
+  const ancestors = new Map<string, Set<string>>();
+  const anc = (nodeId: string): Set<string> => {
+    const cached = ancestors.get(nodeId);
+    if (cached) return cached;
+    const result = new Set([nodeId]);
+    ancestors.set(nodeId, result);
+    for (const parent of parentsOf(s, nodeId)) for (const ancestor of anc(parent)) result.add(ancestor);
+    return result;
+  };
+  const order = (a: string, b: string) =>
+    (s.nodesById[a]?.created_at ?? "").localeCompare(s.nodesById[b]?.created_at ?? "") || a.localeCompare(b);
+
+  const thread = (nodeId: string, done: Set<string>): ThreadPlanItem[] => {
+    if (done.has(nodeId)) return [];
+    const parents = parentsOf(s, nodeId);
+    if (parents.length === 0) return [nodeId];
+    const prefix = parents.length === 1 ? thread(parents[0]!, done) : join(parents, done);
+    return [...prefix, nodeId];
+  };
+
+  const join = (tips: string[], done: Set<string>): ThreadPlanItem[] => {
+    const first = anc(tips[0]!);
+    const common = new Set([...first].filter((candidate) => !done.has(candidate) && tips.every((tip) => anc(tip).has(candidate))));
+    const heads = [...common]
+      .filter((candidate) => ![...common].some((other) => candidate !== other && anc(other).has(candidate)))
+      .sort(order);
+    const shared = heads.length === 0
+      ? []
+      : heads.length === 1
+        ? thread(heads[0]!, done)
+        : join(heads, done);
+    const seen = new Set([...done, ...common]);
+    const branches: { from: string; plan: ThreadPlanItem[] }[] = [];
+    for (const tip of tips) {
+      const plan = thread(tip, seen);
+      if (plan.length) branches.push({ from: tip, plan });
+      for (const card of anc(tip)) seen.add(card);
+    }
+    return branches.length ? [...shared, { merge: branches }] : shared;
+  };
+
+  return thread(id, new Set());
+}
+
+/** Tree cards keep gapless outline numbers; merges use independent joint-exhibit labels. */
+export function selectExhibits(
+  s: Pick<TreeState, "rootId" | "nodesById" | "childrenByParent">,
+): Record<string, string> {
   const out: Record<string, string> = {};
+  const isMerge = (id: string) => (s.nodesById[id]?.merge_source_ids?.length ?? 0) > 0;
   const number = (id: string, label: string) => {
-    if (id in out) return; // corrupt data: a cycle
+    if (id in out) return;
     out[id] = label;
-    s.childrenByParent[id]?.forEach((child, i) => number(child, `${label}.${i + 1}`));
+    (s.childrenByParent[id] ?? []).filter((child) => !isMerge(child)).forEach((child, i) => number(child, `${label}.${i + 1}`));
   };
   if (s.rootId) number(s.rootId, "1");
+  Object.values(s.nodesById)
+    .filter((node) => isMerge(node.id))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+    .forEach((node, i) => number(node.id, `J${i + 1}`));
   return out;
 }

@@ -1,7 +1,7 @@
 import { api, forkedProjectIdOf } from "@/api";
 import type { ForkInfo } from "@/api";
 import type { NodeMeta } from "@/api/types";
-import { selectBreadcrumb, useTreeStore } from "@/store/treeStore";
+import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
 
 /* The map's per-node actions, shared with the chat's "branch" button.
  * Both throw on failure; the caller decides where the error shows. */
@@ -201,6 +201,10 @@ export async function mergeNodes(a: string, b: string) {
   if (!na || !nb || a === b) return;
   const [parent, child] = nb.parent_id === a ? [na, nb] : na.parent_id === b ? [nb, na] : [null, null];
   if (!parent || !child) return mergeBranches(a, b);
+  if (child.merge_source_ids?.length) throw new Error("A merge can't be folded into one of its sources.");
+  if (Object.values(store.nodesById).some((node) => node.merge_source_ids?.includes(parent.id))) {
+    throw new Error("A card that feeds a merge can't take its child back in.");
+  }
   if ((store.childrenByParent[parent.id] ?? []).length > 1) {
     throw new Error("Other tangents branch from that card, so it can't take this one back in.");
   }
@@ -237,29 +241,20 @@ export async function mergeNodes(a: string, b: string) {
   useTreeStore.getState().updateNode(joined);
 }
 
-/** Two leaves of separate branches become a new card under the point where their branches part, carrying
- * both conversations (POST /nodes/merge). A placeholder shows it at once, joined to both, and selected. */
+/** Two leaves become a new two-parent card (POST /nodes/merge). */
 async function mergeBranches(a: string, b: string) {
   const store = useTreeStore.getState();
-  if (store.childrenByParent[a]?.length || store.childrenByParent[b]?.length) {
-    throw new Error("Only cards at the ends of their branches can be merged, or a card with its only branch.");
+  if (!selectIsLeaf(store, a) || !selectIsLeaf(store, b)) {
+    throw new Error("Only cards at the ends of their branches can be merged.");
   }
+  if (a === b) throw new Error("Pick two different cards to merge.");
   if (isPending(a) || isPending(b)) throw new Error("That card is still being made. Try again in a moment.");
   if (a in store.streaming || b in store.streaming) throw new Error("Wait for the reply to finish first.");
-  const [pathA, pathB] = [selectBreadcrumb(store, a), selectBreadcrumb(store, b)];
-  let shared = 0;
-  while (shared < Math.min(pathA.length, pathB.length) && pathA[shared]!.id === pathB[shared]!.id) shared++;
-  const ancestor = pathA[shared - 1];
-  if (!ancestor) return;
-
-  // what the server will copy in, from whatever of both branches is loaded; the real chats are read once it answers
-  const below = (path: typeof pathA, key: string) =>
-    path.slice(shared).flatMap((n) => store.chatsByNode[n.id] ?? []).map((m) => ({ ...m, branch_source: key }));
-  const siblings = store.childrenByParent[ancestor.id] ?? [];
+  const siblings = store.childrenByParent[a] ?? [];
   const temp: NodeMeta = {
-    ...ancestor,
+    ...store.nodesById[a]!,
     id: PENDING + crypto.randomUUID(),
-    parent_id: ancestor.id,
+    parent_id: a,
     fork_index: Math.max(0, ...siblings.map((id) => store.nodesById[id]?.fork_index ?? 0)) + 1,
     title: null,
     summary: null,
@@ -270,7 +265,7 @@ async function mergeBranches(a: string, b: string) {
   };
   const previous = store.activeNodeId;
   store.addNode(temp);
-  store.setChats(temp.id, [...below(pathA, "a"), ...below(pathB, "b")].map((m, i) => ({ ...m, seq: i })));
+  store.setChats(temp.id, []);
   store.setActive(temp.id);
   store.requestCompose();
 
@@ -302,17 +297,11 @@ async function mergeBranches(a: string, b: string) {
     drop();
     return switchToFork(fork, merged.id);
   }
-  const real = { ...merged, merge_source_ids: [a, b] };
+  const real = merged;
   const waiting = queued();
   if (waiting) return waiting(real);
   confirmedForks.add(real.id);
   useTreeStore.getState().replaceNode(temp.id, real);
-  // drop the preview, so the chat panel reads what the server actually copied
-  useTreeStore.setState((s) => {
-    const chatsByNode = { ...s.chatsByNode };
-    delete chatsByNode[real.id];
-    return { chatsByNode };
-  });
 }
 
 /** Delete a node and everything branching from it. Optimistic: the branch goes at once and is put
@@ -320,9 +309,26 @@ async function mergeBranches(a: string, b: string) {
  * A placeholder fork goes at once too; its delete is sent as soon as the server confirms the real node. */
 export async function deleteNode(nodeId: string) {
   const store = useTreeStore.getState();
-  // parents before children, so each restored node has its parent back already
-  const ids = [nodeId];
-  for (let i = 0; i < ids.length; i++) ids.push(...(store.childrenByParent[ids[i]!] ?? []));
+  const gone = new Set([nodeId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const id of gone) {
+      for (const child of store.childrenByParent[id] ?? []) {
+        if (!gone.has(child)) {
+          gone.add(child);
+          changed = true;
+        }
+      }
+    }
+    for (const node of Object.values(store.nodesById)) {
+      if (!gone.has(node.id) && node.merge_source_ids?.some((source) => gone.has(source))) {
+        gone.add(node.id);
+        changed = true;
+      }
+    }
+  }
+  const ids = [...gone];
   const nodes = ids.flatMap((id) => store.nodesById[id] ?? []);
   const chats = ids.flatMap((id) => (store.chatsByNode[id] ? [[id, store.chatsByNode[id]] as const] : []));
   let previous = store.activeNodeId;
@@ -341,7 +347,18 @@ export async function deleteNode(nodeId: string) {
     await api.nodes.delete(nodeId);
   } catch (e) {
     const now = () => useTreeStore.getState(); // each add changes the state, so read it fresh
-    for (const n of nodes) if (n.parent_id && now().nodesById[n.parent_id] && !now().nodesById[n.id]) now().addNode(n);
+    const remaining = new Map(nodes.map((node) => [node.id, node]));
+    while (remaining.size) {
+      const ready = [...remaining.values()].filter((node) => {
+        const parents = [...(node.parent_id ? [node.parent_id] : []), ...(node.merge_source_ids ?? [])];
+        return parents.every((parent) => !remaining.has(parent));
+      });
+      if (!ready.length) throw new Error("Could not restore the deleted branch because its parent graph is cyclic.");
+      for (const n of ready) {
+        if (n.parent_id && now().nodesById[n.parent_id] && !now().nodesById[n.id]) now().addNode(n);
+        remaining.delete(n.id);
+      }
+    }
     for (const [id, c] of chats) if (now().nodesById[id]) now().setChats(id, c);
     // removeNode moved a selection inside the branch to its parent; put it back unless the user has moved on
     const parent = nodes[0]?.parent_id ?? null;

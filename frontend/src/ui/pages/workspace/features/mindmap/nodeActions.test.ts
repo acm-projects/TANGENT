@@ -69,6 +69,26 @@ describe("deleteNode (optimistic)", () => {
     expect(s.chatsByNode["g"]).toEqual([]);
     expect(s.activeNodeId).toBe("g");
   });
+
+  it("removes dependent merges and restores them after both parents if the server refuses", async () => {
+    useTreeStore.getState().hydrateTree("r", [
+      node("r", null, 0),
+      node("a", "r", 1),
+      node("b", "r", 2),
+      { ...node("m", "a", 1), merge_source_ids: ["a", "b"] },
+      node("tail", "m", 1),
+    ]);
+    let refuse!: (e: Error) => void;
+    remove.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)));
+    const done = deleteNode("a");
+    expect(Object.keys(useTreeStore.getState().nodesById).sort()).toEqual(["b", "r"]);
+    refuse(new Error("nope"));
+    await expect(done).rejects.toThrow("nope");
+    const s = useTreeStore.getState();
+    expect(s.nodesById["m"]!.merge_source_ids).toEqual(["a", "b"]);
+    expect(s.nodesById["tail"]!.parent_id).toBe("m");
+    expect(s.childrenByParent["a"]).toEqual(["m"]);
+  });
 });
 
 describe("deleting a placeholder fork", () => {
@@ -128,7 +148,7 @@ describe("loadChats", () => {
 });
 
 describe("splitNode (optimistic)", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     const s = useTreeStore.getState();
     s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("k", "a", 1)]);
@@ -172,7 +192,7 @@ describe("splitNode (optimistic)", () => {
 });
 
 describe("mergeNodes", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     // r -> a -> t -> k   (a, t: a split; k: a branch of t)
     const s = useTreeStore.getState();
@@ -210,7 +230,23 @@ describe("mergeNodes", () => {
     expect(join).not.toHaveBeenCalled();
   });
 
-  it("merges two leaves of separate branches into a placeholder under where they part, then the server's node", async () => {
+  it("refuses to fold a merge into its source or change the history of a merge source", async () => {
+    useTreeStore.getState().hydrateTree("r", [
+      node("r", null, 0),
+      node("a", "r", 1),
+      node("b", "r", 2),
+      { ...node("m", "a", 1), merge_source_ids: ["a", "b"] },
+    ]);
+    useTreeStore.getState().setChats("a", []);
+    useTreeStore.getState().setChats("m", []);
+    await expect(mergeNodes("a", "m")).rejects.toThrow(/merge can't be folded/i);
+    useTreeStore.getState().addNode(node("child", "a", 2));
+    useTreeStore.getState().setChats("child", []);
+    await expect(mergeNodes("a", "child")).rejects.toThrow(/feeds a merge/i);
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it("merges two leaves into an empty placeholder under the first source", async () => {
     // r -> (a -> t -> k, b)
     useTreeStore.getState().addNode(node("b", "r", 2));
     let answer!: (r: unknown) => void;
@@ -219,20 +255,21 @@ describe("mergeNodes", () => {
     let s = useTreeStore.getState();
     const temp = s.activeNodeId!;
     expect(isPending(temp)).toBe(true);
-    expect(s.nodesById[temp]!.parent_id).toBe("r");
+    expect(s.nodesById[temp]!.parent_id).toBe("k");
     expect(s.nodesById[temp]!.merge_source_ids).toEqual(["k", "b"]);
-    answer({ ...node("m", "r", 3), fork: null });
+    expect(s.chatsByNode[temp]).toEqual([]);
+    answer({ ...node("m", "k", 1), merge_source_ids: ["k", "b"], fork: null });
     await done;
     s = useTreeStore.getState();
     expect(merge).toHaveBeenCalledWith(["k", "b"]);
     expect(s.activeNodeId).toBe("m");
     expect(s.nodesById["m"]!.merge_source_ids).toEqual(["k", "b"]);
-    expect(s.chatsByNode["m"]).toBeUndefined(); // read fresh from the server
+    expect(s.chatsByNode["m"]).toEqual([]);
   });
 });
 
 describe("placeholders made from a merged card", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     // m merges a and b, and has used tokens; it is what gets split or forked
     const s = useTreeStore.getState();
@@ -260,7 +297,7 @@ describe("placeholders made from a merged card", () => {
 });
 
 describe("ready to type after a branch or merge", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   const asks = async (act: () => Promise<unknown>) => {
     const before = useTreeStore.getState().composeAt;
     await act().catch(() => {});
@@ -287,7 +324,7 @@ describe("ready to type after a branch or merge", () => {
   });
 
   it("merging two leaves asks too, and a refused merge doesn't", async () => {
-    merge.mockResolvedValueOnce({ ...node("m", "r", 3), fork: null });
+    merge.mockResolvedValueOnce({ ...node("m", "t", 1), merge_source_ids: ["t", "b"], fork: null });
     expect(await asks(() => mergeNodes("t", "b"))).toBe(true);
     expect(await asks(() => mergeNodes("a", "b"))).toBe(false); // a has a branch: not a leaf
   });

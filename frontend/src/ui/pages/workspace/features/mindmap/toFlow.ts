@@ -26,7 +26,9 @@ export interface MindMapNodeData extends Record<string, unknown> {
   hasChildren: boolean;
   /** Its place in the case, outline-numbered like exhibits: "1", "1.2", "1.2.1". */
   exhibit: string;
-  /** A merged card hangs below it (draw the outgoing dot). Not a child: deleting this card leaves the merge. */
+  /** The parent exhibit labels for a joint exhibit. */
+  subtitle: string | null;
+  /** This card is a parent of a merge (draw the outgoing dot). */
   feedsMerge: boolean;
   tokens: number;
   /** A debate's verdict card (node_type "debate"). */
@@ -52,35 +54,9 @@ function mergesOf(s: StructureSlice): Map<string, string[]> {
   return out;
 }
 
-/** The tree as it's drawn: a merged card is laid out under the deepest of its sources (the first, on a tie)
- * rather than under its real parent, so it sits below every card it joins and the join reads down the board.
- * Depth is the drawn one: a merged card is drawn deeper than its real depth, and so is everything under it. */
-function drawnChildren(s: StructureSlice, merges: Map<string, string[]>): Record<string, string[]> {
-  if (!merges.size) return s.childrenByParent;
-  const depths = new Map<string, number>();
-  const depth = (id: string): number => {
-    const known = depths.get(id);
-    if (known !== undefined) return known;
-    depths.set(id, 0); // cycle guard: corrupt data mustn't recurse forever
-    const sources = merges.get(id);
-    const parent = s.nodesById[id]?.parent_id;
-    const d = sources ? 1 + Math.max(...sources.map(depth)) : parent ? 1 + depth(parent) : 0;
-    depths.set(id, d);
-    return d;
-  };
-  const out = { ...s.childrenByParent };
-  for (const [id, sources] of merges) {
-    const parent = s.nodesById[id]!.parent_id;
-    const under = sources.reduce((a, b) => (depth(b) > depth(a) ? b : a));
-    if (parent) out[parent] = (out[parent] ?? []).filter((c) => c !== id);
-    out[under] = [...(out[under] ?? []), id];
-  }
-  return out;
-}
-
 export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Edge[] } {
   const merges = mergesOf(s);
-  const positions = layoutTree(s.rootId, drawnChildren(s, merges));
+  const positions = layoutTree(s.rootId, s.childrenByParent);
   const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
@@ -107,8 +83,9 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         state: stateOf(id),
         tags: meta.attachment_kinds ?? [],
         hasParent: meta.parent_id !== null,
-        hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
+        hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0 || feeding.has(id),
         exhibit: exhibits[id],
+        subtitle: merges.has(id) ? merges.get(id)!.map((source) => exhibits[source]).filter(Boolean).join(" + ") : null,
         feedsMerge: feeding.has(id),
         tokens: meta.tokens,
         debate: meta.node_type === "debate",

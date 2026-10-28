@@ -16,6 +16,7 @@ from sqlalchemy.future import select
 from app import database
 from app.branch_scope import require_visible, visible_to
 from app.context.flatten import flatten, to_provider_messages
+from app.context.plan import build_plan
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.models import Node, NodeMergeSource, Project, User
 from app.papers import service as paper_service
@@ -261,7 +262,17 @@ async def ask_node(node_id, message, *, project_id: UUID, user_id: UUID, default
         path, _ = await nodes_router._load_path(db, node.id, user_id)  # 409 unless it is a leaf
         model_id = node.model or default_model or DEFAULT_MODEL_ID  # a node keeps the model it started with
         get_model_or_400(model_id)
-        messages = [{"role": "system", "content": ASK_SYSTEM_PROMPT}, *to_provider_messages(flatten(path), message)]
+        nodes = {item.id: item for item in path}
+        parents = {
+            item.id: item.merge_source_ids or ([item.parent_id] if item.parent_id else [])
+            for item in path
+        }
+        order = {item.id: (item.created_at, item.id) for item in path}
+        plan = build_plan(str(node.id), parents, order)
+        messages = [
+            {"role": "system", "content": ASK_SYSTEM_PROMPT},
+            *to_provider_messages(flatten(plan, nodes), message),
+        ]
         node_pk = node.id
     reply, usage = "", None  # the session is closed: no connection is held for the length of the model call
     async for event in stream_openrouter(messages, model_id):

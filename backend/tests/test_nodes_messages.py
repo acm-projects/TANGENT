@@ -89,7 +89,7 @@ def client(monkeypatch):
         )
 
     async def fake_path(db, node_id, user_id):
-        return [PathNode(id="root", chats=[
+        return [PathNode(id=str(node_id), chats=[
             {"role": "user", "content": "earlier q", "seq": 0, "created_at": "2026-01-01T00:00:00Z"},
             {"role": "assistant", "content": "earlier a", "seq": 1, "created_at": "2026-01-01T00:00:01Z"},
         ])], PROJECT
@@ -239,6 +239,18 @@ async def load(db):
     return await nodes_router._load_path(db, NODE, USER.id)
 
 
+def path_row(node_id="a"):
+    return SimpleNamespace(
+        id=node_id,
+        chats=[],
+        model=None,
+        parent_id=None,
+        title=None,
+        created_at=None,
+        merge_source_ids=[],
+    )
+
+
 @pytest.mark.anyio
 async def test_load_path_404_when_node_missing_or_hidden():
     with pytest.raises(HTTPException) as e:
@@ -249,13 +261,13 @@ async def test_load_path_404_when_node_missing_or_hidden():
 @pytest.mark.anyio
 async def test_load_path_409_for_non_leaf():
     with pytest.raises(HTTPException) as e:
-        await load(FakeDb([SimpleNamespace(id="a", chats=[])], has_child=True))
+        await load(FakeDb([path_row()], has_child=True))
     assert e.value.status_code == 409
 
 
 @pytest.mark.anyio
 async def test_load_path_owner_gets_path_and_project_id():
-    path, project_id = await load(FakeDb([SimpleNamespace(id="a", chats=[])]))
+    path, project_id = await load(FakeDb([path_row()]))
     assert [p.id for p in path] == ["a"]
     assert project_id == PROJECT
 
@@ -263,7 +275,7 @@ async def test_load_path_owner_gets_path_and_project_id():
 @pytest.mark.anyio
 async def test_load_path_sharee_without_a_copy_may_prompt():
     # A sharee's first write forks the project, so reading the original's path must be allowed.
-    path, project_id = await load(FakeDb([SimpleNamespace(id="a", chats=[])], is_owner=False))
+    path, project_id = await load(FakeDb([path_row()], is_owner=False))
     assert project_id == PROJECT
 
 
@@ -271,7 +283,7 @@ async def test_load_path_sharee_without_a_copy_may_prompt():
 async def test_load_path_sharee_with_a_copy_gets_409_pointing_at_it():
     copy_id = uuid.uuid4()
     with pytest.raises(HTTPException) as e:
-        await load(FakeDb([SimpleNamespace(id="a", chats=[])], is_owner=False, copy_id=copy_id))
+        await load(FakeDb([path_row()], is_owner=False, copy_id=copy_id))
     assert e.value.status_code == 409
     assert e.value.detail["forked_project_id"] == str(copy_id)
 

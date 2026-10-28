@@ -201,9 +201,11 @@ def test_split_moves_the_rest_and_the_branches_down(monkeypatch):
 
 
 def test_join_undoes_a_split_and_merge_reads_back(monkeypatch):
-    replies = iter(["one", "two", "three", "four"])
+    replies = iter(["one", "two", "three", "four", "five"])
+    seen = []
 
     async def fake_llm(messages, model, **_):
+        seen.append(messages)
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -231,22 +233,29 @@ def test_join_undoes_a_split_and_merge_reads_back(monkeypatch):
         other = c.post(f"/nodes/{root}/fork", headers=auth).json()
         assert c.post(f"/nodes/{root}/join", headers=auth).status_code == 409
 
-        # two leaves merge into a node under their common ancestor, which reads back, and the tree lists its sources
+        # Two leaves merge into an empty card under the first source. The model gets each history once.
         c.post(f"/nodes/{below['id']}/messages", json={"content": "a?"}, headers=auth)
         c.post(f"/nodes/{other['id']}/messages", json={"content": "b?"}, headers=auth)
         merged = c.post("/nodes/merge", json={"source_leaf_ids": [below["id"], other["id"]]}, headers=auth).json()
-        assert merged["parent_id"] == root
-        assert chats(merged["id"]) == ["a?", "three", "b?", "four"]
+        assert merged["parent_id"] == below["id"]
+        assert merged["merge_source_ids"] == [below["id"], other["id"]]
+        assert chats(merged["id"]) == []
+        c.post(f"/nodes/{merged['id']}/messages", json={"content": "merge prompt"}, headers=auth)
+        prompt = "\n".join(message["content"] for message in seen[-1])
+        assert prompt.count("User: a?") == 1 and prompt.count("Assistant: three") == 1
+        assert prompt.count("User: b?") == 1 and prompt.count("Assistant: four") == 1
         nodes = {n["id"]: n for n in c.get(f"/trees/{t['tree']['id']}", headers=auth).json()["nodes"]}
-        assert sorted(nodes[merged["id"]]["merge_source_ids"]) == sorted([below["id"], other["id"]])
+        assert nodes[merged["id"]]["merge_source_ids"] == [below["id"], other["id"]]
 
 
 def test_merge_sources_follow_a_split_and_a_join(monkeypatch):
     """The Linear Algebra case: m merges (a, b); m2 merges (c, m); then m is split and later joined back.
     m2's source must follow the conversation's end: the tail after the split, m again after the join."""
     replies = iter(f"r{i}" for i in range(20))
+    seen = []
 
     async def fake_llm(messages, model, **_):
+        seen.append(messages)
         yield {"text": next(replies)}
 
     monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
@@ -268,17 +277,54 @@ def test_merge_sources_follow_a_split_and_a_join(monkeypatch):
         ask(m, "q1"), ask(m, "q2")
         cc = fork(b)
         ask(cc, "qc")
-        m2 = c.post("/nodes/merge", json={"source_leaf_ids": [cc, m]}, headers=auth).json()["id"]
+        m2 = c.post("/nodes/merge", json={"source_leaf_ids": [m, cc]}, headers=auth).json()["id"]
+        assert c.get(f"/nodes/{a}", headers=auth).json()["chats"][0]["content"] == "qa"
+        assert c.post(f"/nodes/{m2}/messages", json={"content": "q3"}, headers=auth).status_code == 200
+        context = "\n".join(message["content"] for message in seen[-1])
+        assert context.count("User: qa") == 1 and context.count("qb") == 1
+        assert context.count("r1") == 1
+        assert context.count("User: qc") == 1 and context.count("User: q1") == 1 and context.count("User: q2") == 1
 
-        # split m after its first own reply (index 5: two merged exchanges, then q1 and its reply): the tail ends m's conversation
-        tail = c.post(f"/nodes/{m}/split", json={"after_seq": 5}, headers=auth).json()["tail"]["id"]
+        # m now has only its own messages, so the split index is 1. Its first-parent merge moves to the tail.
+        split = c.post(f"/nodes/{m}/split", json={"after_seq": 1}, headers=auth).json()
+        tail = split["tail"]["id"]
         assert sources(m2) == sorted([cc, tail])
+        nodes = {n["id"]: n for n in c.get(f"/trees/{t['tree']['id']}", headers=auth).json()["nodes"]}
+        assert nodes[m2]["parent_id"] == tail
         assert sources(m) == sorted([a, b])  # still a merge itself
 
         # joined back: m2 points at m again, and nothing was lost to the tail's delete
         assert c.post(f"/nodes/{m}/join", headers=auth).status_code == 200
         assert sources(m2) == sorted([cc, m])
         assert sources(m) == sorted([a, b])
+
+
+def test_merge_sources_are_locked_and_delete_with_their_merge_descendants(monkeypatch):
+    async def fake_llm(messages, model):
+        yield {"text": "answer"}
+
+    monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
+
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])},
+                     headers=auth).json()["id"]
+        tree = c.get(f"/projects/{pid}/tree", headers=auth).json()
+        root = tree["tree"]["root_node_id"]
+        a = c.post(f"/nodes/{root}/fork", headers=auth).json()["id"]
+        b = c.post(f"/nodes/{root}/fork", headers=auth).json()["id"]
+        merged = c.post("/nodes/merge", json={"source_leaf_ids": [a, b]}, headers=auth).json()
+        merge_id = merged["id"]
+        tail = c.post(f"/nodes/{merge_id}/fork", headers=auth).json()["id"]
+
+        assert c.post(f"/nodes/{a}/messages", json={"content": "locked"}, headers=auth).status_code == 409
+        assert c.post("/nodes/merge", json={"source_leaf_ids": [a, b]}, headers=auth).status_code == 409
+        assert c.post(f"/nodes/{a}/join", headers=auth).status_code == 409
+        assert c.delete(f"/nodes/{b}", headers=auth).status_code == 204
+        assert c.get(f"/nodes/{merge_id}", headers=auth).status_code == 404
+        assert c.get(f"/nodes/{tail}", headers=auth).status_code == 404
+        assert c.get(f"/nodes/{a}", headers=auth).status_code == 200
 
 
 def _workspace_id(user_id):

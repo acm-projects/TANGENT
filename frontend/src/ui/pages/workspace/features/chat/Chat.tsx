@@ -3,14 +3,11 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { AgentWindow } from "../agent/AgentWindow";
-import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
-import { useChat } from "./useChat";
+import { type HistoryItem, useChat } from "./useChat";
 import "./Chat.css";
-
-const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 /* The chat panel (Figma "Chat", 24:531, and "Chat History", 160:7205).
  *
@@ -30,6 +27,82 @@ type Layout = "docked" | "expanded" | "collapsed";
 const MIN_WIDTH = 360;
 const KEY_STEP = 32;
 type ChatProps = { className?: string };
+
+type HistoryListProps = {
+  items: HistoryItem[];
+  activeNodeId: string | null;
+  streaming: string | null;
+  canRetry: boolean;
+  branch: (nodeId: string, seq: number) => void;
+  retry: () => Promise<void>;
+};
+
+function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }: HistoryListProps) {
+  return (
+    <>
+      {items.map((item, i) => {
+        if (item.kind === "merge") {
+          return (
+            <li key={`merge-${i}`} className="chat-merge">
+              <ol className="chat-merge-branches">
+                {item.branches.map((source) => (
+                  <li key={source.from}>
+                    <details>
+                      <summary className="chat-merge-branch-heading">
+                        <Icon icon="merge" size="s" />
+                        <span>Branch from {source.exhibit} {source.title ?? "Untitled branch"}</span>
+                      </summary>
+                      <ol className="chat-history chat-merge-history">
+                        <HistoryList
+                          items={source.items}
+                          activeNodeId={activeNodeId}
+                          streaming={streaming}
+                          canRetry={canRetry}
+                          branch={branch}
+                          retry={retry}
+                        />
+                      </ol>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+            </li>
+          );
+        }
+
+        const isActive = item.node.id === activeNodeId;
+        return (
+          <Fragment key={item.node.id}>
+            {i > 0 && (
+              <li>
+                <BranchDivider exhibit={item.exhibit} title={item.node.title} />
+              </li>
+            )}
+            {item.messages === undefined && (
+              <li>
+                <Loading />
+              </li>
+            )}
+            {item.messages?.map((message, j, all) => (
+              <MessageBubble
+                key={`${item.node.id}-${message.seq}-${message.role}`}
+                message={message}
+                nodeId={item.node.id}
+                onBranch={streaming !== null && isActive ? undefined : branch}
+                onRetry={canRetry && isActive && j === all.length - 1 ? retry : undefined}
+              />
+            ))}
+            {item.messages?.length === 0 && streaming === null && isActive && (
+              <li className="chat-hint">
+                <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
+              </li>
+            )}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
 
 export function Chat({ className }: ChatProps) {
   const chat = useChat();
@@ -59,10 +132,10 @@ export function Chat({ className }: ChatProps) {
 
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastSection = chat.history.at(-1);
+  const activeNode = chat.activeNode;
   // `layout` is in the key because reopening a collapsed panel remounts the list. Every section's count, since
   // an ancestor's (often long) history can load after the selected card's.
-  const loaded = chat.history.reduce((n, section) => n + (section.messages?.length ?? 0), 0);
+  const loaded = chat.loadedMessageCount;
   const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming?.length ?? 0}`;
   useEffect(() => {
     const el = scrollRef.current;
@@ -168,16 +241,18 @@ export function Chat({ className }: ChatProps) {
             onClick={() => setLayout(layout === "expanded" ? "docked" : "expanded")}
             className="chat-fold-button"
           />
-          {lastSection && (
+          {activeNode && (
             // keyed, so picking another card swaps the heading in
-            <Frame key={lastSection.node.id} gap="0" align="center" className="chat-title">
+            <Frame key={activeNode.id} gap="0" align="center" className="chat-title">
               <Text
                 as="span"
                 size="xxs"
                 className="chat-title-kicker"
-                content={`Case notes · Exhibit ${lastSection.exhibit}`}
+                content={(activeNode.merge_source_ids?.length ?? 0) > 0
+                  ? `Case notes · Joint exhibit ${chat.activeExhibit}`
+                  : `Case notes · Exhibit ${chat.activeExhibit}`}
               />
-              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={lastSection.node.title ?? "Untitled card"} />
+              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
             </Frame>
           )}
           <Button
@@ -204,43 +279,14 @@ export function Chat({ className }: ChatProps) {
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
-              {chat.history.map((section, i) => (
-                <Fragment key={section.node.id}>
-                  {i > 0 && (
-                    <Frame as="li">
-                      <BranchDivider exhibit={section.exhibit} title={section.node.title} />
-                    </Frame>
-                  )}
-                  {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
-                  {section.node.node_type === "debate" && i === chat.history.length - 1 && (
-                    <Frame as="li">
-                      <VerdictCard nodeId={section.node.id} />
-                    </Frame>
-                  )}
-                  {section.messages === undefined && (
-                    <Frame as="li">
-                      <Loading />
-                    </Frame>
-                  )}
-                  {section.messages?.map((m, j, all) => (
-                    <MessageBubble
-                      key={`${section.node.id}-${m.seq}-${m.role}`}
-                      message={m}
-                      nodeId={section.node.id}
-                      // a node can't be cut while its reply is still arriving
-                      onBranch={chat.streaming !== null && i === chat.history.length - 1 ? undefined : chat.branch}
-                      // only the newest reply on the card being written on can be asked again
-                      onRetry={chat.canRetry && i === chat.history.length - 1 && j === all.length - 1 ? chat.retry : undefined}
-                    />
-                  ))}
-                  {/* only the card being written on needs the hint; an empty card above it is just its divider */}
-                  {section.messages?.length === 0 && chat.streaming === null && i === chat.history.length - 1 && (
-                    <Frame as="li" className="chat-hint">
-                      <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
-                    </Frame>
-                  )}
-                </Fragment>
-              ))}
+              <HistoryList
+                items={chat.history}
+                activeNodeId={chat.activeNodeId}
+                streaming={chat.streaming}
+                canRetry={chat.canRetry}
+                branch={chat.branch}
+                retry={chat.retry}
+              />
               {chat.streaming !== null && (
                 <MessageBubble
                   streaming
@@ -248,7 +294,6 @@ export function Chat({ className }: ChatProps) {
                     role: "assistant",
                     content: chat.streaming,
                     seq: -1,
-                    branch_source: null,
                     created_at: "",
                   }}
                 />
@@ -259,45 +304,34 @@ export function Chat({ className }: ChatProps) {
 
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
-        {lastSection && (
-          // One quiet line (node, branch and, after a reply, how full the context is); open it for the full counts.
-          <details className="chat-token-usage">
-            <summary>
-              <Icon icon="data_usage" size="s" hierarchy="tertiary" />
-              <Text
-                as="span"
-                size="xs"
-                content={[
-                  `${compact.format(chat.nodeTokens)} node`,
-                  `${compact.format(chat.branchTokens)} branch`,
-                  contextUsagePercentage !== null && `${contextUsagePercentage.toFixed(0)}% context`,
-                ].filter(Boolean).join(" · ")}
-              />
-            </summary>
-            <Frame gap="1" className="chat-token-details" role="status" aria-label="Token usage">
-              <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
-              <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
-              {chat.usage && (
-                <>
-                  <Text size="xs" hierarchy="tertiary" content="Latest response" />
-                  <Frame direction="row" gap="3" className="chat-token-counts">
-                    <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
-                    <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
-                    <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
-                    {contextUsagePercentage !== null && chat.usageContextLength !== null && (
-                      <Text
-                        size="xs"
-                        content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
-                      />
-                    )}
-                  </Frame>
-                </>
-              )}
-              {chat.usageUnavailable && (
-                <Text size="xs" hierarchy="tertiary" content="Token usage was not included in the provider stream." />
+        {activeNode && (
+          <Frame
+            direction="row"
+            gap="3"
+            className="chat-token-usage"
+            role="status"
+            aria-label="Saved token usage"
+          >
+            <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
+            <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
+          </Frame>
+        )}
+
+        {chat.usage && (
+          <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
+            <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
+            <Frame direction="row" gap="3" className="chat-token-counts">
+              <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
+              <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
+              {contextUsagePercentage !== null && chat.usageContextLength !== null && (
+                <Text
+                  size="xs"
+                  content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
+                />
               )}
             </Frame>
-          </details>
+          </Frame>
         )}
 
         <MessageField
@@ -309,9 +343,8 @@ export function Chat({ className }: ChatProps) {
           modelsLoading={chat.modelsLoading}
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}
-          about={lastSection?.node.title}
-          // hidden, not unmounted, with no card picked: a half-written draft survives deselecting
-          className={chat.blocker === "no-selection" ? "chat-field chat-field-idle" : "chat-field"}
+          about={activeNode?.title}
+          className="chat-field"
         />
       </Frame>
     </Panel>

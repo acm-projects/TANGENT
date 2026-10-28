@@ -94,6 +94,31 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const remove = act(() => deleteNode(id), "Could not delete the node.");
   // while its reply is arriving, the card's pin pulses (MindMap.css)
   const thinking = useTreeStore((s) => id in s.streaming);
+  const mergeNames = useTreeStore((s) => {
+    const gone = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const removed of gone) {
+        for (const child of s.childrenByParent[removed] ?? []) {
+          if (!gone.has(child)) {
+            gone.add(child);
+            changed = true;
+          }
+        }
+      }
+      for (const node of Object.values(s.nodesById)) {
+        if (!gone.has(node.id) && node.merge_source_ids?.some((source) => gone.has(source))) {
+          gone.add(node.id);
+          changed = true;
+        }
+      }
+    }
+    return Object.values(s.nodesById)
+      .filter((node) => gone.has(node.id) && node.merge_source_ids?.length)
+      .map((node) => node.title ?? node.id)
+      .join(", ");
+  });
   // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
   const unread = useTreeStore((s) => Boolean(s.unread[id]));
   // An empty branch (no messages, nothing under it, no reply on its way) has nothing to lose, so it goes without asking.
@@ -221,6 +246,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               </Panel>
             ))}
           </Frame>
+          {data.subtitle && (
+            <Text as="span" size="xxs" className="mindmap-node-subtitle" content={data.subtitle} />
+          )}
           <Text
             as="span"
             size="xs"
@@ -355,7 +383,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       </Popup>
       <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this branch?">
         <Text
-          content={`"${data.title}"${data.hasChildren ? " and every branch under it" : ""} will be deleted. This can't be undone.`}
+          content={`"${data.title}"${data.hasChildren ? " and every branch under it" : ""}${mergeNames ? `, including merged cards ${mergeNames}` : ""} will be deleted. This can't be undone.`}
         />
         <Frame direction="row" gap="2" justify="end">
           <Button label="Cancel" onClick={() => setConfirmingDelete(false)} />

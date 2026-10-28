@@ -217,3 +217,24 @@ def test_a_second_branch_share_is_still_refused(sent):
         # and with an active branch share, a new branch invite is refused up front
         assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": b}, headers=owner).status_code == 400
         assert {n["id"] for n in c.get(f"/projects/{pid}/tree", headers=sharee).json()["nodes"]} == {root, a}
+
+
+def test_sharing_a_merge_includes_both_parent_paths_and_project_copy(sent):
+    with TestClient(app) as c:
+        owner, sharee, base, pid, root, a, b = project_with_branches(c)
+        sibling = c.post(f"/nodes/{root}/fork", headers=owner).json()["id"]
+        merged = c.post("/nodes/merge", json={"source_leaf_ids": [a, b]}, headers=owner).json()
+        merge_id = merged["id"]
+
+        assert c.post(f"{base}/share", json={"email": SHAREE, "branch_node_id": merge_id},
+                      headers=owner).status_code == 201
+        assert c.post(f"/shares/{sent[SHAREE]}/accept", headers=sharee).status_code == 200
+        visible = c.get(f"/projects/{pid}/tree", headers=sharee).json()["nodes"]
+        assert {node["id"] for node in visible} == {root, a, b, merge_id}
+        assert sibling not in {node["id"] for node in visible}
+        assert next(node for node in visible if node["id"] == merge_id)["merge_source_ids"] == [a, b]
+
+        fork = c.post(f"/nodes/{merge_id}/fork", headers=sharee).json()["fork"]
+        assert set(fork["node_map"]) == {root, a, b, merge_id}
+        copied = c.get(f"/projects/{fork['project_id']}/tree", headers=sharee).json()["nodes"]
+        assert len(copied) == 5

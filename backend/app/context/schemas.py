@@ -2,10 +2,9 @@ from datetime import datetime
 from uuid import UUID
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Role = Literal["user", "assistant"]
-BranchSource = str  # merge copies are tagged with the source leaf node id (nodes_router.merge_nodes)
 
 
 class ChatMessage(BaseModel):
@@ -14,16 +13,19 @@ class ChatMessage(BaseModel):
     role: Role
     content: str
     seq: int  # redundant with array index; flatten trusts array order
-    branch_source: Optional[BranchSource] = None  # set only on merge-copied messages
     created_at: datetime
 
 
 class PathNode(BaseModel):
-    """One ancestor row as returned by the recursive CTE, root -> leaf order."""
+    """One node row in the ancestor graph returned by the recursive CTE."""
 
     id: str
     chats: list[ChatMessage]
     model: Optional[str] = None
+    parent_id: Optional[str] = None
+    title: Optional[str] = None
+    created_at: Optional[datetime] = None
+    merge_source_ids: list[str] = Field(default_factory=list)
 
 
 # --- GET /trees/:id, GET /nodes/:id (mirrors frontend/src/api/types.ts) -------------------------

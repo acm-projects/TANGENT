@@ -10,7 +10,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -18,6 +18,7 @@ from sqlalchemy.future import select
 from app.auth import get_current_user
 from app.branch_scope import require_visible
 from app.context.flatten import flatten, to_provider_messages
+from app.context.plan import build_plan
 from app.context.schemas import NodeMeta, NodeOut, PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.database import AsyncSessionLocal, get_db_session
@@ -34,16 +35,26 @@ from app.project_forking import (
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/nodes", tags=["Nodes"])
 
-# Root -> leaf, one query (see context/flatten.py). Runs under the caller's RLS identity, so a node
-# in a project the user cannot see comes back empty, exactly like a node that does not exist.
-_PATH_SQL = text("""
-    WITH RECURSIVE path AS (
-      SELECT id, parent_id, chats, model, 0 AS depth FROM nodes WHERE id = :node_id
-      UNION ALL
-      SELECT n.id, n.parent_id, n.chats, n.model, p.depth + 1
-      FROM nodes n JOIN path p ON n.id = p.parent_id
+# All ancestors through both parent links, under the caller's RLS identity.
+_GRAPH_SQL = text("""
+    WITH RECURSIVE anc(id) AS (
+      SELECT CAST(:node_id AS uuid)
+      UNION
+      SELECT e.parent FROM anc
+      JOIN (
+        SELECT id AS child, parent_id AS parent FROM nodes WHERE parent_id IS NOT NULL
+        UNION ALL
+        SELECT node_id, source_leaf_id FROM node_merge_sources
+      ) e ON e.child = anc.id
     )
-    SELECT id::text AS id, chats, model FROM path ORDER BY depth DESC
+    SELECT n.id::text AS id, n.parent_id::text AS parent_id, n.title, n.chats, n.model, n.created_at,
+           ARRAY(
+             SELECT ms.source_leaf_id
+             FROM node_merge_sources ms
+             WHERE ms.node_id = n.id
+             ORDER BY CASE WHEN ms.source_leaf_id = n.parent_id THEN 0 ELSE 1 END, ms.source_leaf_id
+           ) AS merge_source_ids
+    FROM nodes n JOIN anc USING (id)
 """)
 
 
@@ -114,7 +125,7 @@ def _as_list(chats) -> list[dict]:
 async def _load_path(
     db: AsyncSession, node_id: UUID, user_id: UUID
 ) -> tuple[list[PathNode], UUID]:
-    rows = (await db.execute(_PATH_SQL, {"node_id": node_id})).all()
+    rows = (await db.execute(_GRAPH_SQL, {"node_id": node_id})).all()
     if not rows:
         raise HTTPException(404, "Node not found")
     flags = (
@@ -122,7 +133,10 @@ async def _load_path(
             text("""
                 SELECT n.project_id AS project_id,
                        p.created_by_id AS owner_id,
-                       EXISTS (SELECT 1 FROM nodes c WHERE c.parent_id = n.id) AS has_child
+                       (
+                         EXISTS (SELECT 1 FROM nodes c WHERE c.parent_id = n.id)
+                         OR EXISTS (SELECT 1 FROM node_merge_sources ms WHERE ms.source_leaf_id = n.id)
+                       ) AS has_child
                 FROM nodes n JOIN projects p ON p.id = n.project_id
                 WHERE n.id = :id
             """),
@@ -138,7 +152,20 @@ async def _load_path(
     if flags.has_child:
         # ARCHITECTURE.md §8: only leaves take prompts. The UI hint is not enforcement; this is.
         raise HTTPException(409, "Only a leaf node can be prompted; fork it instead")
-    return [PathNode(id=r.id, chats=r.chats, model=getattr(r, "model", None)) for r in rows], flags.project_id
+    path = [
+        PathNode(
+            id=r.id,
+            parent_id=r.parent_id,
+            title=r.title,
+            chats=r.chats,
+            model=r.model,
+            created_at=r.created_at,
+            merge_source_ids=[str(source_id) for source_id in r.merge_source_ids],
+        )
+        for r in rows
+    ]
+    path.sort(key=lambda node: node.id == str(node_id))
+    return path, flags.project_id
 
 
 _background_tasks: set = set()
@@ -191,10 +218,10 @@ async def _persist(
                   chats = {base}
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'user', 'content', CAST(:user_text AS text),
-                         'seq', jsonb_array_length({base}), 'branch_source', NULL, 'created_at', CAST(:now AS text)))
+                         'seq', jsonb_array_length({base}), 'created_at', CAST(:now AS text)))
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'assistant', 'content', CAST(:assistant_text AS text),
-                         'seq', jsonb_array_length({base}) + 1, 'branch_source', NULL, 'created_at', CAST(:now AS text)))
+                         'seq', jsonb_array_length({base}) + 1, 'created_at', CAST(:now AS text)))
                 WHERE id = :node_id AND (model IS NULL OR model = :model_id) {guard}
             """),
             {
@@ -383,6 +410,18 @@ async def join_child(
     if len(children) != 1:
         raise HTTPException(409, "Only a node with exactly one branch can take it back in")
     child = children[0]
+    child_is_merge = (
+        await db.execute(select(NodeMergeSource.node_id).where(NodeMergeSource.node_id == child.id).limit(1))
+    ).scalar_one_or_none()
+    if child_is_merge is not None:
+        raise HTTPException(409, "A merge can't be folded into one of its sources")
+    node_feeds_merge = (
+        await db.execute(
+            select(NodeMergeSource.node_id).where(NodeMergeSource.source_leaf_id == node.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if node_feeds_merge is not None:
+        raise HTTPException(409, "A card that feeds a merge can't take its child back in")
     if any(streaming in (node_id, node.id, child.id) for _, streaming in _stops):
         raise HTTPException(409, "Wait for the reply to finish before merging")
     if node.model and child.model and node.model != child.model:
@@ -394,11 +433,10 @@ async def join_child(
     # out of the way first: a grandchild moving up may hold the same fork_index under the node
     await db.execute(Node.__table__.update().where(Node.id == child.id).values(fork_index=-1))
     await db.execute(Node.__table__.update().where(Node.parent_id == child.id).values(parent_id=node.id))
-    # merges that came from the child, or that the child is, are the node's now: deleting it would drop them
+    # A merge that came from the child now follows the conversation into the node.
     await db.execute(
         NodeMergeSource.__table__.update().where(NodeMergeSource.source_leaf_id == child.id).values(source_leaf_id=node.id)
     )
-    await db.execute(NodeMergeSource.__table__.update().where(NodeMergeSource.node_id == child.id).values(node_id=node.id))
     # Core delete: the ORM's delete-orphan cascade must not reach the children that just moved
     await db.execute(Node.__table__.delete().where(Node.id == child.id))
     info = await build_fork_info(db, fork) if fork is not None else None
@@ -413,67 +451,65 @@ async def merge_nodes(
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ):
-    """Merge two or more leaves of one tree into a new node. The new node hangs off the nearest common ancestor and
-    carries every branch (everything below that ancestor) in its own chats, tagged with branch_source "a", "b", ...
-    in request order, so the merge never needs to walk its sources. node_merge_sources records the leaves.
-    A non-owner's first write forks the project, exactly like fork_node."""
-    ids = req.source_leaf_ids
-    if len(set(ids)) != len(ids):
+    """Create a merge node from two or more leaves. A non-owner's first write forks the project."""
+    source_ids = req.source_leaf_ids
+    if len(set(source_ids)) != len(source_ids):
         raise HTTPException(400, "Pick different leaf nodes")
 
-    metas = (
+    locked_nodes = (
         await db.execute(
-            select(Node.id, Node.tree_id, Node.project_id).where(Node.id.in_(ids))
+            select(Node)
+            .where(Node.id.in_(source_ids))
+            .order_by(Node.id)
+            .with_for_update()
         )
-    ).all()
-    if len(metas) != len(ids):
+    ).scalars().all()
+    if len(locked_nodes) != len(source_ids):
         raise HTTPException(404, "Node not found")
-    if len({m.tree_id for m in metas}) != 1 or len({m.project_id for m in metas}) != 1:
+    if len({n.tree_id for n in locked_nodes}) != 1 or len({n.project_id for n in locked_nodes}) != 1:
         raise HTTPException(400, "All nodes must be in the same tree")
-    tree_id, project_id = metas[0].tree_id, metas[0].project_id
-    await require_visible(db, project_id, user.id, *ids)
+    tree_id, project_id = locked_nodes[0].tree_id, locked_nodes[0].project_id
+    await require_visible(db, project_id, user.id, *source_ids)
 
-    has_child = (
-        await db.execute(select(Node.id).where(Node.parent_id.in_(ids)).limit(1))
+    linked_sources = (
+        await db.execute(
+            select(Node.id)
+            .where(
+                or_(
+                    Node.parent_id.in_(source_ids),
+                    Node.id.in_(
+                        select(NodeMergeSource.node_id).where(NodeMergeSource.source_leaf_id.in_(source_ids))
+                    ),
+                )
+            )
+            .limit(1)
+        )
     ).scalar_one_or_none()
-    if has_child is not None:
-        raise HTTPException(409, "Only leaf nodes can be merged")
+    if linked_sources is not None:
+        raise HTTPException(409, "Only cards at the ends of their branches can be merged")
+    if any(
+        (user.id, source_id) in _stops
+        for source_id in [*source_ids, *(n.id for n in locked_nodes)]
+    ):
+        raise HTTPException(409, "Wait for the reply to finish before merging")
 
-    paths = [(await db.execute(_PATH_SQL, {"node_id": i})).all() for i in ids]
-    shared = 0
-    while shared < min(map(len, paths)) and len({p[shared].id for p in paths}) == 1:
-        shared += 1
-    if shared == 0:
-        raise HTTPException(400, "All nodes must be in the same tree")
-    ancestor_id = UUID(paths[0][shared - 1].id)
-
-    chats: list[dict] = []
-    # tagged "a", "b", ... by branch, which is what ChatMessage and flatten() read
-    for key, rows in zip("abcdefgh", paths):
-        for row in rows[shared:]:
-            for message in _as_list(row.chats):
-                chats.append({**message, "branch_source": key})
-    for seq, message in enumerate(chats):
-        message["seq"] = seq
-
-    sources = list(ids)
     project_id, fork = await get_write_target(db, project_id, user.id)
     if fork is not None:
         tree_id = fork.tree_map[tree_id]
-        ancestor_id = fork.node_map[ancestor_id]
-        sources = [fork.node_map[s] for s in sources]
+        source_ids = [fork.node_map[source_id] for source_id in source_ids]
 
     child = await _create_child(
-        db, tree_id=tree_id, project_id=project_id, parent_id=ancestor_id, user_id=user.id, chats=chats
+        db, tree_id=tree_id, project_id=project_id, parent_id=source_ids[0], user_id=user.id
     )
-    for source_id in sources:
+    for source_id in source_ids:
         db.add(NodeMergeSource(node_id=child.id, source_leaf_id=source_id))
     await db.flush()
 
     info = await build_fork_info(db, fork) if fork is not None else None
     await db.commit()
     await db.refresh(child)
-    return ForkNodeOut(**NodeMeta.model_validate(child).model_dump(), fork=info)
+    meta = NodeMeta.model_validate(child).model_copy(update={"merge_source_ids": source_ids})
+    return ForkNodeOut(**meta.model_dump(), fork=info)
 
 
 @router.post("/{node_id}/messages/stop", status_code=204)
@@ -491,7 +527,7 @@ async def delete_node(
     db: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ):
-    """Delete a node and every branch under it (nodes.parent_id cascades). The root stays: a tree needs one."""
+    """Delete a node and every descendant that depends on it through either parent link."""
     node = await db.get(Node, node_id)
     if node is None:
         raise HTTPException(404, "Node not found")
@@ -500,7 +536,23 @@ async def delete_node(
         raise HTTPException(403, "Only the project owner can delete")
     if node.parent_id is None:
         raise HTTPException(409, "The root node can't be deleted")
-    await db.delete(node)
+    await db.execute(
+        text("""
+            WITH RECURSIVE doomed(id) AS (
+              SELECT CAST(:node_id AS uuid)
+              UNION
+              SELECT e.child
+              FROM doomed d
+              JOIN (
+                SELECT id AS child, parent_id AS parent FROM nodes WHERE parent_id IS NOT NULL
+                UNION ALL
+                SELECT node_id, source_leaf_id FROM node_merge_sources
+              ) e ON e.parent = d.id
+            )
+            DELETE FROM nodes WHERE id IN (SELECT id FROM doomed)
+        """),
+        {"node_id": node_id},
+    )
     await db.commit()
 
 
@@ -531,8 +583,15 @@ async def send_message(
         # the stored question, not the client's copy: a retry re-asks exactly what was asked
         prompt = chats[-2].content
         path[-1] = path[-1].model_copy(update={"chats": chats[:-2]})
+    nodes = {node.id: node for node in path}
+    parents = {
+        node.id: node.merge_source_ids or ([node.parent_id] if node.parent_id else [])
+        for node in path
+    }
+    order = {node.id: (node.created_at, node.id) for node in path}
+    plan = build_plan(str(node_id), parents, order)
     system = paper_service.RESEARCH_SYSTEM_PROMPT + await paper_service.project_sources_note(project_id)
-    messages = [{"role": "system", "content": system}] + to_provider_messages(flatten(path), prompt)
+    messages = [{"role": "system", "content": system}] + to_provider_messages(flatten(plan, nodes), prompt)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 

@@ -26,8 +26,6 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   seq: number;
-  /** Merged nodes tag each message with its source leaf's node id; null elsewhere. */
-  branch_source: string | null;
   created_at: string;
   /** [proposed] Files the user attached to this message. */
   attachments?: Attachment[];
@@ -52,7 +50,7 @@ export interface NodeMeta {
   created_at: string;
   /** [proposed] Kinds of files attached anywhere in this node, for the mind-map tags. */
   attachment_kinds?: AttachmentKind[];
-  /** A merged node's two source leaves (empty otherwise). Only the tree endpoints fill it in. */
+  /** Every parent of a merge card, first parent (= `parent_id`) first; empty for other cards. */
   merge_source_ids?: string[];
   /** A branch made from a debate's "where to go next": the debate it came out of. */
   branch_of_debate_id?: string | null;

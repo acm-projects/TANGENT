@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { useEffect, useMemo, useState } from "react";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
-import { selectBreadcrumb, selectExhibits, selectIsLeaf, useTreeStore } from "@/store/treeStore";
+import { selectExhibits, selectIsLeaf, selectThreadPlan, type ThreadPlanItem, useTreeStore } from "@/store/treeStore";
 import { forkNode, isPending, redirectToCopy, splitNode, switchToFork } from "../mindmap/nodeActions";
 import { uploadAttachments } from "./attachments";
 
@@ -16,13 +15,47 @@ import { uploadAttachments } from "./attachments";
  * itself; sending posts just `{content}` and the server rebuilds the rest.
  */
 
-/** One node's slice of the visible history. */
-export interface HistorySection {
-  node: NodeMeta;
-  /** its outline number on the board, as the map shows it: "1.2.1" */
-  exhibit: string;
-  /** undefined while this node's chats are still loading */
-  messages: ChatMessage[] | undefined;
+export type HistoryItem =
+  | {
+      kind: "node";
+      node: NodeMeta;
+      exhibit: string;
+      messages: ChatMessage[] | undefined;
+    }
+  | {
+      kind: "merge";
+      branches: { from: string; exhibit: string; title: string | null; items: HistoryItem[] }[];
+    };
+
+function planIds(plan: ThreadPlanItem[], result = new Set<string>()): Set<string> {
+  for (const item of plan) {
+    if (typeof item === "string") result.add(item);
+    else for (const branch of item.merge) planIds(branch.plan, result);
+  }
+  return result;
+}
+
+function buildHistory(
+  plan: ThreadPlanItem[],
+  nodesById: Record<string, NodeMeta>,
+  chatsByNode: Record<string, ChatMessage[]>,
+  exhibits: Record<string, string>,
+): HistoryItem[] {
+  return plan.flatMap((item): HistoryItem[] => {
+    if (typeof item === "string") {
+      const node = nodesById[item];
+      return node ? [{ kind: "node", node, exhibit: exhibits[item] ?? "", messages: chatsByNode[item] }] : [];
+    }
+    return [{
+      kind: "merge",
+      branches: item.merge.map((branch) => ({
+        from: branch.from,
+        exhibit: exhibits[branch.from] ?? "",
+        title: nodesById[branch.from]?.title ?? null,
+        items: buildHistory(branch.plan, nodesById, chatsByNode, exhibits),
+      })),
+    }];
+  });
 }
 
 /** Why the message box is disabled, or null when the user can send. */
@@ -30,12 +63,19 @@ export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | "pending" 
 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
-  const path = useTreeStore(useShallow((s) => (s.activeNodeId ? selectBreadcrumb(s, s.activeNodeId) : [])));
-  const nodeModel = path.at(-1)?.model ?? null;
-  const nodeTokens = path.at(-1)?.tokens ?? 0;
-  const branchTokens = path.reduce((total, node) => total + node.tokens, 0);
+  const nodesById = useTreeStore((s) => s.nodesById);
+  const activeNode = activeNodeId ? nodesById[activeNodeId] : undefined;
+  const plan = useMemo(
+    () => (activeNodeId ? selectThreadPlan({ nodesById }, activeNodeId) : []),
+    [activeNodeId, nodesById],
+  );
+  const nodeModel = activeNode?.model ?? null;
+  const nodeTokens = activeNode?.tokens ?? 0;
+  const historyIds = [...planIds(plan)];
+  const branchTokens = historyIds.reduce((total, id) => total + (nodesById[id]?.tokens ?? 0), 0);
   const isLeaf = useTreeStore((s) => (s.activeNodeId ? selectIsLeaf(s, s.activeNodeId) : false));
   const chatsByNode = useTreeStore((s) => s.chatsByNode);
+  const loadedMessageCount = historyIds.reduce((total, id) => total + (chatsByNode[id]?.length ?? 0), 0);
   const rootId = useTreeStore((s) => s.rootId);
   const childrenByParent = useTreeStore((s) => s.childrenByParent);
   // The active node's partial reply, or null when it isn't streaming. Other nodes' streams don't re-render this.
@@ -75,7 +115,7 @@ export function useChat() {
 
   // Load chats for every node on the path that isn't loaded yet. Cached in the
   // store, so moving between siblings doesn't refetch their shared ancestors.
-  const missing = path.filter((n) => chatsByNode[n.id] === undefined).map((n) => n.id);
+  const missing = historyIds.filter((id) => chatsByNode[id] === undefined);
   const missingKey = missing.join(",");
   useEffect(() => {
     if (!missingKey) return;
@@ -95,8 +135,8 @@ export function useChat() {
     };
   }, [missingKey]);
 
-  const exhibits = selectExhibits({ rootId, childrenByParent });
-  const history: HistorySection[] = path.map((node) => ({ node, exhibit: exhibits[node.id], messages: chatsByNode[node.id] }));
+  const exhibits = selectExhibits({ rootId, nodesById, childrenByParent });
+  const history = buildHistory(plan, nodesById, chatsByNode, exhibits);
 
   const blocker: SendBlocker = !activeNodeId
     ? "no-selection"
@@ -163,7 +203,6 @@ export function useChat() {
       role: "user",
       content: text,
       seq,
-      branch_source: null,
       created_at: new Date().toISOString(),
     });
 
@@ -203,7 +242,6 @@ export function useChat() {
               role: "assistant",
               content: s.streaming[nodeId] ?? "",
               seq: seq + 1,
-              branch_source: null,
               created_at: new Date().toISOString(),
             });
           } else {
@@ -260,6 +298,10 @@ export function useChat() {
 
   return {
     activeNodeId,
+    activeNode,
+    activeExhibit: activeNodeId ? exhibits[activeNodeId] : undefined,
+    historyIds,
+    loadedMessageCount,
     history,
     nodeModel,
     nodeTokens,

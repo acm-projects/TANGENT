@@ -260,7 +260,7 @@ class NodeMergeSource(Base):
     __tablename__ = "node_merge_sources"
 
     node_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    source_leaf_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
+    source_leaf_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="NO ACTION"), primary_key=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
 
     node = relationship("Node", foreign_keys=[node_id], back_populates="merge_sources")

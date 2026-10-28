@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import defer
@@ -25,6 +26,11 @@ async def _tree_out(db: AsyncSession, tree: Tree, user: User) -> TreeOut:
         select(NodeMergeSource.node_id, NodeMergeSource.source_leaf_id)
         .join(Node, Node.id == NodeMergeSource.node_id)
         .where(Node.tree_id == tree.id)
+        .order_by(
+            NodeMergeSource.node_id,
+            case((NodeMergeSource.source_leaf_id == Node.parent_id, 0), else_=1),
+            NodeMergeSource.source_leaf_id,
+        )
     )
     for merged_id, source_id in rows:
         sources.setdefault(merged_id, []).append(source_id)
