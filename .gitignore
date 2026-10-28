@@ -19,6 +19,6 @@ samconfig.toml
 __pycache__/
 .pytest_cache/
 .DS_Store
-backend/evals/data/
+backend/evals/data/scifact*
 *.zip
 .playwright-mcp/
