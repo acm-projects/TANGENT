@@ -101,7 +101,7 @@ def test_graph_tools_end_to_end(monkeypatch):
         paper = asyncio.run(_add_upload(pid, "processing"))
         out = run("search_sources", query="entropy")
         assert out["passages"] == [] and out["not_ready"] == [{"source_id": f"p{paper}", "status": "processing"}]
-        assert "not indexed" in out["message"]
+        assert "indexed yet" in out["message"]
         asyncio.run(_make_ready(paper))
         out = run("search_sources", query="entropy")
         assert [p["evidence_id"] for p in out["passages"]] == [f"p{paper}:c0"] and out["passages"][0]["pages"] == "3"
