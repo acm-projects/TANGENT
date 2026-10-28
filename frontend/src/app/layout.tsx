@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Aleo, Outfit } from "next/font/google";
+import { Libertinus_Serif, Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import { lightingScript } from "@/ui/library/tokens/lighting";
 import "./globals.css";
 
-const heading = Aleo({ weight: "400", subsets: ["latin"], variable: "--font-heading" });
+// headings were Aleo (weight 400) before the noir font trial
+const heading = Libertinus_Serif({ weight: "600", subsets: ["latin"], variable: "--font-heading" });
 const content = Outfit({ subsets: ["latin"], variable: "--font-content" });
 
 /* next/font/google doesn't carry Material Symbols, so it comes from the

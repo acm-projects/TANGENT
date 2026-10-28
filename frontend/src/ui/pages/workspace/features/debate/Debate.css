@@ -1,0 +1,523 @@
+/* Debate mode — the session sheet, the start form and the verdict card. Unlayered (DESIGN.md §2).
+ * For and Against are told apart by which side of the sheet they speak from, not by colour. */
+
+/* ── the session sheet: a courtroom ───────────────────────── */
+
+.debate {
+  display: flex;
+  flex-direction: column;
+  width: min(34rem, calc(100vw - 88px - var(--space-8)));
+  max-height: min(46rem, calc(100dvh - var(--space-8)));
+  padding: 0;
+  overflow: hidden;
+  /* drops onto the board from below, like a sheet slid across the desk */
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 4rem;
+}
+
+.debate > [data-ui="frame"] {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: var(--space-4);
+}
+
+.debate > [data-ui="frame"] > :not(.debate-room, .debate-caption) {
+  margin-inline: var(--space-4);
+}
+
+.debate[data-collapsed] {
+  width: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.debate-kicker {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* the case caption, as a filing heads it */
+.debate-caption {
+  padding: var(--space-2) var(--space-3) var(--space-3) var(--space-4);
+}
+
+.debate-docket {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+
+.debate-docket::before {
+  content: "·";
+  margin-right: var(--space-2);
+}
+
+.debate-matter {
+  text-align: center;
+  padding-inline: var(--space-4);
+}
+
+.debate-inre {
+  font-family: var(--font-heading);
+  font-style: italic;
+}
+
+.debate-title {
+  font-family: var(--font-heading);
+  text-wrap: balance;
+}
+
+/* ── the room: bench on top, counsel tables either side below it ── */
+
+.debate-room {
+  position: relative;
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-block: 1px solid var(--color-border);
+  background: var(--texture-grain), var(--color-surface-raised);
+}
+
+/* the rail between the floor and the gallery */
+.debate-room::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -4px;
+  height: 3px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debate-bench {
+  position: relative;
+  align-self: center;
+  min-width: 13rem;
+  padding: var(--space-2) var(--space-6) var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--texture-grain), var(--color-folder);
+  /* the dais: a step beneath the bench, then its shadow on the floor */
+  box-shadow: 0 5px 0 -1px var(--color-surface-raised), 0 5px 0 0 var(--color-border-strong), var(--shadow-floating);
+  text-align: center;
+  transition: box-shadow var(--motion-base) var(--ease-out), translate var(--motion-base) var(--ease-out);
+}
+
+.debate-bench-gavel {
+  color: var(--color-text-secondary);
+  transform-origin: 80% 80%;
+}
+
+.debate-tables {
+  margin-top: calc(-1 * var(--space-4));
+}
+
+.debate-table {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-top: var(--space-2);
+}
+
+.debate-table[data-side="against"] {
+  text-align: right;
+}
+
+/* the table's front edge: a ruled line with the placard on it */
+.debate-placard {
+  padding-bottom: var(--space-1);
+  border-bottom: 2px solid var(--color-border-strong);
+}
+
+.debate-placard .debate-kicker {
+  color: var(--color-text-secondary);
+}
+
+/* a red pin marks whoever has the floor (red is a graphic, never text) */
+.debate-placard::before,
+.debate-bench::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+  transition: background var(--motion-fast) var(--ease-out), scale var(--motion-spring) var(--ease-spring);
+}
+
+.debate-table[data-side="against"] .debate-placard::before {
+  order: 1;
+}
+
+.debate-bench::before {
+  position: absolute;
+  top: -0.25rem;
+  left: 50%;
+  translate: -50% 0;
+  opacity: 0;
+}
+
+.debate-bench[data-floor]::before {
+  opacity: 1;
+}
+
+/* judgment entered: the gavel comes down once */
+.debate-bench[data-ruled] .debate-bench-gavel {
+  animation: debate-gavel 0.9s var(--ease-spring) 0.2s 1 backwards;
+}
+
+.debate-table[data-floor] .debate-placard::before,
+.debate-bench[data-floor]::before {
+  background: var(--texture-pin), var(--color-string);
+  scale: 1.3;
+  box-shadow: 0 1px 2px var(--color-string-shadow);
+  animation: debate-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+.debate-table[data-floor] .debate-placard {
+  border-bottom-color: var(--color-border-emphasis);
+}
+
+.debate-bench[data-floor] {
+  box-shadow: 0 5px 0 -1px var(--color-surface-raised), 0 5px 0 0 var(--color-border-strong), var(--shadow-lift);
+  translate: 0 -2px;
+}
+
+.debate-bench[data-floor] .debate-bench-gavel {
+  animation: debate-gavel 1.4s var(--ease-spring) infinite;
+}
+
+/* counsel's legal pad: their latest working note, on ruled paper */
+.debate-pad {
+  padding: var(--space-1) var(--space-2);
+  border-left: 1px solid var(--color-border);
+  background: repeating-linear-gradient(transparent 0 calc(1lh - 1px), var(--color-border) calc(1lh - 1px) 1lh);
+  background-position: 0 var(--space-1);
+  text-align: left;
+}
+
+.debate-pad > [data-ui="text"] {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
+/* ── the transcript, as the court reporter types it ──────── */
+
+.debate-log {
+  flex: 1 1 auto;
+  min-height: 6rem;
+  margin: 0;
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  overflow-y: auto;
+  list-style: none;
+  /* pleading paper's double margin rule */
+  border-left: 3px double var(--color-border);
+  scrollbar-width: thin;
+}
+
+.debate-phase {
+  padding-top: var(--space-2);
+}
+
+.debate-phase::before,
+.debate-phase::after {
+  content: "";
+  flex: 1 1 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.debate-search > [data-ui="text"] {
+  font-style: italic;
+  padding-left: 6.5rem;
+}
+
+.debate-turn {
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 0.5rem;
+}
+
+.debate-speaker {
+  flex: 0 0 6rem;
+  align-items: flex-end;
+  padding-top: 0.15em;
+  text-align: right;
+}
+
+.debate-speaker .debate-kicker {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.debate-turn[data-side="judge"] .debate-speech {
+  font-family: var(--font-heading);
+}
+
+.debate-speech {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+/* the line being spoken: a caret where the reporter is typing */
+.debate-turn[data-speaking] .debate-speech::after {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 0.1em;
+  vertical-align: -0.12em;
+  background: var(--color-text-muted);
+  animation: debate-caret 1s steps(2, jump-none) infinite;
+}
+
+.debate-turn[data-speaking] .debate-speaker .debate-kicker {
+  color: var(--color-text);
+}
+
+@keyframes debate-pulse {
+  50% {
+    scale: 1.05;
+  }
+}
+
+@keyframes debate-gavel {
+  0%, 60%, 100% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: -22deg;
+  }
+  32% {
+    rotate: 4deg;
+  }
+}
+
+@keyframes debate-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .debate-table[data-floor] .debate-placard::before,
+  .debate-bench[data-floor]::before,
+  .debate-bench[data-floor] .debate-bench-gavel,
+  .debate-turn[data-speaking] .debate-speech::after {
+    animation: none;
+  }
+}
+
+.debate-ready {
+  font-style: italic;
+}
+
+/* the bench turns to the gallery: a slip passed down, pinned to the transcript */
+.debate-question {
+  position: relative;
+  padding: var(--space-4);
+  border-color: var(--color-border-strong);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 1rem;
+  --pop-rotate: -1deg;
+}
+
+.debate-question::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  width: 0.6rem;
+  height: 0.6rem;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background: var(--texture-pin), var(--color-string);
+  box-shadow: 0 1px 2px var(--color-string-shadow);
+}
+
+/* while the court waits on the user, the room gives up its notes to make space */
+.debate:has(.debate-question) .debate-pad,
+.debate:has(.debate-question) .debate-table-status {
+  display: none;
+}
+
+.debate > [data-ui="frame"] {
+  overflow-y: auto;
+}
+
+.debate-option input,
+.verdict-branch input {
+  flex: none;
+  width: auto;
+  margin-top: 0.2em;
+  accent-color: var(--color-brand);
+}
+
+.debate-other,
+.debate-start-topic {
+  padding: var(--space-2) var(--space-3);
+}
+
+.debate-other input,
+.debate-start-topic textarea {
+  width: 100%;
+}
+
+.debate-start-topic textarea {
+  min-height: 4lh;
+  max-height: 12lh;
+}
+
+.debate-start-options {
+  flex-wrap: wrap;
+}
+
+.debate-outcome {
+  padding-top: var(--space-3);
+  text-align: center;
+}
+
+/* the judgment, stamped on the transcript: a red ink border (a graphic), black ink inside */
+.debate-stamp {
+  padding: var(--space-2) var(--space-6);
+  border: 3px double var(--color-string);
+  border-radius: var(--radius-sm);
+  rotate: -2deg;
+  animation: debate-stamp 420ms var(--ease-spring) backwards;
+}
+
+.debate-stamp[data-contested] {
+  border-color: var(--color-border-strong);
+  border-style: dashed;
+}
+
+.debate-stamp .debate-kicker {
+  letter-spacing: 0.3em;
+}
+
+.debate-stamp-verdict {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.debate-summary {
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+
+@keyframes debate-stamp {
+  from {
+    opacity: 0;
+    scale: 1.6;
+    rotate: -8deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .debate-stamp {
+    animation: none;
+  }
+}
+
+.debate-error {
+  color: var(--color-danger);
+}
+
+.debate-controls {
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── the verdict card, above a debate card's chat ──────────── */
+
+.verdict {
+  padding: var(--space-4);
+}
+
+.verdict-headline {
+  font-family: var(--font-heading);
+}
+
+.verdict-head {
+  padding-top: var(--space-2);
+  text-align: center;
+}
+
+.verdict-subline {
+  text-wrap: balance;
+}
+
+/* the tally: each side's score on its own side of a centre rule, the winner's underlined in red */
+.verdict-tally {
+  justify-content: center;
+}
+
+.verdict-side {
+  flex: 0 1 9rem;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+}
+
+.verdict-side + .verdict-side {
+  border-left: 1px solid var(--color-border);
+}
+
+.verdict-score {
+  font-family: var(--font-heading);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.verdict-side[data-lead] .verdict-score {
+  color: var(--color-text);
+  text-decoration: underline 3px var(--color-string);
+  text-underline-offset: 0.2em;
+}
+
+.verdict-rubric {
+  text-align: center;
+}
+
+.verdict-warning {
+  padding: var(--space-2) var(--space-3);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+
+.verdict-more {
+  align-self: start;
+}
+
+.verdict-reasoning ol,
+.verdict-branches ol,
+.verdict-reasoning > [data-ui="frame"] {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verdict-item {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
+
+.verdict-branches {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.verdict-branch label {
+  cursor: pointer;
+}
+
+.verdict-branch[data-done] label {
+  cursor: default;
+}
+
+.verdict-why {
+  font-style: italic;
+}
+
+.verdict-open {
+  align-self: start;
+}

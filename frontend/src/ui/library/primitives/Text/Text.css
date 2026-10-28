@@ -12,7 +12,7 @@
     color: inherit;
   }
 
-  /* Headings use the heading face. Aleo is loaded at one weight, so never bold it. */
+  /* Headings use the heading face. It is loaded at one weight, so never bold it. */
   [data-ui="text"]:is(h1, h2, h3, h4, h5, h6) {
     font-family: var(--font-heading);
     line-height: var(--line-height-tight);

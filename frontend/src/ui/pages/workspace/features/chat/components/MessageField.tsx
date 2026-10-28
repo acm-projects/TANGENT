@@ -4,8 +4,9 @@ import { Button, Frame, Icon, Input, Panel, Select, Text, TextArea } from "@/ui/
 import type { AvailableModel } from "@/api/types";
 import type { SendBlocker } from "../useChat";
 
-/* The message box (Figma "MessageField", 10:39, + "Send Button", 10:54):
- * a growing text area, attach-file and attach-image buttons, and Send.
+/* The message box (Figma "MessageField", 10:39, + "Send Button", 10:54), drawn
+ * as an index card: a head (model, attach-file, attach-image) over the card's red
+ * rule, then ruled lines to write on with Send stamped beside them.
  * Enter sends; Shift+Enter adds a new line. Styles live in ../Chat.css. */
 
 const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
@@ -34,6 +35,8 @@ type MessageFieldProps = {
 export function MessageField({ blocker, models, selectedModel, modelLocked, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  // true for the moment the card is stamped down as a message leaves it (Chat.css)
+  const [sent, setSent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +56,7 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
   function submit() {
     if (!canSend) return;
     onSend(text, files);
+    setSent(true);
     setText("");
     setFiles([]);
   }
@@ -74,6 +78,9 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
       as="footer"
       className={["message-field", className].filter(Boolean).join(" ")}
       data-disabled={disabled || undefined}
+      data-sent={sent || undefined}
+      // children animate too, and their animationend bubbles here
+      onAnimationEnd={(e) => e.target === e.currentTarget && setSent(false)}
     >
       <Frame gap="2">
         {files.length > 0 && (
@@ -98,18 +105,8 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
           </Frame>
         )}
 
-        <TextArea
-          ref={input}
-          aria-label="Message"
-          placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
-          value={text}
-          disabled={disabled}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-          className="message-field-input"
-        />
-
-        <Frame direction="row" justify="between" align="center">
+        {/* the card's head: what it's written with, above the red rule */}
+        <Frame direction="row" justify="between" align="center" className="message-field-head">
           <Frame direction="row" gap="1" align="center">
             <Select
               aria-label="Chat model"
@@ -150,6 +147,20 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
               onClick={() => imageInput.current?.click()}
             />
           </Frame>
+          <Text as="span" size="xxs" hierarchy="tertiary" className="message-field-hint" content="Enter to send · Shift+Enter for a new line" />
+        </Frame>
+
+        <Frame direction="row" gap="3" align="end" className="message-field-body">
+          <TextArea
+            ref={input}
+            aria-label="Message"
+            placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
+            value={text}
+            disabled={disabled}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="message-field-input"
+          />
           {/* keyed, so swapping Send for Stop stamps the new one in */}
           {blocker === "streaming" ? (
             <Button

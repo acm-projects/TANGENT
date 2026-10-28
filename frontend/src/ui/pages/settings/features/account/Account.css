@@ -165,7 +165,7 @@
 .id-badge-stamp {
   padding: 0.15em 0.6em;
   rotate: -4deg;
-  border: 0.14em solid var(--color-text-secondary);
+  border: 0.14em solid var(--color-string);
   border-radius: var(--radius-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -232,6 +232,11 @@
   min-width: var(--space-4);
   border-bottom: 2px dotted var(--color-border-strong);
   translate: 0 -0.3em;
+  transition: border-color var(--motion-base) var(--ease-out);
+}
+
+.contents-link:is(:hover, :focus-visible, [aria-current]) .contents-leader {
+  border-color: var(--color-string);
 }
 
 .contents-link[aria-current] .contents-label {
@@ -250,7 +255,7 @@
   width: 0.85rem;
   height: 2.4rem;
   rotate: -6deg;
-  border: 2px solid var(--color-text-muted);
+  border: 2px solid var(--color-string);
   border-radius: var(--radius-full);
   pointer-events: none;
 }
@@ -259,7 +264,7 @@
   content: "";
   position: absolute;
   inset: 0.3rem 0.1rem 0.6rem;
-  border: 2px solid var(--color-text-muted);
+  border: 2px solid var(--color-string);
   border-bottom: 0;
   border-radius: var(--radius-full) var(--radius-full) 0 0;
 }
@@ -406,6 +411,16 @@
   rotate: -6deg;
 }
 
+/* the folder you point at gets a red marker tab */
+.workspace-row-tab::before {
+  transition: background-color var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
+}
+
+.workspace-row:is(:hover, :focus-within) .workspace-row-tab::before {
+  border-color: var(--color-string);
+  background: var(--color-string);
+}
+
 .workspace-row-body {
   flex: 1;
   min-width: 0;
@@ -455,7 +470,7 @@
   flex: none;
   padding: 0.1em 0.5em;
   rotate: -3deg;
-  border: 0.14em solid var(--color-text-secondary);
+  border: 0.14em solid var(--color-string);
   border-radius: var(--radius-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;

@@ -28,3 +28,11 @@
   justify-self: end;
   z-index: 1;
 }
+
+/* the debate in session: bottom of the board, clear of the toolbar rail (88px, as the chat leaves it) */
+.workspace-debate {
+  justify-self: start;
+  align-self: end;
+  z-index: 2;
+  margin: 0 0 var(--space-4) 88px;
+}

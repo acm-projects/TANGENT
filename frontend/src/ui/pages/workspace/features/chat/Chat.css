@@ -113,7 +113,7 @@
   --fold: 0px;
 }
 
-.chat-fold-button:not(:hover, :focus-visible) {
+.chat:not([data-layout="expanded"]) .chat-fold-button:not(:hover, :focus-visible) {
   opacity: 0;
 }
 
@@ -150,7 +150,8 @@
 }
 
 .chat[data-layout="expanded"] {
-  /* full screen, leaving the toolbar column visible */
+  /* full screen, leaving the toolbar column visible; the corner stays unfolded so the exit button shows */
+  --fold: 0px;
   width: calc(100% - var(--toolbar-room));
 }
 
@@ -203,7 +204,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 /* The one scroll container: just the history. The message box and anything
@@ -222,27 +222,77 @@
 .chat-empty {
   flex: 1;
   padding: var(--space-8);
-  color: var(--color-text-secondary);
   text-align: center;
+  text-wrap: balance;
 }
 
-/* the arrow points across at the board, and leans that way once on arrival */
-.chat-empty-arrow {
-  color: var(--color-string);
-  animation: chat-empty-nudge var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
+/* the empty card's string runs right to the sheet's edge, past its padding */
+.chat-scroll:has(> .chat-empty) {
+  margin-left: calc(-1 * var(--space-2));
+  padding-left: var(--space-2);
 }
 
-@keyframes chat-empty-nudge {
+/* a blank card, outlined in pencil, pinned crooked to the sheet */
+.chat-empty-card {
+  position: relative;
+  max-width: 22rem;
+  padding: var(--space-8) var(--space-6);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  rotate: -2deg;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 1.5rem;
+  --pop-rotate: 6deg;
+  --pop-scale: 0.9;
+}
+
+.chat-empty-title {
+  font-family: var(--font-heading);
+}
+
+/* its pin, at the top left */
+.chat-empty-card::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-6) - 0.35rem);
+  left: var(--space-4);
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: var(--radius-full);
+  background: var(--texture-pin), var(--color-string);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
+  --pop-from: 0 -1rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 1.8;
+}
+
+/* and the string, reaching from the pin out past the sheet's edge toward the board
+ * (the scroll area clips it at the edge) */
+.chat-empty-card::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-6) - 1px);
+  right: calc(100% - var(--space-4) - 0.35rem);
+  width: 60rem;
+  height: 2px;
+  background: var(--color-string);
+  transform-origin: right;
+  rotate: 2deg;
+  animation: string-reach var(--motion-slow) var(--ease-out) var(--motion-slow) backwards;
+}
+
+@keyframes string-reach {
   from {
-    opacity: 0;
-    translate: 3rem 0;
-    rotate: 25deg;
+    scale: 0 1;
   }
 }
 
-.chat-empty > :not(.chat-empty-arrow) {
+/* the copy follows the card in, one line after another */
+.chat-empty-card > * {
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  animation-delay: calc(sibling-index() * var(--motion-fast) / 2);
+  animation-delay: calc(var(--motion-fast) + sibling-index() * var(--motion-fast) / 2);
   --pop-from: 0 0.75rem;
   --pop-rotate: 0deg;
   --pop-scale: 0.96;
@@ -314,8 +364,11 @@
   overflow-wrap: anywhere;
 }
 
+/* capped at the sheet: a code line or a table can't wrap, and would otherwise
+ * widen the whole reply instead of scrolling inside itself */
 .message-markdown {
   min-width: 0;
+  max-width: 100%;
 }
 
 .message-markdown > :first-child {
@@ -349,12 +402,36 @@
 .message-markdown blockquote {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--texture-grain), var(--color-surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--color-text-secondary);
   rotate: 0.4deg;
+}
+
+.message-markdown blockquote {
+  position: relative;
+}
+
+/* held down by a strip of clear tape across its top edge */
+.message-markdown blockquote::before {
+  content: "";
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  width: 4.5rem;
+  height: 1.1rem;
+  translate: -50% 0;
+  rotate: -4deg;
+  background: light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.1));
+  box-shadow: 0 0 0 1px light-dark(rgb(40 30 20 / 0.06), rgb(255 255 255 / 0.05));
+  backdrop-filter: blur(1px);
+  /* torn, not cut: ragged at both ends */
+  clip-path: polygon(0 8%, 3% 0, 97% 4%, 100% 0, 98% 30%, 100% 55%, 97% 80%, 100% 100%, 2% 96%, 0 100%, 3% 70%, 0 45%, 2% 25%);
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
+  --pop-from: 0 -0.5rem;
+  --pop-rotate: 6deg;
+  --pop-scale: 1.3;
 }
 
 .message-markdown blockquote > * {
@@ -367,7 +444,6 @@
   font-family: var(--font-heading);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-tight);
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 .message-markdown h1 { font-size: var(--font-size-xl); }
@@ -411,6 +487,8 @@
   max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
+  /* words stay whole in a cell, so a wide table scrolls instead of crushing its columns */
+  overflow-wrap: normal;
 }
 
 .message-markdown th,
@@ -418,6 +496,7 @@
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   text-align: left;
+  min-width: 7rem;
 }
 
 .message-markdown a {
@@ -518,11 +597,16 @@
 /* The question is a slip of paper laid on the sheet, a touch crooked, written
  * in the heading face: it is what the thread below is answering. */
 .message-user-bubble {
+  position: relative;
   max-width: min(32rem, 85%);
   padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--texture-grain), color-mix(in srgb, var(--color-text) 5%, var(--color-surface));
+  /* a legal pad's red margin line, inset from the edge: red marks what the user did */
+  background:
+    linear-gradient(var(--color-string), var(--color-string)) var(--space-3) 0 / 1px 100% no-repeat,
+    var(--texture-grain),
+    color-mix(in srgb, var(--color-text) 5%, var(--color-surface));
   box-shadow: var(--shadow-floating);
   rotate: -0.6deg;
   transition:
@@ -535,24 +619,85 @@
   box-shadow: var(--shadow-lift);
 }
 
+/* the tack holding the slip to the sheet: red, since the slip is the user's */
+.message-user-bubble::before {
+  content: "";
+  position: absolute;
+  top: -0.3rem;
+  right: var(--space-4);
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--texture-pin), var(--color-string);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
+  --pop-from: 0 -0.75rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 1.8;
+}
+
 .message-user-bubble .message-text {
   font-family: var(--font-heading);
   font-size: var(--font-size-m);
   line-height: var(--line-height-tight);
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 .message-meta {
   color: var(--color-text-muted);
 }
 
+/* "Thought for 1m 4s" is rubber-stamped on the file, inked a little unevenly */
+.message-assistant > .message-meta {
+  padding: 0.1rem var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+  border-radius: var(--radius-sm);
+  rotate: -1deg;
+  mask-image: var(--texture-grain), linear-gradient(#000, #000);
+  mask-composite: exclude;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 0;
+  --pop-rotate: -8deg;
+  --pop-scale: 1.4;
+}
+
+.message-assistant > .message-meta [data-ui="text"] {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: var(--font-size-xxs);
+}
+
 .message-actions {
   color: var(--color-text-muted);
+}
+
+/* Branch pulls a red thread out under its label */
+[data-ui="panel"][data-component="button"].message-branch {
+  background-image: linear-gradient(var(--color-string), var(--color-string));
+  background-position: var(--space-3) calc(100% - 0.3rem);
+  background-size: 0 1.5px;
+  background-repeat: no-repeat;
+  transition:
+    background-size var(--motion-spring) var(--ease-spring),
+    translate var(--motion-spring) var(--ease-spring);
+}
+
+/* the thread is the hover, so no wash behind it */
+[data-ui="panel"][data-component="button"].message-branch:is(:hover, :focus-visible):not(:disabled) {
+  background-color: transparent;
+  background-size: calc(100% - var(--space-3) * 2) 1.5px;
 }
 
 /* Branch is pulled like a length of string: hovering it tugs it a little to the right. */
 [data-ui="panel"][data-component="button"].message-branch:hover:not(:disabled) {
   translate: 3px 0;
+}
+
+.message-branch [data-ui="icon"] {
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.message-branch:is(:hover, :focus-visible) [data-ui="icon"] {
+  color: var(--color-string);
 }
 
 /* Copy and Copied spin in over each other, like a stamp coming down. */
@@ -564,39 +709,14 @@
 }
 
 .branch-divider {
+  gap: 0;
   padding-block: var(--space-6) var(--space-4);
   color: var(--color-text-muted);
 }
 
-/* a branch is a connection, so its mark is the string's red */
-.branch-divider-icon {
-  color: var(--color-string);
-}
-
-.branch-divider-exhibit {
-  flex: none;
-  margin-right: calc(-1 * var(--space-2));
-  font-family: var(--font-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-
-.branch-divider-title {
-  flex: none;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-heading);
-  color: var(--color-text-secondary);
-  animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-fast) backwards;
-  --pop-from: -1rem 0;
-  --pop-rotate: 0deg;
-  --pop-scale: 0.9;
-}
-
-/* the rules stretch out from the branch icon, which spins in between them */
+/* the rules are the red string a branch hangs on */
 .branch-divider > [data-ui="divider"] {
+  border-top: 1.5px solid var(--color-string);
   animation: branch-rule var(--motion-spring) var(--ease-spring) backwards;
 }
 
@@ -608,11 +728,40 @@
   transform-origin: left;
 }
 
-.branch-divider > .branch-divider-icon {
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  --pop-from: 0 0;
-  --pop-rotate: -180deg;
-  --pop-scale: 0.2;
+/* The evidence tag tied into the string: a slip of card, a touch crooked,
+ * that swings in on its knot. */
+.branch-divider-tag {
+  flex: none;
+  max-width: 75%;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-surface-raised);
+  box-shadow: var(--shadow-floating);
+  rotate: -1.5deg;
+  transform-origin: top center;
+  animation: tag-swing var(--motion-spring) var(--ease-spring) var(--motion-fast) backwards;
+}
+
+/* a branch is a connection, so its mark is the string's red */
+.branch-divider-icon {
+  color: var(--color-string);
+}
+
+.branch-divider-exhibit {
+  flex: none;
+  font-family: var(--font-heading);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.branch-divider-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-heading);
+  color: var(--color-text);
 }
 
 @keyframes branch-rule {
@@ -621,24 +770,168 @@
   }
 }
 
+@keyframes tag-swing {
+  from {
+    opacity: 0;
+    rotate: 14deg;
+    translate: 0 -0.5rem;
+  }
+  60% {
+    opacity: 1;
+    rotate: -4deg;
+  }
+}
+
 /* ── message field ─────────────────────────────────────────── */
 
-/* Not a box inside the sheet: one ruled line divides it from the history. */
+/* An index card laid on the bottom of the sheet: a head over its red rule,
+ * then ruled lines to write on. It sits a touch crooked and straightens and
+ * lifts while you write, as if picked up. */
 .message-field {
-  padding: var(--space-3) var(--space-2);
-  border-width: 1px 0 0;
-  border-radius: 0;
-  box-shadow: none;
-  transition: border-color var(--motion-fast) var(--ease-out);
+  container-type: inline-size;
+  --rule: 1.75rem;
+  --color-border-ruled: light-dark(color-mix(in srgb, var(--color-border) 80%, transparent), color-mix(in srgb, var(--color-text) 14%, transparent));
+  margin: 0 var(--space-1) var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* whiter than the sheet, as card stock is */
+  background: var(--texture-grain), light-dark(color-mix(in srgb, var(--color-surface) 35%, #fff), var(--color-surface-raised));
+  box-shadow: var(--shadow-floating);
+  rotate: -0.35deg;
+  transition:
+    rotate var(--motion-spring) var(--ease-spring),
+    translate var(--motion-spring) var(--ease-spring),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out);
 }
 
-.message-field:hover:not([data-disabled]),
+/* nothing to write on until a card is picked */
+.chat-field-idle {
+  display: none;
+}
+
+/* picking a card deals the index card up from the bottom of the sheet (display: none to shown replays it) */
+.chat-field {
+  transform-origin: bottom center;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 3rem;
+  --pop-rotate: -3deg;
+  --pop-scale: 0.94;
+}
+
 .message-field:focus-within {
+  rotate: 0deg;
+  translate: 0 -2px;
   border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
 }
 
+.message-field[data-disabled] {
+  box-shadow: none;
+  rotate: 0deg;
+}
+
+/* sending: the card is pressed down once, like a stamp, and its rule flashes */
+/* pop-in is listed again so the finished entrance is kept, not replayed */
+.chat-field[data-sent] {
+  animation:
+    pop-in var(--motion-spring) var(--ease-spring) backwards,
+    card-stamped var(--motion-base) var(--ease-out);
+}
+
+.message-field[data-sent] .message-field-head::after {
+  animation: rule-flash var(--motion-slow) var(--ease-out);
+}
+
+@keyframes card-stamped {
+  40% {
+    translate: 0 2px;
+    scale: 0.985;
+    box-shadow: var(--shadow-floating);
+  }
+}
+
+@keyframes rule-flash {
+  from {
+    scale: 1 1;
+    transform-origin: right;
+    height: 4px;
+  }
+}
+
+/* the card's header rule: dim red, drawn over in full red once there is something to send */
+.message-field-head {
+  position: relative;
+  padding-bottom: var(--space-1);
+}
+
+.message-field-head::before,
+.message-field-head::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: calc(-1 * var(--space-3));
+  right: calc(-1 * var(--space-3));
+  height: 2px;
+  pointer-events: none;
+}
+
+.message-field-head::before {
+  background: color-mix(in srgb, var(--color-string) 35%, transparent);
+}
+
+.message-field[data-disabled] .message-field-head::before {
+  background: var(--color-border);
+}
+
+.message-field-head::after {
+  background: var(--color-string);
+  transform-origin: left;
+  scale: 0 1;
+  /* ease-out, not the spring: an overshoot would run the rule past the card's edge */
+  transition: scale var(--motion-slow) var(--ease-out);
+}
+
+.message-field:has(.message-field-send:not(:disabled, [data-stop])) .message-field-head::after {
+  scale: 1 1;
+}
+
+/* the keys, shown only while writing */
+.message-field-hint {
+  opacity: 0;
+  translate: 0.5rem 0;
+  transition: opacity var(--motion-base) var(--ease-out), translate var(--motion-spring) var(--ease-spring);
+}
+
+.message-field:focus-within .message-field-hint {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* narrow sheet: the model picker and attachments need the room */
+@container (max-width: 26rem) {
+  .message-field-hint {
+    display: none;
+  }
+}
+
+.message-field-body {
+  padding-top: var(--space-1);
+}
+
+/* writing lines: one faint rule per line of text, scrolling with it */
 .message-field-input {
-  max-height: 12rem;
+  flex: 1;
+  min-height: calc(var(--rule) * 2);
+  max-height: calc(var(--rule) * 7);
+  padding-inline: var(--space-1);
+  /* written in the slip's face, so the card reads as the slip it becomes */
+  font-family: var(--font-heading);
+  font-size: var(--font-size-m);
+  line-height: var(--rule);
+  /* one tile per line, so every rule lands on a whole pixel */
+  background: linear-gradient(transparent calc(var(--rule) - 1px), var(--color-border-ruled) 0) 0 0 / 100% var(--rule) local;
 }
 
 /* Send is a round ink stamp. Disabled it sits small and faint; the moment
@@ -662,6 +955,34 @@
   box-shadow: none;
 }
 
+/* Red, like every action the user takes. The icon is a graphic on it (3:1 is
+ * enough), so paper-white works on the flag red in both themes. */
+[data-ui="panel"][data-component="button"].message-field-send:not(:disabled, [data-stop]) {
+  border-color: transparent;
+  background: var(--color-string);
+  color: #fff;
+  box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--color-string) 55%, transparent);
+  animation: send-armed var(--motion-slow) var(--ease-out);
+}
+
+[data-ui="panel"][data-component="button"].message-field-send:not(:disabled, [data-stop]) [data-ui="icon"] {
+  color: inherit;
+}
+
+[data-ui="panel"][data-component="button"].message-field-send:hover:not(:disabled, :active, [data-stop]) {
+  background: color-mix(in srgb, var(--color-string) 88%, #000);
+  box-shadow: 0 8px 18px -4px color-mix(in srgb, var(--color-string) 60%, transparent);
+}
+
+@keyframes send-armed {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-string) 60%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0.7rem transparent;
+  }
+}
+
 [data-ui="panel"][data-component="button"].message-field-send:hover:not(:disabled, :active) {
   translate: 0 -3px;
   rotate: -8deg;
@@ -681,14 +1002,62 @@
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
 }
 
-/* the model picker: a quiet control in the action row, outlined only on hover */
+/* the model picker: a quiet control in the card's head, outlined only on hover */
 .message-field-model {
   max-width: 14rem;
+  margin-left: calc(-1 * var(--space-2));
+  /* labelled like the card's filing tag, as the sheet's "Case notes" kicker is */
+  font-size: var(--font-size-xxs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
 }
 
 .chat-token-usage {
   padding-inline: var(--space-2);
   color: var(--color-text-secondary);
+}
+
+/* the folded line: icon, counts and a caret, quiet until pointed at */
+.chat-token-usage > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  list-style: none;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.chat-token-usage > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-token-usage > summary::after {
+  content: "expand_more";
+  font-family: var(--font-symbols);
+  font-size: 1rem;
+  transition: rotate var(--motion-spring) var(--ease-spring);
+}
+
+.chat-token-usage[open] > summary::after {
+  rotate: 180deg;
+}
+
+.chat-token-usage > summary:is(:hover, :focus-visible),
+.chat-token-usage[open] > summary {
+  color: var(--color-text-secondary);
+}
+
+.chat-token-details {
+  padding-top: var(--space-2);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 -0.5rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 0.97;
 }
 
 .chat-token-counts {
@@ -706,4 +1075,27 @@
 /* Retry winds the reply back: the round arrow turns a full circle under the pointer */
 [data-ui="panel"][data-component="button"].message-retry:hover:not(:disabled) {
   rotate: -360deg;
+}
+
+/* Scrolled, the thread slides under the heading instead of being cut off by
+ * it: the top edge fades in once there is anything above. */
+@supports (animation-timeline: scroll()) {
+  .chat-scroll {
+    mask-image: linear-gradient(transparent, #000 var(--chat-scroll-fade, 0px));
+    animation: scroll-fade linear both;
+    animation-timeline: scroll(self);
+    animation-range: 0 3rem;
+  }
+}
+
+@property --chat-scroll-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes scroll-fade {
+  to {
+    --chat-scroll-fade: 2rem;
+  }
 }

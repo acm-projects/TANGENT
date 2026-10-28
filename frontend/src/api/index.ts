@@ -12,6 +12,7 @@
 import { createAgentApi } from "./endpoints/agent";
 import { createAuthApi } from "./endpoints/auth";
 import { createChatsApi } from "./endpoints/chats";
+import { createDebatesApi } from "./endpoints/debates";
 import { createNodesApi } from "./endpoints/nodes";
 import { createProjectsApi } from "./endpoints/projects";
 import { createSharesApi } from "./endpoints/shares";
@@ -24,6 +25,7 @@ export const api = {
   agent: createAgentApi(apiClient),
   auth: createAuthApi(apiClient),
   chats: createChatsApi(apiClient),
+  debates: createDebatesApi(apiClient),
   nodes: createNodesApi(apiClient),
   projects: createProjectsApi(apiClient),
   shares: createSharesApi(apiClient),
@@ -35,7 +37,8 @@ export const api = {
 export type Api = typeof api;
 
 // Streaming is not request/response, so it is not part of `api`.
-export { streamMessage } from "./stream";
+export { DebateGoneError, streamDebate, streamMessage } from "./stream";
+export type { DebateStreamEvent } from "./stream";
 export { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";
 export { apiClient, getAccessToken, setAccessToken, takeTokenFromUrl } from "./session";
 export type * from "./types";

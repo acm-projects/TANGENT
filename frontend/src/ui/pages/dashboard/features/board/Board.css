@@ -56,8 +56,6 @@
 
 .board-title {
   font-family: var(--font-heading);
-  /* the same faint ink bleed as a map card's title */
-  text-shadow: 0 0 0.25px currentColor;
   overflow-wrap: anywhere;
 }
 
@@ -141,7 +139,7 @@
   height: 0.8em;
   translate: -50% 0;
   border-radius: var(--radius-full);
-  background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.55), transparent 45%), var(--color-string);
+  background: var(--texture-pin), var(--color-string);
   box-shadow: 0 0.12em 0.15em rgb(0 0 0 / 0.3);
 }
 
@@ -189,7 +187,6 @@
   font-family: var(--font-heading);
   font-size: 1.15em;
   line-height: 1.2;
-  text-shadow: 0 0 0.25px currentColor;
   overflow: hidden;
   overflow-wrap: anywhere;
 }

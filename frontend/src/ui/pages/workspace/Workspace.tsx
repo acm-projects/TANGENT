@@ -1,5 +1,6 @@
 import { Frame } from "@/ui/library";
 import { Chat } from "./features/chat/Chat";
+import { Debate } from "./features/debate/Debate";
 import { MindMap } from "./features/mindmap/MindMap";
 import { Toolbar } from "./features/toolbar/Toolbar";
 import "./Workspace.css";
@@ -17,9 +18,10 @@ type WorkspaceProps = { slug: string; projectId: string };
 export function Workspace({ slug, projectId }: WorkspaceProps) {
   return (
     <Frame as="main" gap="0" className="workspace">
-      <MindMap slug={slug} projectId={projectId}className="workspace-map" />
+      <MindMap slug={slug} projectId={projectId} className="workspace-map" />
       <Toolbar slug={slug} projectId={projectId} className="workspace-toolbar" />
       <Chat className="workspace-chat" />
+      <Debate projectId={projectId} className="workspace-debate" />
     </Frame>
   );
 }

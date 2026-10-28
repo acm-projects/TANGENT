@@ -6,6 +6,7 @@ import { apiErrorMessage } from "@/api";
 import { spring } from "@/ui/library/tokens/motion";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
+import { StartDebate } from "../../debate/components/StartDebate";
 import { SharePanel } from "../../toolbar/components/SharePanel";
 import { confirmedForks, deleteNode, forkNode, isPending, loadChats } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
@@ -56,6 +57,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // Right-click pins the tray out: it stays until Escape or a click elsewhere, not just while hovered.
   const [pinned, setPinned] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [debating, setDebating] = useState(false);
   const release = () => {
     setPinned(false);
     setPeeled(false);
@@ -203,6 +205,11 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           <Frame direction="row" gap="2" align="center">
             <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
             <Text as="span" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
+            {data.debate && (
+              <Panel elevation="floating" className="mindmap-node-tag" aria-label="A debate's verdict">
+                <Icon icon="gavel" size="s" />
+              </Panel>
+            )}
             {data.tags.map((tag) => (
               <Panel key={tag} elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
                 <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />
@@ -269,16 +276,20 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             merge.start(id);
           }}
         />
-        {/* Not built yet (no debate mode on the backend), so disabled like the toolbar's. */}
         <Button
           size="l"
-          title="Debate mode (not available yet)"
+          title="Start a debate"
           elevation="floating"
           showIcon
           showLabel={false}
-          icon="balance"
-          label="Debate mode (not available yet)"
-          disabled
+          icon="gavel"
+          label="Start a debate"
+          disabled={busy || !project}
+          onClick={(e) => {
+            e.stopPropagation();
+            release();
+            setDebating(true);
+          }}
         />
         <Frame gap="0" align="center" className="mindmap-node-more">
           {/* Listed bottom-up: the first option sits just above More. Each slides up out from
@@ -332,6 +343,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       <Popup open={sharing} onClose={() => setSharing(false)} title={`"${data.title}"`}>
         {/* Mounted only while open: the panel loads this branch's shares when it mounts. */}
         {sharing && project && <SharePanel {...project} branchNodeId={id} onClose={() => setSharing(false)} />}
+      </Popup>
+      <Popup open={debating} onClose={() => setDebating(false)} title={`Bring "${data.title}" to court`}>
+        {/* Mounted only while open, so the form starts fresh each time. */}
+        {debating && project && <StartDebate projectId={project.projectId} nodeId={id} onClose={() => setDebating(false)} />}
       </Popup>
       <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this branch?">
         <Text

@@ -3,11 +3,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { AgentWindow } from "../agent/AgentWindow";
+import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
 import { useChat } from "./useChat";
 import "./Chat.css";
+
+const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 /* The chat panel (Figma "Chat", 24:531, and "Chat History", 160:7205).
  *
@@ -191,10 +194,13 @@ export function Chat({ className }: ChatProps) {
         <Frame ref={scrollRef} gap="0" className="chat-scroll">
 
           {chat.history.length === 0 ? (
-            <Frame justify="center" align="center" gap="3" className="chat-empty">
-              <Icon icon="west" size="xxl" className="chat-empty-arrow" />
-              <Text as="h2" size="xl" hierarchy="primary" content="Pick a card off the board" />
-              <Text hierarchy="tertiary" content="Select a node on the map to read its thread here." />
+            // an empty evidence card, its string reaching out across to the board
+            <Frame justify="center" align="center" className="chat-empty">
+              <Frame gap="2" align="center" className="chat-empty-card">
+                <Text as="span" size="xxs" className="chat-title-kicker" content="Exhibit —" />
+                <Text as="h2" size="xl" hierarchy="primary" className="chat-empty-title" content="Pick a card off the board" />
+                <Text hierarchy="tertiary" content="Select a node on the map to read its thread here." />
+              </Frame>
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
@@ -203,6 +209,12 @@ export function Chat({ className }: ChatProps) {
                   {i > 0 && (
                     <Frame as="li">
                       <BranchDivider exhibit={section.exhibit} title={section.node.title} />
+                    </Frame>
+                  )}
+                  {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
+                  {section.node.node_type === "debate" && i === chat.history.length - 1 && (
+                    <Frame as="li">
+                      <VerdictCard nodeId={section.node.id} />
                     </Frame>
                   )}
                   {section.messages === undefined && (
@@ -248,36 +260,44 @@ export function Chat({ className }: ChatProps) {
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
         {lastSection && (
-          <Frame
-            direction="row"
-            gap="3"
-            className="chat-token-usage"
-            role="status"
-            aria-label="Saved token usage"
-          >
-            <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
-            <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
-          </Frame>
-        )}
-
-        {chat.usage && (
-          <Frame gap="1" className="chat-token-usage" role="status" aria-label="Latest response token usage">
-            <Text size="xs" hierarchy="tertiary" content="Latest response token usage" />
-            <Frame direction="row" gap="3" className="chat-token-counts">
-              <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
-              <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
-              <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
-              {contextUsagePercentage !== null && chat.usageContextLength !== null && (
-                <Text
-                  size="xs"
-                  content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
-                />
+          // One quiet line (node, branch and, after a reply, how full the context is); open it for the full counts.
+          <details className="chat-token-usage">
+            <summary>
+              <Icon icon="data_usage" size="s" hierarchy="tertiary" />
+              <Text
+                as="span"
+                size="xs"
+                content={[
+                  `${compact.format(chat.nodeTokens)} node`,
+                  `${compact.format(chat.branchTokens)} branch`,
+                  contextUsagePercentage !== null && `${contextUsagePercentage.toFixed(0)}% context`,
+                ].filter(Boolean).join(" · ")}
+              />
+            </summary>
+            <Frame gap="1" className="chat-token-details" role="status" aria-label="Token usage">
+              <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
+              <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
+              {chat.usage && (
+                <>
+                  <Text size="xs" hierarchy="tertiary" content="Latest response" />
+                  <Frame direction="row" gap="3" className="chat-token-counts">
+                    <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
+                    <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
+                    <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
+                    {contextUsagePercentage !== null && chat.usageContextLength !== null && (
+                      <Text
+                        size="xs"
+                        content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
+                      />
+                    )}
+                  </Frame>
+                </>
+              )}
+              {chat.usageUnavailable && (
+                <Text size="xs" hierarchy="tertiary" content="Token usage was not included in the provider stream." />
               )}
             </Frame>
-          </Frame>
-        )}
-        {chat.usageUnavailable && (
-          <Text size="xs" hierarchy="tertiary" className="chat-token-usage" content="Token usage was not included in the provider stream." />
+          </details>
         )}
 
         <MessageField
@@ -290,7 +310,8 @@ export function Chat({ className }: ChatProps) {
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}
           about={lastSection?.node.title}
-          className="chat-field"
+          // hidden, not unmounted, with no card picked: a half-written draft survives deselecting
+          className={chat.blocker === "no-selection" ? "chat-field chat-field-idle" : "chat-field"}
         />
       </Frame>
     </Panel>

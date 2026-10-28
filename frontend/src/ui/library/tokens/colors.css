@@ -102,9 +102,9 @@
 
   /* what string and pins cast on the board, and the light caught on a pin head */
   --color-string-shadow: light-dark(rgb(40 30 20 / 0.28), rgb(0 0 0 / 0.6));
-  --color-pin-shine: light-dark(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.55));
+  --color-pin-shine: light-dark(rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.32));
   /* that light as a layer for a domed pin head: `background: var(--texture-pin), var(--color-string)` */
-  --texture-pin: radial-gradient(circle at 32% 30%, var(--color-pin-shine) 0 18%, transparent 46%);
+  --texture-pin: radial-gradient(circle at 35% 30%, var(--color-pin-shine), transparent 30%);
 
   --color-selection: light-dark(rgb(42 40 38 / 0.16), rgb(236 233 228 / 0.2));
 

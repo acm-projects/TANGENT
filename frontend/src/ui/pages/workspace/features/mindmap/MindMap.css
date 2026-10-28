@@ -174,7 +174,7 @@
   outline-offset: 2px;
 }
 
-/* Titles are the heading face, with a hair of ink bleed so they read as pen on paper. */
+/* Titles are the heading face. */
 /* The root is the case itself: labelled, a size up, and ruled twice round
  * like the cover of a file. */
 .mindmap-node[data-root] {
@@ -217,7 +217,6 @@
   /* margin, not padding: padding would show the clamped third line */
   margin-block: var(--space-2);
   font-family: var(--font-heading);
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 /* A card's token count: tucked in its bottom corner, shown only while the card
@@ -445,7 +444,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 /* too narrow: the chat takes the screen and the label would crowd the toolbar */

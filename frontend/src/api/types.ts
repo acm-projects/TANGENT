@@ -3,7 +3,7 @@
 // keep the names so nothing downstream changes.
 
 // Open unions: known values autocomplete, unknown ones still type-check until the team freezes them.
-export type NodeType = "chat" | "question" | "poll" | "document" | (string & {});
+export type NodeType = "chat" | "question" | "poll" | "document" | "standard" | "debate" | (string & {});
 export type NodeStatus = "active" | (string & {});
 
 // [proposed] fields below are what the Figma wireframe displays but the
@@ -54,6 +54,8 @@ export interface NodeMeta {
   attachment_kinds?: AttachmentKind[];
   /** A merged node's two source leaves (empty otherwise). Only the tree endpoints fill it in. */
   merge_source_ids?: string[];
+  /** A branch made from a debate's "where to go next": the debate it came out of. */
+  branch_of_debate_id?: string | null;
 }
 
 /** Returned when a write created the sharee's own copy of a shared project. */
@@ -231,4 +233,109 @@ export interface AgentReply {
   reply: string;
   tool_calls: AgentToolCall[];
   model: string;
+}
+
+// ---- Debate mode (/debates/*: backend debate/pg/api.py; docs FRONTEND_DEBATE_MODE.md) ----
+
+export type DebateSide = "for" | "against";
+export type DebateStatus = "queued" | "running" | "awaiting_input" | "finalizing" | "completed" | "failed" | "cancelled";
+
+/** GET /debates/models */
+export interface DebateModels {
+  models: { id: string; label: string }[];
+  default: string;
+  rounds: { default: number; max: number };
+}
+
+/** POST /debates (202). `fork`: a sharee's start, which runs in their new copy. */
+export interface DebateStarted {
+  id: string;
+  status: DebateStatus;
+  model_mode: "same" | "pair";
+  for_model: string;
+  against_model: string;
+  fork?: ForkInfo;
+}
+
+/** A clarifying question from the judge or a debater (question_requested, pending_questions). */
+export interface DebateQuestion {
+  id: string;
+  prompt: string;
+  type: "single" | "multi";
+  options: { label: string; description?: string }[];
+  allow_other: boolean;
+}
+
+/** GET /debates/:id, and the stream's `state` and `done` events. */
+export interface DebateInfo {
+  id: string;
+  topic: string;
+  for_model: string;
+  against_model: string;
+  rounds: number;
+  status: DebateStatus;
+  current_phase: string | null;
+  current_round: number | null;
+  pending_questions: DebateQuestion[] | null;
+  result_node_id: string | null;
+  end_reason: string | null;
+  error_code: string | null;
+}
+
+/** One direction a finished debate proposes exploring next. */
+export interface DebateBranch {
+  id: string;
+  title: string;
+  question: string;
+  why: string;
+  kind: "research" | "debate" | "open";
+  from_claims: string[];
+  selected: boolean;
+  created_node_id: string | null;
+}
+
+export interface DebateCitation {
+  id?: string;
+  title: string;
+  year?: number | null;
+  url?: string;
+}
+
+/** Per-side criteria, claim labels and how settled the verdict is. Absent on older nodes; newer fields may be too. */
+export interface DebateRubric {
+  criteria?: Record<DebateSide, Record<string, number>>;
+  claim_counts?: Record<DebateSide, Record<string, number>>;
+  margin?: number;
+  gap?: number;
+  agreement?: number;
+  judge_samples?: number;
+  prose_matches_winner?: boolean;
+}
+
+/** GET /debates/node/:nodeId -- the structured verdict behind a debate node. */
+export interface DebateResult {
+  node_id: string;
+  debate_id: string;
+  proposition: string;
+  winner: DebateSide | "no_clear_winner";
+  judge_would_have_chosen: DebateSide | "no_clear_winner" | null;
+  confidence: number;
+  summary: string;
+  end_reason: string | null;
+  for_model: string;
+  against_model: string;
+  judge_model: string;
+  final_output: string;
+  strongest_counterpoints: string[] | null;
+  verdict_flips_if: string[] | null;
+  citations: DebateCitation[] | null;
+  scores: { for?: number; against?: number; rubric?: DebateRubric } | null;
+  branches: DebateBranch[] | null;
+}
+
+/** POST /debates/node/:nodeId/branches (201). The new nodes hang under `parent_node_id`, not the debate node. */
+export interface DebateBranchesCreated {
+  parent_node_id: string;
+  created: { branch_id: string; node_id: string; created: boolean }[];
+  branches: DebateBranch[];
 }
