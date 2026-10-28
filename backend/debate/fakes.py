@@ -87,6 +87,10 @@ class ScriptedBrain:
         self.usage = usage
         self.script = script or {}
         self.frame_questions = frame_questions or []
+        self.branches: Optional[list] = None  # None disables branch proposals; else a list of Branch
+        self.branch_calls: list[dict[str, Any]] = []
+        self.conclusion: Optional[str] = None  # None disables the check; else "supported"|"not_supported"|"neither"
+        self.conclusion_calls: list[tuple[str, str]] = []
         self.contexts: list[AgentContext] = []
         self.judge_views: list[JudgeView] = []
         self.fixed_winners: list[Optional[str]] = []
@@ -146,6 +150,19 @@ class ScriptedBrain:
                 claims=[Claim(id=cid, text=f"claim {me} {ctx.phase} {ctx.round}", evidence_ids=ev)],
             )
         )
+
+    async def propose_branches(self, proposition, summary, open_questions, flips, counterpoints, max_branches=5):
+        self.branch_calls.append({"proposition": proposition, "summary": summary, "open_questions": open_questions,
+                                  "flips": list(flips), "counterpoints": list(counterpoints)})
+        if self.branches is None:
+            raise AttributeError("no scripted branches")  # same effect as a brain without the method
+        return list(self.branches)[:max_branches], self.usage
+
+    async def check_conclusion(self, proposition: str, text: str) -> tuple[str, Optional[Usage]]:
+        self.conclusion_calls.append((proposition, text))
+        if self.conclusion is None:
+            raise AttributeError("no scripted conclusion")  # same effect as a brain without the method
+        return self.conclusion, self.usage
 
     async def judge(self, view: JudgeView, fixed_winner: Optional[str], sink: Any = None) -> JudgeVerdict:
         await self._stream_text(sink, "final output text")

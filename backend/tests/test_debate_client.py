@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from scripts import debate_client  as dc  # noqa: E402
+import debate_client as dc  # noqa: E402
 
 
 def test_parse_sse_skips_pings_and_reads_frames():

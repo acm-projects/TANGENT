@@ -19,7 +19,9 @@ def node_title(payload: dict[str, Any], topic: str) -> str:
     elif reason == "user_stopped":
         head = "Stopped early" if w == "no_clear_winner" else f"{SIDE[w]} (stopped early)"
     elif w == "no_clear_winner":
-        head = "No clear winner"
+        # "No clear winner" reads as a failure to answer. On an open question a near-tie is the finding, and the
+        # branches below are what to do about it, so the node is named for the state of the question.
+        head = "Contested"
     else:
         head = f"{SIDE[w]} wins"
     room = max(10, 60 - len(head) - 3)
@@ -41,7 +43,7 @@ def _headline(payload: dict[str, Any]) -> str:
         base = "**You ended the debate early.** "
         return base + ("The judge saw no clear winner from what was argued." if w == "no_clear_winner" else f"From what was argued the judge leaned {SIDE[w]}.")
     if w == "no_clear_winner":
-        return "**Verdict: no clear winner.**"
+        return "**Genuinely unsettled.** The two sides scored too close to separate, so this question is still open."
     conf = payload.get("confidence")
     return f"**Verdict: {SIDE[w]}**" + (f" (confidence {conf:.0%})" if isinstance(conf, (int, float)) and conf else "")
 
@@ -70,6 +72,12 @@ def render_chats(topic: str, payload: dict[str, Any], models: Optional[dict[str,
     rub = (payload.get("scores") or {}).get("rubric")
     if rub:
         parts.append(_scoring_block(rub))
+    br = payload.get("branches") or []
+    if br:
+        kind_word = {"research": "find evidence", "debate": "worth its own debate", "open": "a judgement call"}
+        rows = [f"- **{b['title']}** — {b['question']}  \n  _{b['why']}_ ({kind_word.get(b.get('kind'), b.get('kind'))})"
+                for b in br]
+        parts.append("**Where to go next** (tick the ones worth exploring; each becomes its own node)\n" + "\n".join(rows))
     cp = payload.get("strongest_counterpoints") or []
     if cp:
         parts.append("**Strongest points against this conclusion**\n" + "\n".join(f"- {x}" for x in cp))

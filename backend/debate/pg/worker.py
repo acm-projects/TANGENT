@@ -38,6 +38,10 @@ class WorkerEnv:
     min_slice_ms: int = 20_000
     max_attempts: int = 3
     # DEBATE_STREAM_TOKENS=0 turns live text off (the debate then runs on plain, non-streamed model calls).
+    # DEBATE_JUDGE_SAMPLES: how many times the judge runs per debate (default 3). 1 is the old single-call behaviour.
+    judge_samples: int = field(default_factory=lambda: max(1, int(os.environ.get("DEBATE_JUDGE_SAMPLES", "3") or 3)))
+    # DEBATE_MAX_BRANCHES: how many "explore this next" questions a finished debate proposes. 0 turns the feature off.
+    max_branches: int = field(default_factory=lambda: max(0, int(os.environ.get("DEBATE_MAX_BRANCHES", "4") or 4)))
     stream_tokens: bool = field(default_factory=lambda: os.environ.get("DEBATE_STREAM_TOKENS", "1").strip().lower() not in ("0", "false", "no", "off"))
 
     def __post_init__(self) -> None:
@@ -96,6 +100,8 @@ async def run_debate(
             rng=random.Random(),
             max_cost_usd=env.max_cost_usd,
             stream_tokens=env.stream_tokens,
+            judge_samples=env.judge_samples,
+            max_branches=env.max_branches,
         )
         cfg = {"configurable": {"thread_id": debate_id, "deps": deps}, "recursion_limit": 200}
         graph = build_graph(saver)

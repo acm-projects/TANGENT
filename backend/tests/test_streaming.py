@@ -12,7 +12,7 @@ from helpers import drive, run
 from test_openrouter import ctx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from scripts import debate_client as dc  # noqa: E402
+import debate_client as dc  # noqa: E402
 
 
 def read_all(raw, step, field="argument"):

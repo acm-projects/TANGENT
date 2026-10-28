@@ -23,7 +23,11 @@ def load_search() -> Any:
 
 def build_env(search: Optional[Any] = None) -> tuple[WorkerEnv, OpenRouterClient]:
     url = os.environ["DATABASE_URL"]
-    client = OpenRouterClient(os.environ["OPENROUTER_DEBATE_API_KEY"], app_url=os.environ.get("APP_URL", ""))
+    client = OpenRouterClient(
+        os.environ["OPENROUTER_DEBATE_API_KEY"],
+        app_url=os.environ.get("APP_URL", ""),
+        reasoning_effort=os.environ.get("DEBATE_REASONING_EFFORT") or None,
+    )
     summary_model = os.environ.get("DEBATE_SUMMARY_MODEL")
     env = WorkerEnv(
         factory=make_factory(make_engine(url)),

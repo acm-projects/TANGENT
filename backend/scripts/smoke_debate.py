@@ -93,6 +93,8 @@ def check(a, state, result, events, deps) -> list[tuple[bool, str]]:
         (not any(t.get("truncated") and ("could not be produced" in t["argument"] or not t["argument"].strip()) for t in turns), "no turn forced by the step cap came back empty or skipped"),
         (types.count("turn_completed") == len(turns), "one turn_completed event per turn"),
         (bool(result.get("timing_summary")) and bool(result.get("usage_summary")), "timings and usage were recorded"),
+        (all(b.get("id") and b.get("title") and b.get("question") and b.get("why") for b in (result.get("branches") or [])),
+         f"every proposed branch is complete ({len(result.get('branches') or [])} branch(es))"),
     ]
     if not a.offline:
         out.append((float((result["usage_summary"].get("total") or {}).get("cost") or 0) > 0, "OpenRouter reported a cost"))
@@ -106,7 +108,21 @@ async def main(a: argparse.Namespace) -> None:
         from debate.schemas import Question
 
         client = None
+        from debate.schemas import Branch
+
         brain = ScriptedBrain(frame_questions=[Question(id="q1", prompt="What is your budget?", options=[{"label": "<$1k"}, {"label": "$1k+"}])])
+        # scripted so --offline exercises branching too; the real brain writes these from the finished verdict
+        brain.branches = [
+            Branch(title="Delivery speed vs operating cost",
+                   question="Does the faster option stay faster once the operating burden is counted?",
+                   why="Neither side measured both together.", kind="research"),
+            Branch(title="When the benefit starts",
+                   question="At what team size does the advantage begin to pay for itself?",
+                   why="Both sides asserted it without a timeline.", kind="research"),
+            Branch(title="Cost of changing course later",
+                   question="How expensive is switching approach at year two?",
+                   why="Never compared against committing from day one.", kind="debate"),
+        ]
         search = FakeSearch()
     else:
         key = os.environ.get("OPENROUTER_DEBATE_API_KEY")
@@ -134,6 +150,7 @@ async def main(a: argparse.Namespace) -> None:
         writer=InMemoryWriter(),
         rng=random.Random(),
         max_cost_usd=a.max_cost,
+        judge_samples=a.judge_samples,
     )
     graph = build_graph(InMemorySaver())
     cfg = {"configurable": {"thread_id": "smoke", "deps": deps}, "recursion_limit": 200}
@@ -190,6 +207,7 @@ if __name__ == "__main__":
     p.add_argument("--rounds", type=int, default=2, choices=[1, 2, 3])
     p.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default=os.environ.get("DEBATE_REASONING_EFFORT") or None, help="ask models to reason less/more (default: $DEBATE_REASONING_EFFORT, else each model's own default)")
     p.add_argument("--context-file", help="text file standing in for earlier chats")
+    p.add_argument("--judge-samples", type=int, default=3, help="how many times the judge runs (labels swapped between runs) and is combined in code; 1 = a single call")
     p.add_argument("--no-search", action="store_true")
     p.add_argument("--max-cost", type=float, default=None)
     p.add_argument("--dump", help="write the full result JSON here")

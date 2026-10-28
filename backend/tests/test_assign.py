@@ -34,7 +34,7 @@ def P(**o):
 def test_titles_say_who_won_and_fit_60():
     assert node_title(P(), "t").startswith("FOR wins: ")
     assert node_title(P(winner="against"), "t").startswith("AGAINST wins: ")
-    assert node_title(P(winner="no_clear_winner"), "t").startswith("No clear winner: ")
+    assert node_title(P(winner="no_clear_winner"), "t").startswith("Contested: ")
     assert node_title(P(end_reason="user_picked", winner="against"), "t").startswith("AGAINST (your pick): ")
     assert node_title(P(end_reason="user_stopped", winner="no_clear_winner"), "t").startswith("Stopped early: ")
     assert all(len(node_title(P(winner=w, end_reason=r), "t")) <= 60 for w in ("for", "against", "no_clear_winner") for r in ("rounds_exhausted", "user_picked", "user_stopped"))

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -11,7 +11,8 @@ from langgraph.types import Send, interrupt
 from .deps import AgentContext, Deps
 from .judge_view import build_judge_view
 from .framing import choose_questions
-from .scoring import score_rubric
+from .branching import assign_ids, open_questions, to_rows
+from .scoring import NO_WINNER_CONFIDENCE_CAP, combine_samples, sample_to_sides, score_rubric
 from .streaming import make_sink, turn_id
 from .metrics import summarize_timings, summarize_usage, total_cost, usage_record
 from .schemas import (
@@ -438,10 +439,7 @@ async def verify(state: DebateState, config: RunnableConfig) -> dict[str, Any]:
 async def judge(state: DebateState, config: RunnableConfig) -> dict[str, Any]:
     d = _deps(config)
     t0 = time.monotonic()
-    ab = {"A": "for", "B": "against"} if d.rng.random() < 0.5 else {"A": "against", "B": "for"}
-    label_of = {side: label for label, side in ab.items()}
-    view = build_judge_view(dict(state), label_of)
-    fixed = label_of[state["picked_side"]] if state.get("end_reason") == "user_picked" else None
+    first = {"A": "for", "B": "against"} if d.rng.random() < 0.5 else {"A": "against", "B": "for"}
     if not any(t["phase"] != "research" for t in state.get("turns", [])):
         # stopped before anyone argued: nothing to judge, and no model call to pay for
         verdict = {
@@ -451,26 +449,69 @@ async def judge(state: DebateState, config: RunnableConfig) -> dict[str, Any]:
             "final_output": "No arguments were made, so there is no conclusion to report. Start the debate again to get one.",
             "scores": {}, "strongest_counterpoints": [], "verdict_flips_if": [],
         }
-        return {"ab_map": ab, "verdict": verdict, "metrics": [_metric("judge", None, "judge", 0, t0)]}
-    sink = make_sink(d, _did(config), "judge", "judging", 0)
-    try:
-        v = await (d.brain.judge(view, fixed, sink) if sink is not None else d.brain.judge(view, fixed))
-    finally:
-        if sink is not None:
-            await sink.close()
+        return {"ab_map": first, "verdict": verdict, "metrics": [_metric("judge", None, "judge", 0, t0)]}
 
-    calc = None
-    if v.rubric:
-        # The model labelled claims and scored criteria; the winner, scores and confidence are arithmetic on those.
-        calc = score_rubric(v.rubric, view.claims, view.cite_stats, fixed)
+    # The judge runs `judge_samples` times, with the A/B labels swapped between runs so position bias cancels. The runs
+    # are independent and concurrent; only the first streams live text. See scoring.combine_samples.
+    n = max(1, int(d.judge_samples))
+    swapped = {"A": first["B"], "B": first["A"]}
+    abs_ = [first if i % 2 == 0 else swapped for i in range(n)]
+
+    async def one(i: int) -> tuple[Any, Any, Optional[str]]:
+        label_of = {side: label for label, side in abs_[i].items()}
+        view = build_judge_view(dict(state), label_of)
+        fixed = label_of[state["picked_side"]] if state.get("end_reason") == "user_picked" else None
+        sink = make_sink(d, _did(config), "judge", "judging", 0) if i == 0 else None
+        try:
+            v = await (d.brain.judge(view, fixed, sink) if sink is not None else d.brain.judge(view, fixed))
+        finally:
+            if sink is not None:
+                await sink.close()
+        return v, view, fixed
+
+    got = await asyncio.gather(*[one(i) for i in range(n)], return_exceptions=True)
+    ok = [(i, r) for i, r in enumerate(got) if not isinstance(r, BaseException)]
+    if not ok:
+        raise next(r for r in got if isinstance(r, BaseException))
+    usage: list[dict[str, Any]] = []
+    for _, (sv, _view, _fx) in ok:
+        usage += usage_record(sv.usage, role="judge", phase="judge", round=0)
+
+    fixed = ok[0][1][2]
+    samples = []
+    for i, (sv, view, fx) in ok:
+        if sv.rubric:
+            calc_i = score_rubric(sv.rubric, view.claims, view.cite_stats, fx)
+            samples.append((i, sample_to_sides(calc_i, abs_[i]), calc_i))
+    if samples:
+        comb = combine_samples([s for _, s, _ in samples])
+        wi, _, wcalc = samples[comb["writer"]]
+        ab = abs_[wi]
+        v, view, _ = dict(ok)[wi]
+        label_of = {side: label for label, side in ab.items()}
+        # The combined result in the writer sample's A/B labels, so the code below is the same for one sample or many.
+        calc = {
+            **wcalc,
+            "winner": fixed or (label_of[comb["judged"]] if comb["judged"] != "none" else "none"),
+            "would_have_chosen": label_of[comb["judged"]] if comb["judged"] != "none" else "none",
+            "confidence": comb["confidence"],
+            "totals": {label_of[s]: x for s, x in comb["totals"].items()},
+            "criteria": {label_of[s]: x for s, x in comb["criteria"].items()},
+            "gap": comb["gap"], "coverage": comb["coverage"], "complete": comb["complete"],
+            "verified_share": comb["verified_share"], "cited_share": comb["cited_share"],
+            "text_matches_scores": comb["text_matches_scores"],
+        }
         v = v.model_copy(update={
             "winner": calc["winner"], "would_have_chosen": calc["would_have_chosen"],
             "confidence": calc["confidence"], "scores": dict(calc["totals"]),
         })
-        if not calc["text_matches_scores"] and not fixed:
-            v = v.model_copy(update={"final_output": (
-                "> Scoring note: the rubric totals give a different result than the text below was written for. "
-                "The winner shown follows the rubric.\n\n" + v.final_output)})
+    else:
+        # A brain that returns no rubric (a scripted fake): use the first answer as it is.
+        wi = ok[0][0]
+        ab = abs_[wi]
+        v, view, _ = ok[0][1]
+        label_of = {side: label for label, side in ab.items()}
+        calc = comb = None
 
     to_side = {"A": ab["A"], "B": ab["B"], "none": "no_clear_winner"}
     verdict = v.model_dump()
@@ -488,10 +529,48 @@ async def judge(state: DebateState, config: RunnableConfig) -> dict[str, Any]:
             "weights": calc["weights"], "margin": calc["margin"], "gap": calc["gap"], "coverage": calc["coverage"],
             "verified_share": calc["verified_share"], "cited_share": calc["cited_share"],
             "complete": calc["complete"], "text_matches_scores": calc["text_matches_scores"],
+            "judge_samples": comb["samples"], "agreement": comb["agreement"], "gap_spread": comb["gap_spread"],
         }
     verdict.pop("rubric", None)
     verdict["winner_side"] = state["picked_side"] if fixed else to_side[v.winner]
     verdict["would_have_chosen_side"] = to_side[v.would_have_chosen]
+
+    # Does the finished text actually argue for the side the rubric picked? The judge's own `leaning` field cannot answer
+    # that: it has disagreed with its own prose (rubric FOR, prose "the evidence does not support the claim"), and the
+    # leaning-vs-rubric check passed because the leaning matched. So the text is read on its own, by a separate call that
+    # sees only the proposition and the verdict. A mismatch does not change the winner -- the rubric still decides -- but
+    # it is recorded and the reader is told, because a card that contradicts itself is worse than one that admits a split.
+    prose_says = None
+    if calc and not fixed and hasattr(d.brain, "check_conclusion"):
+        try:
+            prose_says, usage_cc = await d.brain.check_conclusion(state["proposition"], verdict["final_output"])
+            usage += usage_record(usage_cc, role="judge", phase="conclusion_check", round=0)
+        except Exception:
+            prose_says = None  # the guard is best-effort: never fail a finished debate over it
+    if prose_says in ("supported", "not_supported", "neither"):
+        implied = {"supported": "for", "not_supported": "against", "neither": "no_clear_winner"}[prose_says]
+        verdict["scores"]["rubric"]["prose_conclusion"] = implied
+        verdict["scores"]["rubric"]["prose_matches_winner"] = implied == verdict["winner_side"]
+        # Only an *opposite* conclusion is a contradiction. A verdict that weighs both sides without committing is the
+        # normal case and the whole reason the winner is computed rather than written: the judge supplies the analysis,
+        # the rubric resolves it. Treating "didn't commit" as a contradiction made 4 of 6 open-question debates report no
+        # winner, which throws away the one thing the orchestration reliably provides. So the override fires only when
+        # both readings name a side and they name different ones.
+        definite = {"for", "against"}
+        contradicts = implied in definite and verdict["winner_side"] in definite and implied != verdict["winner_side"]
+        verdict["scores"]["rubric"]["prose_contradicts_winner"] = contradicts
+        if contradicts:
+            verdict["scores"]["rubric"]["text_matches_scores"] = False
+            verdict["winner_side"] = "no_clear_winner"
+            verdict["confidence"] = min(float(verdict.get("confidence") or 0.0), NO_WINNER_CONFIDENCE_CAP)
+            verdict["final_output"] = (
+                "**No clear winner.** The scored comparison and the written analysis below argued for different sides, "
+                "so neither is reported as winning. The analysis is unchanged.\n\n" + verdict["final_output"])
+    if calc and not fixed and not verdict["scores"]["rubric"]["text_matches_scores"] and prose_says is None:
+        # The judge's own leaning disagreed with its totals and the independent check was unavailable.
+        verdict["final_output"] = (
+            "**Treat this verdict with caution.** The judge's scoring and its written reasoning did not fully agree; "
+            "the winner shown follows the scores.\n\n" + verdict["final_output"])
     # The finished text replaces whatever the judge streamed (deanonymized, and with any scoring note), so a client
     # that missed the live tokens still gets the whole answer here.
     await d.emitter.emit(
@@ -510,7 +589,7 @@ async def judge(state: DebateState, config: RunnableConfig) -> dict[str, Any]:
         "ab_map": ab,
         "verdict": verdict,
         "metrics": [_metric("judge", None, "judge", 0, t0)],
-        "usage": usage_record(v.usage, role="judge", phase="judge", round=0),
+        "usage": usage,
     }
 
 
@@ -542,9 +621,31 @@ async def finalize(state: DebateState, config: RunnableConfig) -> dict[str, Any]
         "usage": state.get("usage", []),
         "usage_summary": summarize_usage(state.get("usage", [])),
     }
+    # The questions worth exploring next, as nodes. A separate small call rather than more work for the judge: the judge
+    # is already the longest call in the run and has produced self-contradictory output when overloaded. Best-effort --
+    # a brain without the method, or a reply that cannot be read, simply yields no branches and never fails a debate.
+    branches: list[dict[str, Any]] = []
+    branch_usage: list[dict[str, Any]] = []
+    argued = any(t["phase"] != "research" for t in state.get("turns", []))
+    if argued and d.max_branches > 0 and hasattr(d.brain, "propose_branches"):
+        try:
+            got, bu = await d.brain.propose_branches(
+                payload["proposition"], payload["summary"], open_questions(payload["final_output"]),
+                payload.get("verdict_flips_if") or [], payload.get("strongest_counterpoints") or [],
+                max_branches=d.max_branches,
+            )
+            branches = to_rows(assign_ids(got))
+            branch_usage = usage_record(bu, role="judge", phase="branches", round=0)
+        except Exception:
+            branches = []
+    payload["branches"] = branches
+    if branch_usage:
+        payload["usage"] = (payload.get("usage") or []) + branch_usage
+        payload["usage_summary"] = summarize_usage(payload["usage"])
+
     node_id = await d.writer.create_result(did, payload)
-    await d.emitter.emit("completed", {"node_id": node_id}, key=f"completed:{did}")
-    return {"result_node_id": node_id}
+    await d.emitter.emit("completed", {"node_id": node_id, "branches": len(branches)}, key=f"completed:{did}")
+    return {"result_node_id": node_id, "usage": branch_usage}
 
 
 def build_graph(checkpointer: Any) -> Any:

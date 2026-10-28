@@ -32,6 +32,18 @@ Parameters:
     Default: low
     AllowedValues: [low, medium, high]
     Description: Reasoning effort sent to OpenRouter (matches DEBATE_REASONING_EFFORT locally)
+  JudgeSamples:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 5
+    Description: How many times the judge runs per debate (A/B labels swapped between runs, combined in code). 1 is a single call. Each extra run costs about $0.004 and runs in parallel.
+  MaxBranches:
+    Type: Number
+    Default: 4
+    MinValue: 0
+    MaxValue: 8
+    Description: How many "explore this next" questions a finished debate proposes (0 turns branching off). One extra cheap model call per debate.
   WorkerMaxConcurrency:
     Type: Number
     Default: 5
@@ -55,6 +67,8 @@ Globals:
         DEBATE_QUEUE_URL: !Ref DebateQueue
         DEBATE_DB_DRIVER: psycopg
         DEBATE_REASONING_EFFORT: !Ref ReasoningEffort
+        DEBATE_JUDGE_SAMPLES: !Ref JudgeSamples
+        DEBATE_MAX_BRANCHES: !Ref MaxBranches
 
 Resources:
   DebateDlq:

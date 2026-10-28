@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..assign import assign_models
+from ..branching import branch_chats
 from . import store
 from .db import tx
 from .queue import Enqueuer
@@ -51,7 +52,11 @@ ResolveTarget = Callable[[str, str, str], Awaitable[WriteTarget]]
 class DebateSettings:
     allowed_models: list[ModelOption]
     judges: list[JudgeOption]
-    max_active_per_user: int = 2
+    # Debates waiting on a user's answer count towards this, and they can wait up to debates.expires_at (7 days), so the
+    # cap is really "how many unanswered debates one person may have parked". 5 leaves room for agent-started debates
+    # alongside the user's own without a 429. Each running debate holds one Lambda, bounded separately by the queue's
+    # MaximumConcurrency, so raising this does not raise peak concurrency.
+    max_active_per_user: int = 5
     dev: bool = False
     rng: random.Random = field(default_factory=random.SystemRandom)  # side assignment when two models are sent
     default_model: Optional[str] = None  # shown to the frontend as the preselected model
@@ -109,6 +114,15 @@ class StartBody(BaseModel):
 class AnswerBody(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
     skip: bool = False
+
+
+class BranchSelectBody(BaseModel):
+    selected: list[str] = Field(default_factory=list, max_length=20)
+
+
+class BranchCreateBody(BaseModel):
+    # Which branches to turn into nodes. Omitted or empty means "the ones already ticked".
+    ids: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ControlBody(BaseModel):
@@ -228,6 +242,44 @@ def build_router(
             raise HTTPException(404, "no debate result for this node")
         r = {k: (str(v) if k in ("node_id", "debate_id") else float(v) if k in ("confidence", "cost_usd") else v) for k, v in r.items()}
         return r
+
+    @router.patch("/node/{node_id}/branches", status_code=200)
+    async def select_branches(node_id: str, body: BranchSelectBody, user: str = Depends(current_user)) -> dict[str, Any]:
+        """Tick or untick the branches on a debate node. The full selection is sent each time, not a delta."""
+        if not _is_uuid(node_id):
+            raise HTTPException(404, "no debate result for this node")
+        try:
+            async with tx(factory, user_id=user) as s:
+                out = await store.set_branch_selection(s, node_id, body.selected)
+        except store.StateError as e:
+            raise HTTPException(404 if "no debate result" in str(e) else 422, str(e))
+        return {"branches": out["branches"]}
+
+    @router.post("/node/{node_id}/branches", status_code=201)
+    async def create_branches(node_id: str, body: BranchCreateBody, user: str = Depends(current_user)) -> dict[str, Any]:
+        """Turn the chosen branches into nodes.
+
+        Each new node's parent is the node the DEBATE STARTED FROM, so the branches are siblings of the debate node and
+        of each other. Context is the lineage through parent_id, so a branch can never see another branch; what it does
+        need from the debate travels in its own seeded chats, with the other branch directions stripped out
+        (debate/branching.py). Idempotent: a branch that already has a node returns it rather than making a second one.
+        """
+        if not _is_uuid(node_id):
+            raise HTTPException(404, "no debate result for this node")
+        try:
+            async with tx(factory, user_id=user) as s:
+                ids = body.ids
+                if not ids:
+                    cur = await store.get_result_by_node(s, node_id)
+                    if cur is None:
+                        raise store.StateError("no debate result for this node")
+                    ids = [b["id"] for b in (cur.get("branches") or []) if b.get("selected")]
+                if not ids:
+                    raise HTTPException(422, "no branches chosen")
+                out = await store.create_branch_nodes(s, node_id, user, ids, branch_chats)
+        except store.StateError as e:
+            raise HTTPException(404 if "no debate result" in str(e) else 422, str(e))
+        return out
 
     @router.get("/{debate_id}")
     async def get(debate_id: str, user: str = Depends(current_user)) -> dict[str, Any]:

@@ -115,6 +115,24 @@ class FrameResult(BaseModel):
     usage: Optional[Usage] = None
 
 
+class Branch(BaseModel):
+    """One direction worth exploring next, as a node the map can actually hold.
+
+    `verdict_flips_if` already said what would change the answer, but as findings ("a controlled study found X"), which
+    is not something anyone can click or an agent can act on. A Branch is the same insight turned into a question, with
+    a title short enough for a node and a `kind` that says how to explore it. The id and the context seed are assigned
+    in code, never by the model: see debate.branching.
+    """
+    id: str = ""
+    title: str  # the node's name on the map; short
+    question: str  # what the user reads beside the checkbox, and what the new node is seeded to explore
+    why: str  # one line, from the debate, so the branch is traceable to the argument
+    kind: Literal["research", "debate", "open"] = "research"
+    # research: go find evidence. debate: this sub-question is itself contested, worth its own debate.
+    # open: a judgement call no evidence will settle, worth thinking through.
+    from_claims: list[str] = Field(default_factory=list)
+
+
 class JudgeVerdict(BaseModel):
     winner: Literal["A", "B", "none"]
     would_have_chosen: Literal["A", "B", "none"]
