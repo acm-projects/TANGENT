@@ -18,3 +18,4 @@ runs/
 samconfig.toml
 __pycache__/
 .pytest_cache/
+.playwright-mcp/
