@@ -42,6 +42,9 @@ class Brain(Protocol):
     # sink (a streaming.StreamSink) is passed only when token streaming is on; a brain may ignore it.
     async def step(self, ctx: AgentContext, sink: Optional[Any] = None) -> AgentAction: ...
     async def judge(self, view: JudgeView, fixed_winner: Optional[str], sink: Optional[Any] = None) -> JudgeVerdict: ...
+    # Optional. Reads a finished verdict and reports what it concludes about the proposition:
+    # "supported" | "not_supported" | "neither". A brain that does not implement it disables the check.
+    # async def check_conclusion(self, proposition: str, text: str) -> tuple[str, Optional[Usage]]: ...
 
 
 class Search(Protocol):
@@ -83,4 +86,6 @@ class Deps:
     ask_cap: int = 2
     search_cap: int = 4
     search_batch_max: int = 2  # queries per search call, so one search is always left to follow up on what came back
+    max_branches: int = 5  # questions proposed for exploring next; 0 turns branch proposals off entirely
+    judge_samples: int = 1  # independent judge runs (A/B swapped between them) combined in code; see scoring.combine_samples
     turn_step_cap: int = 12  # counts thoughts and search results: 4 searches in 2 batches use 6, plus up to 2 asks

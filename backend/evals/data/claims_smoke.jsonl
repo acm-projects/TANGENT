@@ -1,0 +1,11 @@
+# SMOKE TEST ONLY. These are settled, easy claims: every arm should get nearly all of them right, so they show that the
+# pipeline works but say nothing about whether debate helps. For real numbers use SciFact:
+#   python3 scripts/compare_arms.py --fetch-scifact evals/data/scifact
+{"id": "s1", "text": "Antibiotics are an effective treatment for the common cold.", "label": "false"}
+{"id": "s2", "text": "Smoking tobacco increases the risk of lung cancer.", "label": "true"}
+{"id": "s3", "text": "The MMR vaccine causes autism.", "label": "false"}
+{"id": "s4", "text": "Regular physical activity lowers the risk of cardiovascular disease.", "label": "true"}
+{"id": "s5", "text": "Sugar intake causes hyperactivity in children.", "label": "false"}
+{"id": "s6", "text": "Cracking your knuckles causes arthritis.", "label": "false"}
+{"id": "s7", "text": "Statins reduce the risk of major cardiovascular events in people who already have cardiovascular disease.", "label": "true"}
+{"id": "s8", "text": "Humans use only about 10 percent of their brains.", "label": "false"}

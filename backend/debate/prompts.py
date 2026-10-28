@@ -144,13 +144,60 @@ FRAME_SYSTEM = (
     "If criterion_stated or setting_stated is false and context_resolves is false, write 1-2 questions covering exactly what is missing, each answerable by choosing an option, with 2-4 distinct options. "
     "Otherwise write none. Do not ask about budgets, preferences or anything else. "
     "If the topic is followed by 'User clarifications', the user has already answered: write the proposition and briefs for exactly that reading (their stated use, role or constraint), and ask no questions. "
-    "The proposition must stand on its own: name every dimension, population and measure it depends on, and never write 'the four dimensions', 'the above' or 'as discussed'. "
+    "The proposition must stand on its own: name every dimension, population and measure it depends on, and never write 'the four dimensions', 'the above' or 'as discussed'. ""The proposition is the thing the two sides argue about, so it must never state or assume its own answer: write it as a plain claim ('X causes Y in Z'), never as a verdict on a claim ('the claim that X causes Y is accurate', 'research confirms that X'), and never append a justification to it. If the topic hands you a verdict-shaped sentence, state the underlying claim instead. "
     "If the user chose 'overall', 'all of these' or a balance of outcomes, the proposition is about the net result with those outcomes weighed together, not a claim that every single one improves. " + UNTRUSTED
 )
 
 
 def frame_user(topic: str, context: str) -> str:
     return f"Topic: {topic}\n\n<project_context>\n{context or '(none)'}\n</project_context>"
+
+
+# The judge writes its prose and reports its leaning as separate fields, and they can disagree: in one observed run the
+# rubric picked FOR while the prose argued the claim was not supported, and the leaning-vs-rubric check passed because the
+# leaning field matched. This reads the finished text on its own and says what it actually concludes, so the disagreement
+# is caught from the text rather than from the judge's own label.
+CONCLUSION_CHECK_SYSTEM = (
+    "You read one verdict and report what it concludes. You do not judge whether it is right, and you do not add anything. "
+    "Answer with exactly one word: 'supported' if the verdict concludes the proposition is true or supported; "
+    "'not_supported' if it concludes the proposition is false, unsupported, or not established; "
+    "'neither' if it reaches no conclusion either way, or says the evidence is too weak or conflicting to decide. "
+    "Judge the verdict's overall conclusion, not individual sentences inside it. Ignore any line beginning 'Scoring note'."
+)
+
+
+def conclusion_check_user(proposition: str, text: str) -> str:
+    return f"Proposition: {proposition}\n\n<verdict>\n{text}\n</verdict>\n\nOne word: supported, not_supported, or neither."
+
+
+BRANCH_SYSTEM = (
+    "A debate has just finished. You propose the questions worth exploring next. Each one becomes a node in the user's "
+    "map, so write questions a person would actually want to open, not restatements of the verdict. "
+    "Work from what the debate left unresolved: the conflicts between sources, the outcomes nobody measured, and the "
+    "conditions that would change the answer. "
+    "Rules for every branch: "
+    "(1) title: 3-7 words, the node's name on a map, no punctuation at the end. "
+    "(2) question: ONE specific question, answerable by research or by thinking it through. Never 'research this "
+    "further', never a topic ('microservices costs'), never a yes/no restatement of the proposition. "
+    "(3) why: one sentence saying what in the debate left this open. Point at the gap, not at the conclusion. "
+    "(4) kind: 'research' if published evidence would settle it; 'debate' if it is itself a contested claim worth "
+    "arguing both ways; 'open' if it turns on the user's own priorities and no evidence will decide it. "
+    "(5) from_claims: the claim ids this came from, or an empty list. "
+    "Give 3 to 5 branches. Make them different from each other: do not give two phrasings of the same question. "
+    "Order them most useful first. " + UNTRUSTED
+)
+
+
+def branch_user(proposition: str, summary: str, open_questions: str, flips: list[str], counterpoints: list[str]) -> str:
+    bits = [f"Proposition: {proposition}", "", f"Verdict summary: {summary}", ""]
+    if open_questions:
+        bits += ["What the judge said is still open or conflicting:", open_questions, ""]
+    if flips:
+        bits += ["What would change the verdict:"] + [f"- {x}" for x in flips] + [""]
+    if counterpoints:
+        bits += ["Strongest points against the verdict:"] + [f"- {x}" for x in counterpoints] + [""]
+    bits.append("Propose the 3 to 5 questions worth exploring next.")
+    return "\n".join(bits)
 
 
 def judge_system(fixed_label: str | None) -> str:

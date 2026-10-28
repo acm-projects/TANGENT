@@ -45,8 +45,10 @@ CREATE TYPE debate_event_type AS ENUM (
     'verdict_ready',
     'completed',
     'failed',
-    'cancelled'
+    'cancelled',
+    'token'
 );
+-- Existing database: ALTER TYPE debate_event_type ADD VALUE IF NOT EXISTS 'token';
 
 CREATE TABLE debates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -223,6 +225,34 @@ CREATE POLICY debate_results_select_access ON debate_results
 
 CREATE POLICY debate_results_insert_owner ON debate_results
     FOR INSERT
+    WITH CHECK (EXISTS (
+        SELECT 1 FROM projects p
+        WHERE p.id = debate_results.project_id
+          AND p.created_by_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+    ));
+
+-- Branch directions: the questions a finished debate proposes for exploring next.
+ALTER TABLE debate_results ADD COLUMN IF NOT EXISTS branches jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+COMMENT ON COLUMN debate_results.branches IS
+    'Questions worth exploring next: [{id,title,question,why,kind,from_claims,selected,created_node_id}]. '
+    'A selected branch becomes a node whose parent is the node the debate started from, never the debate node, '
+    'so sibling branches never share a lineage and cannot see each other.';
+
+-- Marks a node as having come from a debate, so the map can trace it back. Nullable: ordinary nodes have none.
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS branch_of_debate_id uuid REFERENCES debates(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS nodes_branch_of_debate_id_idx
+    ON nodes (branch_of_debate_id) WHERE branch_of_debate_id IS NOT NULL;
+
+-- Ticking a branch and recording the node it produced are UPDATEs on an existing row. Without this policy every
+-- branch write fails closed under RLS, so it must exist wherever `branches` does.
+CREATE POLICY debate_results_update_owner ON debate_results
+    FOR UPDATE
+    USING (EXISTS (
+        SELECT 1 FROM projects p
+        WHERE p.id = debate_results.project_id
+          AND p.created_by_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+    ))
     WITH CHECK (EXISTS (
         SELECT 1 FROM projects p
         WHERE p.id = debate_results.project_id

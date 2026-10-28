@@ -17,6 +17,7 @@ from .streaming import FieldTap
 from .schemas import (
     AgentAction,
     AskAction,
+    Branch,
     Claim,
     FinishAction,
     FrameResult,
@@ -457,6 +458,29 @@ def parse_action(ctx: AgentContext, message: dict[str, Any]) -> AgentAction:
     )
 
 
+BRANCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "branches": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "question": {"type": "string"},
+                    "why": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["research", "debate", "open"]},
+                    "from_claims": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["title", "question", "why", "kind", "from_claims"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["branches"],
+    "additionalProperties": False,
+}
+
 FRAME_SCHEMA = {
     "type": "object",
     "properties": {
@@ -637,6 +661,50 @@ class OpenRouterBrain:
             max_tokens=3000,
         )
         return out.model_copy(update={"usage": usage})
+
+    async def propose_branches(
+        self, proposition: str, summary: str, open_questions: str, flips: list[str], counterpoints: list[str],
+        max_branches: int = 5,
+    ) -> tuple[list[Branch], Optional[Usage]]:
+        """The questions worth exploring next, as nodes. Ids and context seeds are assigned in code, not here."""
+        def parse(r: ChatResult) -> list[Branch]:
+            d = lenient_loads(r.message.get("content") or "")
+            out: list[Branch] = []
+            for b in d["branches"][:max_branches]:
+                kind = str(b.get("kind", "research")).strip().lower()
+                out.append(Branch(
+                    title=str(b["title"]).strip().rstrip(".")[:70],
+                    question=str(b["question"]).strip(),
+                    why=str(b["why"]).strip(),
+                    kind=kind if kind in ("research", "debate", "open") else "research",
+                    from_claims=[str(x).strip().upper() for x in (b.get("from_claims") or [])][:6],
+                ))
+            if not out:
+                raise ValueError("no branches")
+            return out
+
+        out, usage = await self._structured(
+            self.judge_model,
+            prompts.BRANCH_SYSTEM,
+            prompts.branch_user(proposition, summary, open_questions, flips, counterpoints),
+            parse,
+            response_format=_json_format("debate_branches", BRANCH_SCHEMA),
+            max_tokens=2000,
+        )
+        return out, usage
+
+    async def check_conclusion(self, proposition: str, text: str) -> tuple[str, Optional[Usage]]:
+        """What the finished verdict actually concludes, read independently of the judge's own leaning field."""
+        res = await self.client.chat(
+            model=self.judge_model, max_tokens=200,
+            messages=[{"role": "system", "content": prompts.CONCLUSION_CHECK_SYSTEM},
+                      {"role": "user", "content": prompts.conclusion_check_user(proposition, text)}],
+        )
+        word = (res.message.get("content") or "").strip().lower()
+        for k in ("not_supported", "not supported", "supported", "neither"):
+            if k in word:
+                return ("not_supported" if k.startswith("not") else k), res.usage
+        return "unreadable", res.usage
 
     async def judge(self, view: JudgeView, fixed_winner: Optional[str], sink: Optional[Any] = None) -> JudgeVerdict:
         extra = {"tap": FieldTap("final_output", sink, "content")} if sink is not None else {}

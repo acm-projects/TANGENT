@@ -411,6 +411,12 @@ def print_result(c: httpx.Client, base: str, headers: dict[str, str], node_id: s
             print(f"           {(rub.get('notes') or {}).get(side, '')}")
     if rub:
         print(f"  lead {rub.get('gap')} (needs {rub.get('margin')}), claim coverage {rub.get('coverage')}, verified citations {rub.get('verified_share')}")
+        if rub.get("judge_samples"):
+            print(f"  judge ran {rub['judge_samples']}x, agreement {rub.get('agreement')}", end="")
+            if rub.get("prose_conclusion"):
+                flag = "" if rub.get("prose_matches_winner") else ("  (CONTRADICTS the totals)" if rub.get("prose_contradicts_winner") else "  (no conclusion of its own)")
+                print(f", written verdict reads as {rub['prose_conclusion']}{flag}", end="")
+            print()
     print(f"Judge       : {v.get('judge_model')}")
     print(f"\nSummary: {v.get('summary')}")
     for k, title in (("strongest_counterpoints", "Strongest counterpoints"), ("verdict_flips_if", "Verdict flips if")):
@@ -418,6 +424,20 @@ def print_result(c: httpx.Client, base: str, headers: dict[str, str], node_id: s
             print(f"\n{title}:")
             for x in v[k]:
                 print(f"  - {x}")
+    branches = v.get("branches") or []
+    if branches:
+        kind_word = {"research": "find evidence", "debate": "worth its own debate", "open": "a judgement call"}
+        print("\nWhere to go next (tick these to spawn sibling nodes under the node this debate started from):")
+        for b in branches:
+            mark = "x" if b.get("selected") else " "
+            made = f"  -> node {b['created_node_id']}" if b.get("created_node_id") else ""
+            print(f"  [{mark}] {b['id']}  {b['title']}  ({kind_word.get(b.get('kind'), b.get('kind'))}){made}")
+            print(f"        {b['question']}")
+            print(f"        why: {b['why']}")
+        print(f"\n  Tick:   curl -X PATCH $API/debates/node/{node_id}/branches -H \"Authorization: Bearer $TOKEN\" "
+              f"-H 'content-type: application/json' -d '{{\"selected\":[\"b1\",\"b2\"]}}'")
+        print(f"  Create: curl -X POST  $API/debates/node/{node_id}/branches -H \"Authorization: Bearer $TOKEN\" "
+              f"-H 'content-type: application/json' -d '{{\"ids\":[\"b1\",\"b2\"]}}'")
     print(f"\nCitations stored: {len(v.get('citations') or [])}   result node: {node_id}")
     print()
     for line in usage_lines(v):
