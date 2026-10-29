@@ -26,25 +26,25 @@ class AvailableModel(BaseModel):
 
 AVAILABLE_MODELS: list[AvailableModel] = [
     AvailableModel(
-        id="nvidia/nemotron-3-ultra-550b-a55b:free",
-        name="Nemotron 3 Ultra",
-        description="Large text model with a 1M-token context window (best)",
+        id="nvidia/nemotron-3.5-lightning:free",
+        name="Lite",
+        description="Fast text model with a 1M-token context window",
         supports_images=False,
         context_length=1_000_000,
     ),
     AvailableModel(
         id="nvidia/nemotron-3.5-super-vl:free",
-        name="Nemotron 3.5 Super VL",
-        description="General-purpose model that allow inputs of text, images, and video with a 1M-token context window",
+        name="Balanced",
+        description="General-purpose model for text, images, and video with a 1M-token context window",
         supports_images=True,
         context_length=1_000_000,
     ),
     AvailableModel(
-        id="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        name="Nemotron 3 Nano Omni",
-        description="Model that accepts text, image, video, and audio inputs with 256K-token context window",
+        id="nvidia/nemotron-3-ultra-550b-a55b:free",
+        name="Heavy",
+        description="Multimodal model for text, images, video, and audio with a 1.05M-token context window",
         supports_images=True,
-        context_length=256_000,
+        context_length=1_050_000,
     ),
 ]
 
