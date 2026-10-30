@@ -158,7 +158,7 @@ export function useChat() {
       const projectId = useTreeStore.getState().nodesById[nodeId]?.project_id;
       if (!projectId) return;
       try {
-        await uploadAttachments(api.sources, projectId, files);
+        await uploadAttachments(api.sources, projectId, nodeId, files);
       } catch (e) {
         setError(apiErrorMessage(e, "Could not attach the file; nothing was sent."));
         return;

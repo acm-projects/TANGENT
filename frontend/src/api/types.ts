@@ -174,6 +174,10 @@ export interface Source {
   /** "pdf", or "link" for a Semantic Scholar paper with no open PDF. */
   kind: AttachmentKind;
   origin: "upload" | "s2";
+  /** Node-scoped uploads are visible from their node and descendants; other sources are project-level. */
+  scope: "global" | "node";
+  /** Owning node for node-level uploads; null for global sources. */
+  node_id: string | null;
   /** Where a Semantic Scholar paper opens. Null for uploads: their bytes come from `api.sources.file`. */
   url: string | null;
   /** Thumbnail URL, or null to show the kind's icon instead. */

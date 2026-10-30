@@ -72,7 +72,9 @@ class AgentReply(BaseModel):
     model: str
 
 
-async def _run(call: dict, project_id: UUID, user_id: UUID, model: str) -> tuple[dict, dict]:
+async def _run(
+    call: dict, project_id: UUID, user_id: UUID, model: str, node_id: UUID | None = None
+) -> tuple[dict, dict]:
     """One tool call from the model -> (its arguments, its result). Failures become results the model can read."""
     try:
         args = json.loads(call["function"]["arguments"] or "{}")
@@ -81,7 +83,9 @@ async def _run(call: dict, project_id: UUID, user_id: UUID, model: str) -> tuple
     try:
         name = call["function"]["name"]
         timeout = ASK_TIMEOUT if name == "ask_node" else TOOL_TIMEOUT
-        return args, await asyncio.wait_for(tools.call_tool(name, args, project_id, user_id, model), timeout)
+        return args, await asyncio.wait_for(
+            tools.call_tool(name, args, project_id, user_id, model, node_id), timeout
+        )
     except asyncio.TimeoutError:
         return args, {"error": "The tool timed out."}
 
@@ -124,7 +128,7 @@ async def agent_chat(
             if i >= MAX_CALLS_PER_ROUND:
                 args, result = {}, {"error": f"At most {MAX_CALLS_PER_ROUND} tool calls at once; this one was skipped."}
             else:
-                args, result = await _run(call, project_id, user_id, req.model)
+                args, result = await _run(call, project_id, user_id, req.model, req.active_node_id)
             logged.append(ToolCallLog(name=call["function"]["name"], arguments=args, result=result))
             convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, default=str)})
 

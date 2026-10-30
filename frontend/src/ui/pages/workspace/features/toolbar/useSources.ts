@@ -4,7 +4,7 @@ import type { Source } from "@/api/types";
 
 /* The project's uploaded PDFs, for the Sources panel. */
 
-export function useSources(projectId: string) {
+export function useSources(projectId: string, nodeId: string | null) {
   const [sources, setSources] = useState<Source[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -12,7 +12,7 @@ export function useSources(projectId: string) {
   useEffect(() => {
     let cancelled = false;
     api.sources
-      .list(projectId)
+      .list(projectId, nodeId)
       .then((list) => {
         if (!cancelled) setSources(list);
       })
@@ -22,14 +22,14 @@ export function useSources(projectId: string) {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, nodeId]);
 
   async function add(files: File[]) {
     setUploading(true);
     setError(null);
     try {
       for (const file of files) {
-        const source = await api.sources.add(projectId, file);
+        const source = await api.sources.add(projectId, file, nodeId ?? undefined);
         setSources((prev) => [...(prev ?? []), source]);
       }
     } catch {
@@ -52,7 +52,7 @@ export function useSources(projectId: string) {
       return;
     }
     try {
-      const url = URL.createObjectURL(await api.sources.file(projectId, source.id));
+      const url = URL.createObjectURL(await api.sources.file(projectId, source.id, nodeId ?? source.node_id ?? undefined));
       tab.location.href = url;
       setTimeout(() => URL.revokeObjectURL(url), 60_000); // the tab has loaded it by then
     } catch {

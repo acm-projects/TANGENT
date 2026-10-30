@@ -64,8 +64,9 @@ _ADDED_COLUMNS = [
     """CREATE TABLE IF NOT EXISTS papers (
         id bigserial PRIMARY KEY,
         source text NOT NULL,                  -- 's2' | 'upload'
-        source_id text NOT NULL,               -- S2 paperId, or '{project_id}:{sha256}' for uploads
+        source_id text NOT NULL,               -- S2 paperId, or '{project_id}:{node_id}:{sha256}' for uploads
         project_id uuid REFERENCES projects(id) ON DELETE CASCADE,  -- uploads only; S2 papers are global
+        node_id uuid REFERENCES nodes(id) ON DELETE CASCADE,  -- upload scope: this node and its descendants
         title text NOT NULL,
         authors jsonb NOT NULL DEFAULT '[]'::jsonb,
         year int,
@@ -84,6 +85,7 @@ _ADDED_COLUMNS = [
         updated_at timestamptz NOT NULL DEFAULT now(),
         UNIQUE (source, source_id)
     )""",
+    "ALTER TABLE papers ADD COLUMN IF NOT EXISTS node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
     "CREATE INDEX IF NOT EXISTS papers_search_tsv_idx ON papers USING gin (search_tsv)",
     """CREATE TABLE IF NOT EXISTS paper_files (
         sha256 text PRIMARY KEY,

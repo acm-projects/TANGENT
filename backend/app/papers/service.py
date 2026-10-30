@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 MAX_SEARCH = 10
 MAX_EVIDENCE = 10
 MAX_EVIDENCE_TOKENS = 4000
-MAX_WAIT_SECONDS = 25
+MAX_WAIT_SECONDS = 60
 ABSTRACT_PREVIEW = 300
 
 RESEARCH_SYSTEM_PROMPT = (
@@ -179,14 +179,24 @@ def sources_note(rows) -> str:
     )
 
 
-async def project_sources_note(project_id: UUID) -> str:
+async def project_sources_note(project_id: UUID, node_id: UUID | None = None) -> str:
     """sources_note for this project's uploads (at most 20). Best effort: a failed lookup only leaves it out."""
     try:
         async with database.AsyncSessionLocal() as db:
             rows = (await db.execute(text("""
-                SELECT id, title, status, pdf_url, pdf_sha256 FROM papers
-                WHERE source = 'upload' AND project_id = :p ORDER BY created_at, id LIMIT 20
-            """), {"p": project_id})).mappings().all()
+                WITH RECURSIVE ancestors(id) AS (
+                    SELECT CAST(:node AS uuid)
+                    UNION
+                    SELECT n.parent_id FROM nodes n JOIN ancestors a ON n.id = a.id
+                    WHERE n.parent_id IS NOT NULL
+                )
+                        SELECT p.id, p.title, p.status, p.pdf_url, p.pdf_sha256 FROM papers p
+                        WHERE p.source = 'upload' AND p.project_id = :p
+                          AND (p.node_id IS NULL OR :node IS NULL OR EXISTS (
+                              SELECT 1 FROM ancestors a WHERE a.id = p.node_id
+                          ))
+                ORDER BY created_at, id LIMIT 20
+            """), {"p": project_id, "node": node_id})).mappings().all()
     except Exception:
         log.exception("listing uploads for project %s failed", project_id)
         return ""
@@ -235,20 +245,33 @@ async def _upsert_s2(db, meta: dict):
     return (await db.execute(_UPSERT_S2, {**meta, "authors": json.dumps(meta["authors"])})).mappings().one()
 
 
-async def _load(db, paper_id: int, project_id: UUID | None):
+async def _load(db, paper_id: int, project_id: UUID | None, node_id: UUID | None = None):
     """A paper this project may see: any S2 paper, or an upload to this project."""
     return (await db.execute(
-        text("SELECT * FROM papers WHERE id = :id AND (project_id IS NULL OR project_id = CAST(:pid AS uuid))"),
-        {"id": paper_id, "pid": str(project_id) if project_id else None},
+        text("""
+            WITH RECURSIVE ancestors(id) AS (
+                SELECT CAST(:node AS uuid)
+                UNION
+                SELECT n.parent_id FROM nodes n JOIN ancestors a ON n.id = a.id
+                WHERE n.parent_id IS NOT NULL
+            )
+            SELECT * FROM papers
+            WHERE id = :id
+              AND (source = 's2' OR (
+                   project_id = CAST(:pid AS uuid)
+                   AND (node_id IS NULL OR :node IS NULL OR node_id IN (SELECT id FROM ancestors))
+              ))
+        """),
+        {"id": paper_id, "pid": str(project_id) if project_id else None, "node": node_id},
     )).mappings().first()
 
 
-async def resolve(ref: str, project_id: UUID | None):
+async def resolve(ref: str, project_id: UUID | None, node_id: UUID | None = None):
     """'p12' -> registry row. Any other ref is an S2 id: registry first, then S2 (and upsert). None if unknown."""
     ref = (ref or "").strip()
     async with database.AsyncSessionLocal() as db:
         if m := _PAPER_REF.fullmatch(ref):
-            return await _load(db, int(m.group(1)), project_id)
+            return await _load(db, int(m.group(1)), project_id, node_id)
         kind, _, value = ref.partition(":")
         if kind.upper() == "DOI" and value:
             where, v = "lower(doi) = :v", value.lower()
@@ -269,7 +292,7 @@ async def resolve(ref: str, project_id: UUID | None):
         return row
 
 
-async def project_sources(db, project_id: UUID) -> tuple[list, dict[int, int]]:
+async def project_sources(db, project_id: UUID, node_id: UUID | None = None) -> tuple[list, dict[int, int]]:
     """A project's sources: its uploads, and each Semantic Scholar paper that an assistant reply in the project
     mentions. Searching or reading a paper does not list it; being referenced does. Also returns, per paper id,
     the number of replies that mention it (a reply cites a source as "[p38:c0]" or just "p38"; once however often).
@@ -283,10 +306,20 @@ async def project_sources(db, project_id: UUID) -> tuple[list, dict[int, int]]:
         GROUP BY 1
     """), {"p": project_id})).all())
     rows = (await db.execute(text("""
-        SELECT * FROM papers
-        WHERE (source = 'upload' AND project_id = :p) OR (source = 's2' AND id = ANY(CAST(:ids AS bigint[])))
-        ORDER BY created_at, id
-    """), {"p": project_id, "ids": list(cited)})).mappings().all()
+        WITH RECURSIVE ancestors(id) AS (
+            SELECT CAST(:node AS uuid)
+            UNION
+            SELECT n.parent_id FROM nodes n JOIN ancestors a ON n.id = a.id
+            WHERE n.parent_id IS NOT NULL
+        )
+        SELECT p.* FROM papers p
+        WHERE (p.source = 'upload' AND p.project_id = :p
+               AND (p.node_id IS NULL OR :node IS NULL OR EXISTS (
+                   SELECT 1 FROM ancestors a WHERE a.id = p.node_id
+               )))
+           OR (p.source = 's2' AND p.id = ANY(CAST(:ids AS bigint[])))
+        ORDER BY p.created_at, p.id
+    """), {"p": project_id, "node": node_id, "ids": list(cited)})).mappings().all()
     return list(rows), cited
 
 
@@ -341,7 +374,7 @@ async def ensure_ingest(row) -> None:
 
 # --- tools ----------------------------------------------------------------------------------------------
 
-async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID | None = None) -> dict:
+async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID | None = None, node_id: UUID | None = None) -> dict:
     query = (query or "").strip()
     if not query:
         return {"error": "query is empty"}
@@ -351,12 +384,19 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
         rows = list((await db.execute(text("""
             SELECT * FROM papers, plainto_tsquery('english', :q) AS q
             WHERE search_tsv @@ q
-              AND (project_id IS NULL OR project_id = CAST(:pid AS uuid))
+              AND (source = 's2' OR (project_id = CAST(:pid AS uuid) AND
+                   (node_id IS NULL OR :node IS NULL OR node_id IN (
+                       WITH RECURSIVE ancestors(id) AS (
+                           SELECT CAST(:node AS uuid)
+                           UNION SELECT n.parent_id FROM nodes n JOIN ancestors a ON n.id = a.id
+                           WHERE n.parent_id IS NOT NULL
+                       ) SELECT id FROM ancestors
+                   ))))
               AND (CAST(:year AS int) IS NULL OR year >= CAST(:year AS int))
             ORDER BY ts_rank_cd(search_tsv, q)
                      * CASE WHEN pdf_url IS NOT NULL OR pdf_sha256 IS NOT NULL THEN 1.5 ELSE 1 END DESC
             LIMIT :limit
-        """), {"q": query, "pid": str(project_id) if project_id else None, "year": year, "limit": limit})).mappings())
+        """), {"q": query, "pid": str(project_id) if project_id else None, "node": node_id, "year": year, "limit": limit})).mappings())
         if len(rows) >= limit:
             log.info("papers search cache hit q=%r local=%d", query, len(rows))
             await db.commit()
@@ -377,16 +417,16 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
     return {"results": [_summary(r) for r in rows]}
 
 
-async def get_paper(paper: str, *, project_id: UUID | None = None) -> dict:
+async def get_paper(paper: str, *, project_id: UUID | None = None, node_id: UUID | None = None) -> dict:
     try:
-        row = await resolve(paper, project_id)
+        row = await resolve(paper, project_id, node_id)
     except s2.S2Error as exc:
         return {"error": str(exc)}
     if row is None:
         return {"error": f"No paper found for {paper!r}. Use search_papers to find one."}
     await ensure_ingest(row)
     async with database.AsyncSessionLocal() as db:
-        row = await _load(db, row["id"], project_id)
+        row = await _load(db, row["id"], project_id, node_id)
     return {
         **_summary(row),
         "abstract": row["abstract"],
@@ -397,13 +437,14 @@ async def get_paper(paper: str, *, project_id: UUID | None = None) -> dict:
 
 
 async def search_paper_evidence(
-    paper_id: str, query: str, max_results=5, max_tokens=2000, wait_seconds=10, *, project_id: UUID | None = None
+    paper_id: str, query: str, max_results=5, max_tokens=2000, wait_seconds=60, *, project_id: UUID | None = None,
+    node_id: UUID | None = None
 ) -> dict:
     max_results = _clamp(max_results, 5, 1, MAX_EVIDENCE)
     max_tokens = _clamp(max_tokens, 2000, 100, MAX_EVIDENCE_TOKENS)
     wait = _clamp(wait_seconds, 10, 0, MAX_WAIT_SECONDS)
     try:
-        row = await resolve(paper_id, project_id)
+        row = await resolve(paper_id, project_id, node_id)
     except s2.S2Error as exc:
         return {"error": str(exc)}
     if row is None:
@@ -415,7 +456,7 @@ async def search_paper_evidence(
     async with database.AsyncSessionLocal() as db:
         while row["status"] != "ready" and full_text_state(row) == "processing" and loop.time() < deadline:
             await asyncio.sleep(0.5)
-            row = await _load(db, row["id"], project_id)
+            row = await _load(db, row["id"], project_id, node_id)
             await db.rollback()  # end the read so the next poll sees the worker's commit
         if row["status"] != "ready":
             state = full_text_state(row)
@@ -460,15 +501,20 @@ _HANDLERS = {
 }
 
 
-async def call_tool(name: str, args: dict, project_id: UUID | None = None) -> dict:
-    """Run one tool. Never raises: failures come back as {"error": ...} so the conversation carries on."""
+async def call_tool(
+    name: str, args: dict, project_id: UUID | None = None, node_id: UUID | None = None
+) -> dict:
+    """Run one tool, restricted to uploads visible from node_id."""
     handler = _HANDLERS.get(name)
     if handler is None:
         return {"error": f"Unknown tool {name!r}"}
     if not isinstance(args, dict):
         return {"error": "Tool arguments must be a JSON object"}
     try:
-        return await handler(**args, project_id=project_id)
+        context = {"project_id": project_id}
+        if name != "web_search":
+            context["node_id"] = node_id
+        return await handler(**args, **context)
     except TypeError as exc:
         log.warning("bad arguments for %s: %s", name, exc)
         return {"error": f"Bad arguments for {name}: {exc}"}

@@ -287,7 +287,10 @@ async def ask_node(node_id, message, *, project_id: UUID, user_id: UUID, default
     return {"node_id": str(node_pk), "model": model_id, "reply": reply.strip()}
 
 
-async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000, *, project_id: UUID, user_id: UUID) -> dict:
+async def search_sources(
+    query, source_ids=None, max_results=5, max_tokens=2000, *, project_id: UUID, user_id: UUID,
+    node_id: UUID | None = None
+) -> dict:
     query = (query or "").strip()
     if not query:
         return {"error": "query is empty"}
@@ -302,7 +305,7 @@ async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000,
     async with _session(user_id) as db:
         if await db.get(Project, project_id) is None:
             return {"error": "Project not found"}
-        sources, _ = await paper_service.project_sources(db, project_id)  # as the Sources panel lists them
+        sources, _ = await paper_service.project_sources(db, project_id, node_id)
         if wanted is not None:
             unknown = wanted - {s["id"] for s in sources}
             if unknown:
@@ -346,17 +349,25 @@ async def search_sources(query, source_ids=None, max_results=5, max_tokens=2000,
 _HANDLERS = {f.__name__: f for f in (get_node, search_nodes, branch_node, merge_nodes, delete_node, ask_node, search_sources)}
 
 
-async def call_tool(name: str, args: dict, project_id: UUID, user_id: UUID, model: str | None = None) -> dict:
+async def call_tool(
+    name: str, args: dict, project_id: UUID, user_id: UUID, model: str | None = None,
+    node_id: UUID | None = None
+) -> dict:
     """Run one agent tool: graph tools here, anything else is a node tool and goes to papers.service.
     `model` is the one the agent runs on; ask_node uses it for a node that has none yet."""
     handler = _HANDLERS.get(name)
     if handler is None:
-        return await paper_service.call_tool(name, args, project_id)
+        if node_id is None:
+            return await paper_service.call_tool(name, args, project_id)
+        return await paper_service.call_tool(name, args, project_id, node_id)
     if not isinstance(args, dict):
         return {"error": "Tool arguments must be a JSON object"}
     try:
         extra = {"default_model": model} if name == "ask_node" else {}
-        return await handler(**args, project_id=project_id, user_id=user_id, **extra)
+        context = {"project_id": project_id, "user_id": user_id}
+        if name == "search_sources":
+            context["node_id"] = node_id
+        return await handler(**args, **context, **extra)
     except HTTPException as exc:
         return {"error": exc.detail}
     except TypeError as exc:

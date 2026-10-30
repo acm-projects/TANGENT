@@ -97,10 +97,10 @@ _stops: dict[tuple[UUID, UUID], asyncio.Event] = {}
 
 MAX_TOOL_ROUNDS = 4  # model turns that may call research tools; the next one must answer
 MAX_CALLS_PER_ROUND = 5
-TOOL_TIMEOUT = 30  # seconds per tool call; search_paper_evidence waits up to 25 for a PDF
+TOOL_TIMEOUT = 75  # seconds per tool call; search_paper_evidence waits up to 60 for a PDF
 
 
-async def _run_tool(call: dict, project_id: UUID) -> dict:
+async def _run_tool(call: dict, project_id: UUID, node_id: UUID) -> dict:
     """One tool call from the model -> its result. Failures become results the model can read, not errors."""
     name = call["function"]["name"]
     try:
@@ -108,7 +108,14 @@ async def _run_tool(call: dict, project_id: UUID) -> dict:
     except ValueError:
         return {"error": "The tool arguments were not valid JSON."}
     try:
-        return await asyncio.wait_for(paper_service.call_tool(name, args, project_id), TOOL_TIMEOUT)
+        if node_id is None:
+            return await asyncio.wait_for(paper_service.call_tool(name, args, project_id), TOOL_TIMEOUT)
+        try:
+            return await asyncio.wait_for(paper_service.call_tool(name, args, project_id, node_id), TOOL_TIMEOUT)
+        except TypeError as exc:
+            if "positional argument" not in str(exc):
+                raise
+            return await asyncio.wait_for(paper_service.call_tool(name, args, project_id), TOOL_TIMEOUT)
     except asyncio.TimeoutError:
         log.warning("tool %s timed out", name)
         return {"error": "The tool timed out; continue without it and say so."}
@@ -120,6 +127,16 @@ def _sse(event: str, data: dict) -> str:
 
 def _as_list(chats) -> list[dict]:
     return json.loads(chats) if isinstance(chats, str) else list(chats or [])
+
+
+async def _sources_note(project_id: UUID, node_id: UUID) -> str:
+    """Keep integrations that provide the legacy one-argument note hook working."""
+    try:
+        return await paper_service.project_sources_note(project_id, node_id)
+    except TypeError as exc:
+        if "positional argument" not in str(exc):
+            raise
+        return await paper_service.project_sources_note(project_id)
 
 
 async def _load_path(
@@ -590,7 +607,7 @@ async def send_message(
     }
     order = {node.id: (node.created_at, node.id) for node in path}
     plan = build_plan(str(node_id), parents, order)
-    system = paper_service.RESEARCH_SYSTEM_PROMPT + await paper_service.project_sources_note(project_id)
+    system = paper_service.RESEARCH_SYSTEM_PROMPT + await _sources_note(project_id, node_id)
     messages = [{"role": "system", "content": system}] + to_provider_messages(flatten(plan, nodes), prompt)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
@@ -685,7 +702,7 @@ async def send_message(
                             result = {"error": f"At most {MAX_CALLS_PER_ROUND} tool calls at once; this one was skipped."}
                         else:
                             queue.put_nowait(_sse("tool", {"name": call["function"]["name"]}))
-                            result = await _run_tool(call, project_id)
+                            result = await _run_tool(call, project_id, node_id)
                         for ev in result.get("evidence") or []:
                             evidence[ev["evidence_id"]] = {"title": result.get("title"), "pages": ev["pages"]}
                         convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
