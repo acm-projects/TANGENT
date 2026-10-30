@@ -47,7 +47,7 @@ def agent(monkeypatch):
         for event in script.pop(0):
             yield event
 
-    async def fake_call(name, args, project_id, user_id, model=None):
+    async def fake_call(name, args, project_id, user_id, model=None, node_id=None):
         ran.append((name, args, project_id, user_id, model))
         return {"node_id": "new"} if name in ("branch_node", "write_node") else {"error": "boom"}
 
