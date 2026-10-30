@@ -7,6 +7,7 @@ The route functions in nodes_router do the real work, so the agent and the UI ca
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -47,6 +48,13 @@ GRAPH_TOOLS = [
     _tool("branch_node", "Create a new empty child node under a node. The node and its existing branches are untouched.",
           {"node_id": _NODE_ID, "title": {"type": "string", "description": "Optional title for the new branch"}},
           ["node_id"]),
+    _tool("write_node",
+          "Write your own findings into the tree as a new child node under a node: the title is its heading and the "
+          "body (markdown) is the content. Cite evidence ids inline like [p12:c7]. One call per finding. Use this "
+          "for research instead of answering in chat. Project owner only.",
+          {"parent_id": _NODE_ID, "title": {"type": "string", "description": "Heading for the node"},
+           "body": {"type": "string", "description": "The findings, in markdown"}},
+          ["parent_id", "title", "body"]),
     _tool("merge_nodes",
           "Merge 2-8 leaf nodes of one tree into a new node under their nearest common ancestor. The originals "
           "are kept and linked as its sources.",
@@ -215,6 +223,25 @@ async def branch_node(node_id, title=None, *, project_id: UUID, user_id: UUID) -
                 "title": child.title}
 
 
+async def write_node(parent_id, title, body, *, project_id: UUID, user_id: UUID) -> dict:
+    # shortcut: citations stay plain inline [pN:cM] text, nothing checks them against tool results; add if hallucinated ids show up
+    title, body = _title(title), (body or "").strip()
+    if not title or not body or len(body) > 20_000:
+        return {"error": "title is required and body must be 1 to 20000 characters"}
+    async with _session(user_id) as db:
+        parent = await _node(db, parent_id, project_id, user_id)
+        await _require_owner(db, project_id, user_id)
+        now = datetime.now(timezone.utc).isoformat()
+        chats = [{"role": "user", "content": title, "seq": 0, "created_at": now},
+                 {"role": "assistant", "content": body, "seq": 1, "created_at": now}]
+        child = await nodes_router._create_child(
+            db, tree_id=parent.tree_id, project_id=project_id, parent_id=parent.id, user_id=user_id, chats=chats)
+        child.title = title
+        await db.commit()
+        return {"node_id": str(child.id), "parent_id": str(parent.id), "fork_index": child.fork_index,
+                "title": child.title}
+
+
 async def merge_nodes(node_ids, title=None, *, project_id: UUID, user_id: UUID) -> dict:
     if not isinstance(node_ids, list) or not 2 <= len(node_ids) <= 8:
         return {"error": "node_ids must list 2 to 8 node ids"}
@@ -346,7 +373,7 @@ async def search_sources(
     return result
 
 
-_HANDLERS = {f.__name__: f for f in (get_node, search_nodes, branch_node, merge_nodes, delete_node, ask_node, search_sources)}
+_HANDLERS = {f.__name__: f for f in (get_node, search_nodes, branch_node, write_node, merge_nodes, delete_node, ask_node, search_sources)}
 
 
 async def call_tool(

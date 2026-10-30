@@ -17,7 +17,7 @@ export interface AgentTurn {
 
 /** Tools that change the tree or a node's messages: when one succeeds the map must be read again
  *  (that also drops the cached chats, so the node's new exchange is fetched). */
-const EDITS_TREE = new Set(["branch_node", "merge_nodes", "delete_node", "ask_node"]);
+const EDITS_TREE = new Set(["branch_node", "write_node", "merge_nodes", "delete_node", "ask_node"]);
 
 /** Read the tree again after the agent changed it, keeping the selection if that node survived. */
 async function refreshTree(projectId: string) {
