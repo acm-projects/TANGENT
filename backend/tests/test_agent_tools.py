@@ -99,3 +99,41 @@ def test_ask_node_prompts_the_leaf_and_saves_the_exchange(monkeypatch):
     assert sent[0][0][-1] == {"role": "user", "content": "hi"} and sent[0][1] == tools.DEFAULT_MODEL_ID
     assert saved == [(U, node, "hi", "an answer", tools.DEFAULT_MODEL_ID, 7)]
     assert "error" in asyncio.run(tools.call_tool("ask_node", {"node_id": str(node), "message": " "}, P, U))
+
+
+def test_write_node_saves_the_agents_own_text_as_a_child(monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    parent, created = uuid.uuid4(), []
+
+    class Db:
+        async def commit(self):
+            pass
+
+    @asynccontextmanager
+    async def session(user_id):
+        yield Db()
+
+    async def find(db, node_id, project_id, user_id):
+        return SimpleNamespace(id=parent, tree_id=uuid.uuid4())
+
+    async def owner(db, project_id, user_id):
+        return None
+
+    async def create_child(db, **kw):
+        created.append(kw)
+        return SimpleNamespace(id=uuid.uuid4(), fork_index=1, title=None)
+
+    monkeypatch.setattr(tools, "_session", session)
+    monkeypatch.setattr(tools, "_node", find)
+    monkeypatch.setattr(tools, "_require_owner", owner)
+    monkeypatch.setattr(nodes_router, "_create_child", create_child)
+
+    out = asyncio.run(tools.call_tool("write_node", {"parent_id": str(parent), "title": " Finding ", "body": " Text [p1:c2] "}, P, U))
+    assert out["title"] == "Finding" and out["parent_id"] == str(parent)
+    chats = created[0]["chats"]
+    assert [(m["role"], m["content"], m["seq"]) for m in chats] == [("user", "Finding", 0), ("assistant", "Text [p1:c2]", 1)]
+    for bad in ({"title": " ", "body": "x"}, {"title": "t", "body": " "}, {"title": "t", "body": "x" * 20_001}):
+        assert "error" in asyncio.run(tools.call_tool("write_node", {"parent_id": str(parent), **bad}, P, U))
+    assert len(created) == 1
