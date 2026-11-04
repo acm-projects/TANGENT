@@ -91,3 +91,22 @@ describe("agent run view", () => {
     expect(run(v, ev("something.new", {})).tasks).toEqual(v.tasks);
   });
 });
+
+describe("agent run view: limits and activity", () => {
+  it("records why the runtime cut the run short and marks the task it left unfinished", () => {
+    const v = run(emptyRun("r"), task("t1"), ev("run.limit", { reason: "the 60-step limit" }),
+      ev("task.updated", { key: "t1", status: "unfinished", reason: "run limit reached: the 60-step limit" }));
+    expect(v.limit).toBe("the 60-step limit");
+    expect(v.tasks[0]).toMatchObject({ status: "unfinished", reason: "run limit reached: the 60-step limit" });
+    expect(emptyRun("r").limit).toBeNull();
+  });
+
+  it("describes a tool call by its query or title, not by a whole note body", () => {
+    const body = "# Regulatory viability ".repeat(50);
+    const v = run(emptyRun("r"),
+      ev("tool.executed", { tool: "write_node", args: { body, title: "Regulatory viability", parent_id: "n1" }, status: "succeeded", error: null, task_key: "t1" }),
+      ev("tool.executed", { tool: "web_search", args: { limit: 5, query: "NRC Part 57" }, status: "succeeded", error: null, task_key: "t1" }),
+      ev("tool.executed", { tool: "get_paper", args: { note: "x".repeat(300) }, status: "succeeded", error: null, task_key: null }));
+    expect(v.activity.map((a) => a.about)).toEqual(["Regulatory viability", "NRC Part 57", `${"x".repeat(100)}…`]);
+  });
+});

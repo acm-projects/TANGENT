@@ -284,3 +284,29 @@ def test_an_unexpected_error_fails_the_run_instead_of_hanging(rt, monkeypatch):
     monkeypatch.setattr(loop, "step", broken)
     rt.drive()
     assert rt.row(rid) == "failed" and "boom" in rt.row(rid, "error")
+
+
+def test_a_task_with_work_done_is_unfinished_not_skipped_at_the_limit(rt, monkeypatch):
+    monkeypatch.setattr(ops, "MAX_ITERATIONS", 3)
+    rid = rt.start()
+    rt.script += [
+        tc("create_plan", strategy="A plan that is long enough", tasks=[{"objective": "Investigate the first thing"}, {"objective": "Investigate the second thing"}]),
+        tc("update_task", task_id="t1", status="in_progress"),
+        tc("search_nodes", query="first"),
+        tc("finish_research", outcome="inconclusive", summary="Ran out of steps with the first task still being written up."),
+    ]
+    rt.drive()
+    rows = rt.pg.sql("SELECT key, status FROM agent_tasks WHERE run_id = %s ORDER BY key", (rid,))
+    assert rows == [("t1", "unfinished"), ("t2", "skipped")]
+    types = rt.types(rid)
+    assert types.count("run.limit") == 1 and "task.updated" in types and "task.skipped" in types
+    assert types[-1] == "run.completed"
+
+
+def test_alternating_bad_steps_still_fail_the_run_at_the_total_cap(rt):
+    rid = rt.start()
+    for _ in range(ops.MAX_INVALID_TOTAL):
+        rt.script += ["thinking out loud", tc("get_research_state")]
+    rt.drive()
+    assert rt.row(rid) == "failed" and "rejected steps in this run" in rt.row(rid, "error")
+    assert rt.row(rid, "invalid_streak") <= 1  # never three in a row: only the total cap catches this

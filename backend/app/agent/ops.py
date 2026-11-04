@@ -13,12 +13,13 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.agent.tools import AGENT_TOOLS, _tool
 
-MAX_ITERATIONS = 40
+MAX_ITERATIONS = 60
 MAX_TOOL_CALLS = 60
 MAX_REPLANS = 3
 MAX_TASKS = 12
 MAX_BATCH = 4  # independent read-only calls in one step
 MAX_INVALID_STREAK = 3
+MAX_INVALID_TOTAL = 8  # rejected steps in a whole run, so alternating good and bad steps can't burn the budget
 
 READ_ONLY = {"get_node", "search_nodes", "search_sources", "search_papers", "get_paper", "search_paper_evidence", "web_search"}
 MUTATING = {"branch_node", "write_node", "merge_nodes", "delete_node", "ask_node"}
@@ -26,7 +27,8 @@ OPS = {"get_research_state", "create_plan", "update_plan", "create_task", "updat
        "request_user_input", "finish_research"}
 OUTCOMES = ("satisfied", "partially_satisfied", "inconclusive", "blocked")
 
-_REF = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|p\d+:c\d+|p\d+")
+# node ids, evidence ids (p12:c7), source ids (p12) and web result URLs
+_REF = re.compile(r"https?://[^\s\"'<>\)\]]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|p\d+:c\d+|p\d+")
 
 
 class OpError(Exception):
@@ -43,11 +45,12 @@ class State:
     def task(self, key: str) -> dict | None:
         return next((t for t in self.tasks if t["key"] == key), None)
 
-    def refs(self) -> set[str]:
-        """Node ids and source/evidence ids that actually appeared in a successful tool result of this run."""
+    def refs(self, reads_only: bool = False) -> set[str]:
+        """Node ids, source/evidence ids and URLs that actually appeared in a successful tool result of this run.
+        `reads_only` leaves out what the agent itself wrote, which can't be evidence for its own conclusions."""
         found: set[str] = set()
         for s in self.steps:
-            if s["kind"] == "tool" and s["status"] == "succeeded":
+            if s["kind"] == "tool" and s["status"] == "succeeded" and not (reads_only and s["name"] in MUTATING):
                 found.update(_REF.findall(str(s["result"]).lower()))
         return found
 
@@ -217,6 +220,10 @@ def batch_error(names: list[str]) -> str | None:
     return None
 
 
+def invalid_total(state: State) -> int:
+    return sum(1 for s in state.steps if s["kind"] == "op" and s["status"] == "failed")
+
+
 def limit_reached(run: dict) -> str | None:
     if run["iteration"] >= MAX_ITERATIONS:
         return f"the {MAX_ITERATIONS}-step limit"
@@ -243,12 +250,12 @@ def _new_tasks(state: State, tasks: list[TaskIn]) -> None:
         pending.append(f"t{len(state.tasks) + i + 1}")
 
 
-def _cited(state: State, refs: list[str]) -> None:
-    seen = state.refs()
+def _cited(state: State, refs: list[str], reads_only: bool = False) -> None:
+    seen = state.refs(reads_only)
     missing = [r for r in refs if r.lower() not in seen]
     if missing:
         raise OpError("These ids never appeared in a tool result of this run: " + ", ".join(missing[:5])
-                      + ". Cite only ids you actually retrieved.")
+                      + ". Cite only ids and URLs you actually retrieved.")
 
 
 def blocked_changes(tasks: list[dict]) -> list[tuple[str, str, str | None]]:
@@ -257,7 +264,7 @@ def blocked_changes(tasks: list[dict]) -> list[tuple[str, str, str | None]]:
     status = {t["key"]: t["status"] for t in tasks}
     changes = []
     for t in tasks:
-        bad = [d for d in t["depends_on"] if status.get(d) in ("failed", "skipped")]
+        bad = [d for d in t["depends_on"] if status.get(d) in ("failed", "skipped", "unfinished")]
         if t["status"] == "pending" and bad:
             changes.append((t["key"], "blocked", f"dependency {bad[0]} is {status[bad[0]]}"))
         elif t["status"] == "blocked" and not bad:
@@ -323,5 +330,5 @@ def check(state: State, name: str, args: dict):
             raise OpError("No task was completed, so the outcome can only be inconclusive.")
         if a.outcome == "blocked" and not any(t["status"] in ("failed", "blocked") for t in tasks):
             raise OpError("blocked needs a failed or blocked task; otherwise use partially_satisfied or inconclusive.")
-        _cited(state, a.evidence)
+        _cited(state, a.evidence, reads_only=True)
     return a

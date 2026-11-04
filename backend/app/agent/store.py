@@ -394,15 +394,22 @@ async def fail_run(run_id: str, error: str) -> None:
         await db.commit()
 
 
-async def skip_open_tasks(run_id: str, reason: str) -> None:
-    """Limits ran out: the runtime, not the model, closes what is left so the final assessment can be submitted."""
+async def skip_open_tasks(run_id: str, why: str) -> None:
+    """Limits ran out: the runtime, not the model, closes what is left so the final assessment can be submitted.
+    A task that already made a successful call keeps its work and is 'unfinished'; one that never started is 'skipped'."""
+    reason = f"run limit reached: {why}"
     async with database.AsyncSessionLocal() as db:
         await _lock(db, run_id)
+        await emit(db, run_id, "run.limit", {"reason": why}, "run.limit")
         rows = (await db.execute(text(
-            "UPDATE agent_tasks SET status = 'skipped', reason = :why WHERE run_id = CAST(:r AS uuid) "
-            "AND status IN ('pending', 'in_progress') RETURNING key"), {"r": run_id, "why": reason})).scalars().all()
-        for key in rows:
-            await emit(db, run_id, "task.skipped", {"key": key, "status": "skipped", "reason": reason})
+            "UPDATE agent_tasks t SET reason = :why, status = CASE WHEN EXISTS ("
+            "SELECT 1 FROM agent_executions e WHERE e.run_id = t.run_id AND e.task_key = t.key "
+            "AND e.kind = 'tool' AND e.status = 'succeeded') THEN 'unfinished' ELSE 'skipped' END "
+            "WHERE t.run_id = CAST(:r AS uuid) AND t.status IN ('pending', 'in_progress') RETURNING t.key, t.status"),
+            {"r": run_id, "why": reason})).all()
+        for key, status in rows:
+            await emit(db, run_id, "task.skipped" if status == "skipped" else "task.updated",
+                       {"key": key, "status": status, "reason": reason})
         await db.commit()
 
 

@@ -137,3 +137,14 @@
 .agent-model {
   max-width: 14rem;
 }
+
+/* the runtime cut the run short */
+.agent-limit {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-surface-raised);
+}
+
+.agent-task[data-status="unfinished"] [data-ui="icon"] {
+  color: var(--color-danger);
+}

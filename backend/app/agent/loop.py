@@ -95,7 +95,7 @@ async def step(run_id: str, st: State, iteration: int) -> None:
 
 async def wrap_up(run_id: str, why: str) -> None:
     """A limit was hit: close open tasks, give the model one chance to assess the goal, else record an honest fallback."""
-    await store.skip_open_tasks(run_id, f"run limit reached: {why}")
+    await store.skip_open_tasks(run_id, why)
     st = await store.load_state(run_id)
     try:
         iteration = await store.begin_iteration(run_id)
@@ -123,6 +123,8 @@ async def run_loop(run_id: str) -> None:
         st = await store.load_state(run_id)
         if st.run["status"] != "running":  # waiting for the user, finished, failed or cancelled
             return
+        if ops.invalid_total(st) >= ops.MAX_INVALID_TOTAL:
+            return await store.fail_run(run_id, f"{ops.MAX_INVALID_TOTAL} rejected steps in this run; the model is not following the tool rules")
         if why := ops.limit_reached(st.run):
             return await wrap_up(run_id, why)
         iteration = await store.begin_iteration(run_id)

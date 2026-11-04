@@ -168,9 +168,52 @@ def test_snapshot_gives_goal_budget_plan_and_recent_results_not_the_tree():
                [step(iteration=1, result={"big": "x" * 5000}), step(iteration=2, status="unknown", result={"error": "?"})],
                iteration=2, clarifications=[{"question": "Scope?", "answer": "Narrow"}], authorized_deletes=[NODE])
     text = prompts.snapshot(st)
-    for needle in ("GOAL (unchanged): Does RL help?", "Scope? -> Narrow", f"deleting these nodes: {NODE}", "step 2/40",
+    for needle in ("GOAL (unchanged): Does RL help?", "Scope? -> Narrow", f"deleting these nodes: {NODE}", f"step 2/{ops.MAX_ITERATIONS}",
                    "PLAN v1", "t1 [completed]", "t2 [blocked] (after t1)", "RL beat baselines", "real-world?",
                    "OUTCOME UNKNOWN"):
         assert needle in text
     assert "more chars" in text  # the older step's 5000-char result is squeezed
     assert "{replans}" not in prompts.system_prompt()
+
+
+URL = "https://www.nrc.gov/reactors/new-reactors/microreactors.html"
+
+
+def test_web_urls_from_search_results_can_be_cited():
+    web = state([task("t1", "in_progress")],
+                [step(name="web_search", result={"results": [{"title": "NRC", "url": URL, "snippet": "Part 57"}]})])
+    assert ops.check(web, "complete_task", {**DONE, "node_refs": [], "source_refs": [URL.upper()]})
+    rejects(web, "complete_task", {**DONE, "node_refs": [], "source_refs": ["https://example.com/never-seen"]}, "never appeared")
+
+
+def test_the_agents_own_written_nodes_are_not_evidence_for_its_conclusion():
+    fin = {"outcome": "partially_satisfied", "summary": "RL looks promising in simulation, deployment evidence is thin.",
+           "evidence": [NODE]}
+    wrote = state([task("t1", "completed")], [step(name="write_node", result={"node_id": NODE})])
+    rejects(wrote, "finish_research", fin, "never appeared")
+    # the node it wrote can still back a task's findings, and a node it read can back the conclusion
+    assert ops.check(state([task("t1", "in_progress")], [step(name="write_node", result={"node_id": NODE})]),
+                     "complete_task", DONE)
+    assert ops.check(state([task("t1", "completed")], [step()]), "finish_research", fin)
+
+
+def test_rejected_steps_are_counted_over_the_whole_run():
+    rejected = [step(kind="op", status="failed", result={"error": "x"}) for _ in range(5)]
+    mixed = [*rejected, step(kind="op"), step(status="failed", result={"error": "y"})]
+    assert ops.invalid_total(state(steps=mixed)) == 5
+    assert ops.invalid_total(state()) == 0
+
+
+def test_an_unfinished_task_blocks_what_depends_on_it():
+    assert ops.blocked_changes([task("t1", "unfinished"), task("t2", deps=["t1"])]) == [("t2", "blocked", "dependency t1 is unfinished")]
+
+
+def test_snapshot_warns_when_the_budget_is_low_and_lists_what_the_agent_wrote():
+    plenty = prompts.snapshot(state(iteration=5))
+    assert "LOW BUDGET" not in plenty and "NODES YOU WROTE" not in plenty
+    wrote = step(name="write_node", result={"node_id": NODE})
+    wrote["args"] = {"parent_id": "p", "title": "Regulatory viability", "body": "Part 57 is a proposed rule.\nIt may shrink the EPZ."}
+    low = prompts.snapshot(state([task("t1", "in_progress")], [wrote], iteration=ops.MAX_ITERATIONS - 3))
+    assert "LOW BUDGET: 3 steps" in low and "finish_research" in low
+    assert f"{NODE}: Regulatory viability | Part 57 is a proposed rule. It may shrink the EPZ." in low
+    assert "LOW BUDGET" in prompts.snapshot(state(tool_calls=ops.MAX_TOOL_CALLS - 2))

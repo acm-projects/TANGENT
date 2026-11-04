@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
         run_id uuid NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
         key text NOT NULL,                       -- t1, t2, ...: unique within the run
         objective text NOT NULL,
-        status text NOT NULL DEFAULT 'pending',  -- pending | in_progress | completed | skipped | failed | blocked
+        status text NOT NULL DEFAULT 'pending',  -- pending | in_progress | completed | skipped | failed | blocked | unfinished
         depends_on jsonb NOT NULL DEFAULT '[]'::jsonb,
         plan_version int NOT NULL,
         assessment jsonb,

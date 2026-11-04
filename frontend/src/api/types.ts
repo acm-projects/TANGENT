@@ -241,7 +241,8 @@ export interface AgentReply {
 
 export type AgentRunStatus = "queued" | "running" | "waiting_input" | "completed" | "failed" | "cancelled";
 export type AgentOutcome = "satisfied" | "partially_satisfied" | "inconclusive" | "blocked";
-export type AgentTaskStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed" | "blocked";
+/** `unfinished`: the run hit its limit while the task was under way; its work so far is kept. */
+export type AgentTaskStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed" | "blocked" | "unfinished";
 
 /** A question the agent (or the runtime, before a delete) puts to the user. `text` takes free text only. */
 export interface AgentQuestion {

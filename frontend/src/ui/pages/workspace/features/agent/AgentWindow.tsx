@@ -37,9 +37,12 @@ const TASK_ICON: Record<AgentTaskStatus, string> = {
   skipped: "do_not_disturb_on",
   failed: "error",
   blocked: "lock",
+  unfinished: "pause_circle",
 };
 
 const SHOWN_ACTIVITY = 6;
+const NOTE_CHARS = 280;
+const clip = (s: string) => (s.length <= NOTE_CHARS ? s : `${s.slice(0, NOTE_CHARS)}…`);
 
 type AgentWindowProps = { onClose(): void };
 
@@ -149,8 +152,18 @@ function RunView({ view, onAnswer }: RunViewProps) {
           <Text as="span" size="xxs" className="agent-kicker" content={`Plan v${view.plan.version}`} />
           <Text size="s" content={view.plan.strategy} />
           {view.plan.reason && <Text size="xs" hierarchy="tertiary" content={`Revised because: ${view.plan.reason}`} />}
+          {view.plan.assumptions.length > 0 && (
+            <Frame gap="0">
+              <Text size="xs" hierarchy="tertiary" content="Assumes" />
+              {view.plan.assumptions.map((a, i) => (
+                <Text key={i} size="xs" content={`• ${a}`} />
+              ))}
+            </Frame>
+          )}
         </Frame>
       )}
+
+      {view.limit && <Text role="status" size="s" className="agent-limit" content={`Stopped at ${view.limit}. Unfinished tasks keep the work done so far; the summary below covers only what was completed.`} />}
 
       {view.tasks.length > 0 && (
         <Frame as="ol" gap="2" aria-label="Tasks">
@@ -190,12 +203,13 @@ function RunView({ view, onAnswer }: RunViewProps) {
 
 function TaskRow({ task }: { task: AgentTask }) {
   const note = task.status === "completed" ? task.assessment?.findings : task.reason;
+  const after = task.depends_on.length > 0 ? ` (after ${task.depends_on.join(", ")})` : "";
   return (
     <Frame as="li" direction="row" gap="2" align="start" className="agent-task" data-status={task.status}>
       <Icon icon={TASK_ICON[task.status]} size="m" />
       <Frame gap="0">
-        <Text size="s" hierarchy={task.status === "pending" ? "secondary" : "primary"} content={`${task.key}: ${task.objective}`} />
-        {note && <Text size="xs" hierarchy="tertiary" content={note} />}
+        <Text size="s" hierarchy={task.status === "pending" ? "secondary" : "primary"} content={`${task.key}: ${task.objective}${after}`} />
+        {note && <Text size="xs" hierarchy="tertiary" content={clip(note)} />}
       </Frame>
     </Frame>
   );

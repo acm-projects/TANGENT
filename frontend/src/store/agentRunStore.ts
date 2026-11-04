@@ -33,6 +33,8 @@ export interface AgentRunView {
   asking: "agent" | "confirm_delete" | null;
   final: AgentFinal | null;
   error: string | null;
+  /** Why the runtime cut the run short (a step or tool-call limit), or null if it ended on its own. */
+  limit: string | null;
   /** The stream has ended (`done`): nothing more will arrive. */
   ended: boolean;
   lastEventId: number | null;
@@ -43,9 +45,11 @@ const TERMINAL: AgentRunStatus[] = ["completed", "failed", "cancelled"];
 export const isRunOver = (status: AgentRunStatus) => TERMINAL.includes(status);
 
 export function emptyRun(id: string): AgentRunView {
-  return { id, goal: "", status: "queued", plan: null, tasks: [], activity: [], questions: null, asking: null, final: null, error: null, ended: false, lastEventId: null };
+  return { id, goal: "", status: "queued", plan: null, tasks: [], activity: [], questions: null, asking: null, final: null, error: null, limit: null, ended: false, lastEventId: null };
 }
 
+const ABOUT_CHARS = 100;
+const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n)}…`);
 const str = (x: unknown) => (typeof x === "string" ? x : "");
 const strings = (x: unknown) => (Array.isArray(x) ? x.filter((i): i is string => typeof i === "string") : []);
 
@@ -76,6 +80,8 @@ function onEvent(v: AgentRunView, e: AgentStreamEvent): AgentRunView {
       return { ...v, goal: str(p.goal) };
     case "run.started":
       return { ...v, status: "running" };
+    case "run.limit":
+      return { ...v, limit: str(p.reason) || "a limit" };
     case "plan.created":
     case "plan.revised":
       return { ...v, plan: plan(p) };
@@ -102,7 +108,8 @@ function onEvent(v: AgentRunView, e: AgentStreamEvent): AgentRunView {
     }
     case "tool.executed": {
       const args = (p.args ?? {}) as Record<string, unknown>;
-      const about = Object.values(args).find((a): a is string => typeof a === "string") ?? "";
+      const first = ["query", "title", "node_id", "parent_id"].map((k) => args[k]).find((a): a is string => typeof a === "string");
+      const about = clip(first ?? Object.values(args).find((a): a is string => typeof a === "string") ?? "", ABOUT_CHARS);
       const item: AgentActivity = { tool: str(p.tool), ok: p.status === "succeeded", error: str(p.error) || null, taskKey: str(p.task_key) || null, about };
       return { ...v, activity: [...v.activity, item].slice(-MAX_ACTIVITY) };
     }
