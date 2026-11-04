@@ -76,7 +76,8 @@ def test_ask_node_prompts_the_leaf_and_saves_the_exchange(monkeypatch):
         return None
 
     async def path(db, node_id, user_id):
-        return [nodes_router.PathNode(id="root", chats=[])], P
+        # root -> the asked card: the real path always ends at the card itself (build_plan starts from it)
+        return [nodes_router.PathNode(id="root", chats=[]), nodes_router.PathNode(id=str(node), parent_id="root", chats=[])], P
 
     async def stream(messages, model):
         sent.append((messages, model))
