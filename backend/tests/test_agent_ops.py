@@ -217,3 +217,60 @@ def test_snapshot_warns_when_the_budget_is_low_and_lists_what_the_agent_wrote():
     assert "LOW BUDGET: 3 steps" in low and "finish_research" in low
     assert f"{NODE}: Regulatory viability | Part 57 is a proposed rule. It may shrink the EPZ." in low
     assert "LOW BUDGET" in prompts.snapshot(state(tool_calls=ops.MAX_TOOL_CALLS - 2))
+
+
+def test_research_needs_a_task_in_progress_once_there_is_a_plan():
+    pending = state([task("t1"), task("t2", deps=["t1"])])
+    assert ops.startable(pending) == ["t1"]
+    assert "Start one with update_task" in ops.needs_task(pending, ["search_nodes"]) and "t1" in ops.needs_task(pending, ["write_node"])
+    assert ops.needs_task(pending, ["web_search", "get_node"]) is not None
+    # operations are not research, and nothing is refused without a plan, with a task under way, or with nothing left to start
+    assert ops.needs_task(pending, ["update_task"]) is None
+    assert ops.needs_task(state(plan=False), ["search_nodes"]) is None
+    assert ops.needs_task(state([task("t1", "in_progress"), task("t2")]), ["search_nodes"]) is None
+    assert ops.needs_task(state([task("t1", "completed"), task("t2", "skipped", reason="x")]), ["write_node"]) is None
+    assert ops.needs_task(state([task("t1", "failed"), task("t2", "blocked", deps=["t1"])]), ["search_nodes"]) is None
+
+
+def test_snapshot_points_at_the_tasks_that_can_start():
+    assert "NEXT: no task is in progress" in prompts.snapshot(state([task("t1"), task("t2", deps=["t1"])]))
+    assert "t1" in prompts.snapshot(state([task("t1")])).split("NEXT:")[1]
+    assert "NEXT:" not in prompts.snapshot(state([task("t1", "in_progress")]))
+    assert "NEXT:" not in prompts.snapshot(state(plan=False))
+
+
+def test_a_task_that_builds_on_completed_tasks_can_be_completed_without_new_research():
+    synth = state([task("t1", "completed"), task("t2", "in_progress", deps=["t1"])])  # no tool call in t2
+    assert ops.check(synth, "complete_task", {**DONE, "task_id": "t2", "node_refs": []})
+    # without dependencies it still needs a research call, and the error says how to mark a synthesis task
+    alone = state([task("t2", "in_progress")])
+    with pytest.raises(OpError, match="depend on them"):
+        ops.check(alone, "complete_task", {**DONE, "task_id": "t2", "node_refs": []})
+    # citations are still checked against what the run retrieved
+    rejects(synth, "complete_task", {**DONE, "task_id": "t2", "node_refs": [NODE]}, "never appeared")
+
+
+def test_snapshot_tells_a_dependent_task_to_use_earlier_findings():
+    done = task("t1", "completed", assessment={"findings": "Solar costs X.", "node_refs": [], "source_refs": [], "satisfied": True, "unresolved": []})
+    text = prompts.snapshot(state([done, task("t2", "in_progress", deps=["t1"])]))
+    assert "NOTE: t2 builds on t1" in text and "do not search again" in text
+    assert "NOTE:" not in prompts.snapshot(state([task("t1", "in_progress")]))
+
+
+def test_asking_for_the_status_a_task_already_has_is_not_an_error():
+    live = state([task("t1", "completed"), task("t2", "completed"), task("t3", "in_progress")])
+    # the exact call that was rejected in a live run: re-stating in_progress while adding the dependencies
+    assert ops.check(live, "update_task", {"task_id": "t3", "status": "in_progress", "depends_on": ["t1", "t2"]})
+    assert ops.check(live, "update_task", {"task_id": "t3", "status": "in_progress"})
+    # a real start is still checked, and so are dependencies added to a task under way
+    rejects(state([task("t1"), task("t2", "skipped", reason="x")]), "update_task", {"task_id": "t2", "status": "in_progress"}, "only a pending task")
+    rejects(state([task("t1"), task("t2", "in_progress")]), "update_task", {"task_id": "t2", "depends_on": ["t1"]}, "Dependencies not completed: t1")
+
+
+def test_get_research_state_says_what_to_do_next():
+    assert "create_plan" in ops.next_hint(state(plan=False))
+    assert "start one with update_task" in ops.next_hint(state([task("t1"), task("t2", deps=["t1"])])) and "t1" in ops.next_hint(state([task("t1")]))
+    assert "research it" in ops.next_hint(state([task("t1", "in_progress")]))
+    assert "can be completed" in ops.next_hint(state([task("t1", "in_progress")], [step()]))
+    assert "can be completed" in ops.next_hint(state([task("t1", "completed"), task("t2", "in_progress", deps=["t1"])]))
+    assert "finish_research" in ops.next_hint(state([task("t1", "completed")]))

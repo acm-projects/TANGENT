@@ -258,9 +258,10 @@ async def apply_op(run_id: str, st: State, iteration: int, index: int, name: str
             result["tasks"] = await _insert_tasks(db, run_id, st, [a], run["plan_version"])
         elif name == "update_task":
             sets, p = [], {"r": run_id, "k": a.task_id}
-            if a.status:
+            changed = a.status if a.status != st.task(a.task_id)["status"] else None  # the same status is not a change
+            if changed:
                 sets.append("status = :s")
-                p["s"] = a.status
+                p["s"] = changed
             if a.objective:
                 sets.append("objective = :o")
                 p["o"] = a.objective
@@ -272,8 +273,8 @@ async def apply_op(run_id: str, st: State, iteration: int, index: int, name: str
                 p["why"] = a.reason
             if sets:
                 await db.execute(text(f"UPDATE agent_tasks SET {', '.join(sets)} WHERE run_id = CAST(:r AS uuid) AND key = :k"), p)
-            kind = {"in_progress": "task.started", "skipped": "task.skipped", "failed": "task.failed"}.get(a.status, "task.updated")
-            await emit(db, run_id, kind, {"key": a.task_id, "status": a.status, "reason": a.reason, "objective": a.objective,
+            kind = {"in_progress": "task.started", "skipped": "task.skipped", "failed": "task.failed"}.get(changed, "task.updated")
+            await emit(db, run_id, kind, {"key": a.task_id, "status": changed, "reason": a.reason, "objective": a.objective,
                                           "depends_on": a.depends_on})
             await _reblock(db, run_id)
         elif name == "complete_task":
@@ -292,7 +293,8 @@ async def apply_op(run_id: str, st: State, iteration: int, index: int, name: str
             await db.execute(text("UPDATE agent_runs SET status = 'completed', outcome = :o, final = CAST(:f AS jsonb) "
                                   "WHERE id = CAST(:r AS uuid)"), {"r": run_id, "o": a.outcome, "f": js(final)})
             await emit(db, run_id, "run.completed", final | {"outcome": a.outcome}, "run.completed")
-        # get_research_state changes nothing
+        elif name == "get_research_state":
+            result["next"] = ops.next_hint(st)  # changes nothing; the state itself is already in every step's context
         await _log_op(db, run_id, iteration, index, task_key, name, a.model_dump(), "succeeded", result)
         await db.execute(text("UPDATE agent_runs SET invalid_streak = 0, updated_at = now() WHERE id = CAST(:r AS uuid)"),
                          {"r": run_id})

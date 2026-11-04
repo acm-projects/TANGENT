@@ -6,6 +6,7 @@ test_autonomous_run is the acceptance scenario of the orchestration spec: plan -
 import asyncio
 import json
 import os
+import re
 import uuid
 
 import psycopg
@@ -22,6 +23,7 @@ from sqlalchemy.pool import NullPool  # noqa: E402
 from app import database  # noqa: E402
 from app.agent import loop, ops, store, worker  # noqa: E402
 from app.agent.schema import AGENT_DDL  # noqa: E402
+from app.papers import service as paper_service  # noqa: E402
 from conftest import ADMIN  # noqa: E402
 
 for _k in _added:
@@ -49,7 +51,8 @@ class Scratch:
         self.admin_url = ADMIN.rpartition("/")[0] + "/" + self.name
         self.sql("CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text)")
         self.sql("CREATE TABLE projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_by_id uuid NOT NULL REFERENCES users(id))")
-        for statement in AGENT_DDL:
+        self.sql("CREATE TABLE nodes (id uuid PRIMARY KEY, parent_id uuid)")  # for the papers tables
+        for statement in [*(q for q in database._ADDED_COLUMNS if re.search(r"papers|paper_|ingestion_jobs", q)), *AGENT_DDL]:
             self.sql(statement)
 
     def sql(self, q, params=None):
@@ -310,3 +313,80 @@ def test_alternating_bad_steps_still_fail_the_run_at_the_total_cap(rt):
     rt.drive()
     assert rt.row(rid) == "failed" and "rejected steps in this run" in rt.row(rid, "error")
     assert rt.row(rid, "invalid_streak") <= 1  # never three in a row: only the total cap catches this
+
+
+def test_search_papers_works_without_a_selected_node(rt, monkeypatch):
+    """An agent run has no selected node; the search SQL used to fail with 'could not determine data type of parameter'."""
+    async def no_s2(*_a, **_k):
+        return []
+
+    monkeypatch.setattr(paper_service.s2, "search", no_s2)
+    rt.pg.sql("INSERT INTO papers (source, source_id, project_id, title, abstract) VALUES ('upload', 'u1', %s, 'Solar for schools', 'photovoltaic cost study')",
+              (rt.ids["project"],))
+    project = uuid.UUID(rt.ids["project"])
+    for node in (None, uuid.uuid4()):
+        out = run(paper_service.search_papers("photovoltaic", project_id=project, node_id=node))
+        assert "error" not in out and [r["title"] for r in out["results"]] == ["Solar for schools"], out
+
+
+def test_research_before_starting_a_task_is_refused_then_accepted(rt):
+    rid = rt.start()
+    rt.script += [
+        tc("create_plan", strategy="A plan that is long enough", tasks=[{"objective": "Investigate the first thing"}]),
+        tc("search_nodes", query="first"),  # no task in progress: refused, nothing runs
+        tc("update_task", task_id="t1", status="in_progress"),
+        tc("search_nodes", query="first"),
+        tc("complete_task", task_id="t1", investigated="Searched the tree for the first thing", node_refs=[rt.node],
+           findings="One node covers the first thing.", satisfied=True, needs_more_research=False),
+        tc("finish_research", outcome="satisfied", summary="The first thing is covered by one existing node.", evidence=[rt.node]),
+    ]
+    rt.drive()
+    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes"]
+    refused = rt.executions(rid, status="failed", kind="op")
+    assert len(refused) == 1 and refused[0][0] == "search_nodes" and "Start one with update_task" in refused[0][3]["error"]
+    assert rt.executions(rid, kind="tool")[0][1] == "succeeded" and rt.row(rid, "invalid_streak") == 0
+
+
+def test_a_synthesis_task_completes_from_earlier_findings_without_searching(rt):
+    rid = rt.start()
+    rt.script += [
+        tc("create_plan", strategy="Research two options, then compare them",
+           tasks=[{"objective": "Research the first option"}, {"objective": "Compare the options", "depends_on": ["t1"]}]),
+        tc("update_task", task_id="t1", status="in_progress"),
+        tc("search_nodes", query="first option"),
+        tc("complete_task", task_id="t1", investigated="Searched the tree for the first option", node_refs=[rt.node],
+           findings="One node covers the first option and its cost.", satisfied=True, needs_more_research=False),
+        tc("update_task", task_id="t2", status="in_progress"),
+        tc("complete_task", task_id="t2", investigated="Compared the options using the first task's findings",
+           findings="The first option is covered by one node; no other option was researched.", satisfied=False,
+           unresolved=["the second option"], needs_more_research=False),
+        tc("finish_research", outcome="partially_satisfied", summary="One option was researched and compared; the rest is open.",
+           evidence=[rt.node]),
+    ]
+    rt.drive()
+    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes"]
+    assert rt.pg.sql("SELECT key, status FROM agent_tasks WHERE run_id = %s ORDER BY key", (rid,)) == [("t1", "completed"), ("t2", "completed")]
+    assert not rt.executions(rid, status="failed", kind="op")
+
+
+def test_restating_the_current_status_while_adding_dependencies_works_and_get_research_state_helps(rt):
+    rid = rt.start()
+    rt.script += [
+        tc("create_plan", strategy="Research, then compare", tasks=[{"objective": "Research the first option"}, {"objective": "Compare the options"}]),
+        tc("update_task", task_id="t1", status="in_progress"),
+        tc("search_nodes", query="first"),
+        tc("complete_task", task_id="t1", investigated="Searched the tree", node_refs=[rt.node],
+           findings="One node covers the first option.", satisfied=True, needs_more_research=False),
+        tc("update_task", task_id="t2", status="in_progress"),
+        tc("update_task", task_id="t2", status="in_progress", depends_on=["t1"]),  # was rejected before
+        tc("get_research_state"),
+        tc("complete_task", task_id="t2", investigated="Compared using the first task", findings="Only one option was researched.",
+           satisfied=False, unresolved=["the second option"], needs_more_research=False),
+        tc("finish_research", outcome="partially_satisfied", summary="One option was researched and compared; the rest is open.", evidence=[rt.node]),
+    ]
+    rt.drive()
+    assert rt.row(rid) == "completed" and not rt.executions(rid, status="failed", kind="op")
+    assert rt.pg.sql("SELECT depends_on FROM agent_tasks WHERE run_id = %s AND key = 't2'", (rid,))[0][0] == ["t1"]
+    assert rt.types(rid).count("task.started") == 2  # the second t2 call was a dependency edit, not a second start
+    state_read = [r for r in rt.executions(rid, kind="op") if r[0] == "get_research_state"][0]
+    assert "can be completed" in state_read[3]["next"]

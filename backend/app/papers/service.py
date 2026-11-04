@@ -385,7 +385,7 @@ async def search_papers(query: str, limit=5, year_from=None, *, project_id: UUID
             SELECT * FROM papers, plainto_tsquery('english', :q) AS q
             WHERE search_tsv @@ q
               AND (source = 's2' OR (project_id = CAST(:pid AS uuid) AND
-                   (node_id IS NULL OR :node IS NULL OR node_id IN (
+                   (node_id IS NULL OR CAST(:node AS uuid) IS NULL OR node_id IN (
                        WITH RECURSIVE ancestors(id) AS (
                            SELECT CAST(:node AS uuid)
                            UNION SELECT n.parent_id FROM nodes n JOIN ancestors a ON n.id = a.id

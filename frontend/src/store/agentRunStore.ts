@@ -101,7 +101,7 @@ function onEvent(v: AgentRunView, e: AgentStreamEvent): AgentRunView {
     case "task.updated": {
       const patch: Partial<AgentTask> = {};
       if (p.status) patch.status = p.status as AgentTaskStatus;
-      if ("reason" in p && p.status !== undefined) patch.reason = str(p.reason) || null;
+      if (p.status && "reason" in p) patch.reason = str(p.reason) || null; // an objective-only edit leaves the reason alone
       if (str(p.objective)) patch.objective = str(p.objective);
       if (Array.isArray(p.depends_on)) patch.depends_on = strings(p.depends_on);
       return patchTask(v, key, patch);

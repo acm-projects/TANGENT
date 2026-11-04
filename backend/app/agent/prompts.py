@@ -2,7 +2,7 @@
 
 import json
 
-from app.agent.ops import MAX_ITERATIONS, MAX_REPLANS, MAX_TASKS, MAX_TOOL_CALLS, State
+from app.agent.ops import MAX_ITERATIONS, MAX_REPLANS, MAX_TASKS, MAX_TOOL_CALLS, State, startable
 
 RECENT_ITERATIONS = 6
 LATEST_CHARS = 3000  # the newest step's results are shown fully enough to write up; older ones are squeezed
@@ -26,9 +26,12 @@ unusually broad, or you would have to assume a scope, scale, definition or const
 which region, which meaning of a word), call request_user_input first instead of assuming it. Never ask idle questions. \
 Plan tasks that do not overlap: each should add something the others do not.
 2. Tasks are flat, independently actionable and specific ("Compare latency results across the retrieved studies", never \
-"research everything"). Start one with update_task status=in_progress (its dependencies must be completed), investigate \
+"research everything"). Start one with update_task status=in_progress (its dependencies must be completed); research and write calls are refused \
+unless a task is in progress. Investigate \
 with research tools, then complete_task with an honest assessment: what you investigated, what you found, which node ids, \
 source ids and web URLs support it (only ones you actually retrieved), whether the objective is met, what is unresolved. \
+A task that only compares or summarises earlier tasks must list them in depends_on; it needs no new research: write \
+the comparison (write_node) and complete_task from their findings instead of searching again. \
 Search results are snippets: say so when a claim rests on a snippet alone. Do not repeat a search with near-identical \
 wording; batch independent searches in one step.
 3. Evaluate what you find. If the evidence is thin, one-sided or points somewhere the plan did not expect, revise: \
@@ -85,6 +88,12 @@ def snapshot(st: State) -> str:
         extra = f" — {t['reason']}" if t["reason"] and t["status"] in ("skipped", "failed", "blocked") else ""
         lines.append(f"- {t['key']} [{t['status']}]{dep}: {t['objective']}{extra}")
     out.append("TASKS:\n" + ("\n".join(lines) if lines else "none"))
+    for t in st.tasks:
+        if t["status"] == "in_progress" and t["depends_on"]:
+            out.append(f"NOTE: {t['key']} builds on {', '.join(t['depends_on'])}. If it only compares or summarises their results, "
+                       "do not search again: use COMPLETED TASK RESULTS, write the comparison, then complete_task.")
+    if st.plan and not any(t["status"] == "in_progress" for t in st.tasks) and (todo := startable(st)):
+        out.append(f"NEXT: no task is in progress. Start one with update_task (status=in_progress): {', '.join(todo)}.")
     done = [t for t in st.tasks if t["status"] == "completed"]
     if done:
         out.append("COMPLETED TASK RESULTS:\n" + "\n".join(

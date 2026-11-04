@@ -75,6 +75,9 @@ async def step(run_id: str, st: State, iteration: int) -> None:
     if any(a is None for a in parsed):
         return await _reject(run_id, iteration, names[0], "unparseable", "The tool arguments were not a valid JSON object.")
 
+    if error := ops.needs_task(st, names):
+        return await _reject(run_id, iteration, names[0], parsed[0], error)
+
     if names[0] in ops.OPS:
         try:
             a = ops.check(st, names[0], parsed[0])

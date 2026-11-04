@@ -149,7 +149,8 @@ MODELS: dict[str, type[BaseModel]] = {
 }
 
 _DESCRIPTIONS = {
-    "get_research_state": "Re-read the current goal, plan, tasks and budget. The state is already given every step; use this rarely.",
+    "get_research_state": "Returns a hint for the next step. The goal, plan, tasks and budget are already given at the top of every step, "
+                          "so this adds nothing else; use it rarely.",
     "create_plan": "Submit the initial plan: a strategy, the assumptions you rely on, and 1-6 tasks. Tasks are numbered t1, t2, ... in "
                    "order; depends_on lists keys of earlier tasks. Allowed once.",
     "update_plan": "Revise the plan when research shows it is insufficient. Requires a reason; bumps the plan version; may add tasks. "
@@ -218,6 +219,40 @@ def batch_error(names: list[str]) -> str | None:
     if len(names) > MAX_BATCH:
         return f"At most {MAX_BATCH} calls per step."
     return None
+
+
+def startable(state: State) -> list[str]:
+    """Pending tasks whose dependencies are all completed: the ones update_task may start."""
+    done = {t["key"] for t in state.tasks if t["status"] == "completed"}
+    return [t["key"] for t in state.tasks if t["status"] == "pending" and set(t["depends_on"]) <= done]
+
+
+def needs_task(state: State, names: list[str]) -> str | None:
+    """Research must happen inside a task, or complete_task can never find it (it needs a successful call made during
+    the task). With a plan, no task under way and one that could start, a research or write call is refused."""
+    if not state.plan or not any(n in READ_ONLY | MUTATING for n in names):
+        return None
+    if any(t["status"] == "in_progress" for t in state.tasks) or not (todo := startable(state)):
+        return None
+    return f"No task is in progress. Start one with update_task status=in_progress before researching: {', '.join(todo)}."
+
+
+def next_hint(state: State) -> str:
+    """What to do next, from the state alone. get_research_state returns this: the state itself is already at the top of
+    every step, so repeating it would teach the model nothing."""
+    if not state.plan:
+        return "There is no plan yet: call create_plan (or request_user_input if the goal is ambiguous)."
+    live = next((t for t in state.tasks if t["status"] == "in_progress"), None)
+    if live:
+        worked = live["depends_on"] or any(
+            s["kind"] == "tool" and s["status"] == "succeeded" and s["task_key"] == live["key"] for s in state.steps)
+        if worked:
+            return (f"{live['key']} is in progress and can be completed: call complete_task if its objective is met, "
+                    "otherwise research what is missing or skip it.")
+        return f"{live['key']} is in progress: research it with the research tools, then call complete_task."
+    if todo := startable(state):
+        return f"No task is in progress: start one with update_task status=in_progress ({', '.join(todo)})."
+    return "No task is open: call finish_research."
 
 
 def invalid_total(state: State) -> int:
@@ -300,12 +335,14 @@ def check(state: State, name: str, args: dict):
             raise OpError("A reason is required to skip or fail a task.")
         if a.depends_on is not None:
             _deps(state, a.depends_on, t["key"])
-        if a.status == "in_progress":
+        # Asking for the status a task already has is not an error: the rest of the call (objective, depends_on) still applies.
+        if a.status == "in_progress" and t["status"] != "in_progress":
             if t["status"] not in ("pending", "blocked"):
                 raise OpError(f"{t['key']} is {t['status']}; only a pending task can be started.")
             open_ = [x["key"] for x in tasks if x["status"] == "in_progress" and x["key"] != t["key"]]
             if open_:
                 raise OpError(f"{open_[0]} is already in progress; complete or skip it first.")
+        if a.status == "in_progress" or t["status"] == "in_progress":
             deps = a.depends_on if a.depends_on is not None else t["depends_on"]
             unmet = [d for d in deps if state.task(d)["status"] != "completed"]
             if unmet:
@@ -316,8 +353,12 @@ def check(state: State, name: str, args: dict):
             raise OpError(f"No task {a.task_id}.")
         if t["status"] != "in_progress":
             raise OpError(f"{t['key']} is {t['status']}; start it with update_task first.")
-        if not any(s["kind"] == "tool" and s["status"] == "succeeded" and s["task_key"] == t["key"] for s in state.steps):
-            raise OpError("No successful research call was made during this task. Investigate first, or skip the task.")
+        # A task that builds on completed tasks (it depends on them) may only compare or summarise their findings.
+        if not t["depends_on"] and not any(
+            s["kind"] == "tool" and s["status"] == "succeeded" and s["task_key"] == t["key"] for s in state.steps
+        ):
+            raise OpError("No successful research call was made during this task. Investigate first, or skip the task. "
+                          "A task that only synthesises earlier tasks should depend on them (update_task depends_on).")
         _cited(state, [*a.node_refs, *a.source_refs])
     elif name == "request_user_input":
         if run["pending_input"]:
