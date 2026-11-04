@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeMeta } from "@/api/types";
+import { ROW_HEIGHT } from "@/store/layout";
 import { UNTITLED, toFlow, type StructureSlice } from "./toFlow";
 
 const meta = (id: string, parent: string | null, fork: number, title: string | null = id): NodeMeta => ({
@@ -75,7 +76,28 @@ describe("toFlow", () => {
     expect(pathEdges.sort()).toEqual(["a->m", "b->c", "c->m", "r->a", "r->b"]);
   });
 
-  it("does not re-parent merges for drawing", () => {
+  it("draws a merge in its shallowest source's column, one row below its deepest", () => {
+    // r -> (a, b) ; b -> (c) ; m merges c and a: a is the shallower, though c is m's first parent
+    const s = slice(null);
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "c", 1), merge_source_ids: ["c", "a"] } };
+    s.childrenByParent = { ...s.childrenByParent, c: ["m"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.x).toBe(at["a"]!.x);
+    expect(at["m"]!.y).toBe(at["c"]!.y + ROW_HEIGHT);
+    // c is a leaf of its own again, in its own column
+    expect(at["c"]!.x).not.toBe(at["a"]!.x);
+  });
+
+  it("moves a merge's own branches down with it", () => {
+    const s = slice(null);
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "a", 1), merge_source_ids: ["a", "c"] }, k: meta("k", "m", 1) };
+    s.childrenByParent = { ...s.childrenByParent, a: ["m"], m: ["k"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.y).toBe(3 * ROW_HEIGHT);
+    expect(at["k"]).toEqual({ x: at["m"]!.x, y: 4 * ROW_HEIGHT });
+  });
+
+  it("keeps nested merges below everything they join", () => {
     const s = slice("m2");
     s.nodesById = {
       ...s.nodesById,
