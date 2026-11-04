@@ -75,7 +75,7 @@ async def step(run_id: str, st: State, iteration: int) -> None:
     if any(a is None for a in parsed):
         return await _reject(run_id, iteration, names[0], "unparseable", "The tool arguments were not a valid JSON object.")
 
-    if error := ops.needs_task(st, names):
+    if error := ops.needs_task(st, names) or ops.research_capped(st, names):
         return await _reject(run_id, iteration, names[0], parsed[0], error)
 
     if names[0] in ops.OPS:
@@ -108,7 +108,7 @@ async def wrap_up(run_id: str, why: str) -> None:
         call = next((c for c in calls if c["function"]["name"] == "finish_research"), None)
         args = _args(call) if call else None
         if args is not None:
-            await store.apply_op(run_id, st, iteration, 0, "finish_research", ops.check(st, "finish_research", args))
+            await store.apply_op(run_id, st, iteration, 0, "finish_research", ops.check(st, "finish_research", args, forced=True))
             return
     except store.Stopped:
         return

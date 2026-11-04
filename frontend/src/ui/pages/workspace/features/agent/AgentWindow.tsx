@@ -191,7 +191,7 @@ function RunView({ view, onAnswer }: RunViewProps) {
       {view.final && (
         <Frame gap="2" className="agent-final">
           <Text as="span" size="xxs" className="agent-kicker" content={OUTCOME[view.final.outcome]} />
-          <Text size="s" hierarchy="primary" content={view.final.summary} />
+          <Text size="s" hierarchy="primary" className="agent-summary" content={view.final.summary} />
           <Bullets title="Limitations" items={view.final.limitations} />
           <Bullets title="Still unresolved" items={view.final.unresolved_questions} />
           {view.final.evidence.length > 0 && <Text size="xs" hierarchy="tertiary" content={`Evidence: ${view.final.evidence.join(", ")}`} />}

@@ -5,9 +5,10 @@ The agent manages its work through these eight operations and does its work thro
 model as the tool result. The database is only touched afterwards (store.apply_op), so every rule here is
 testable without one. The model never sets run status, limits or execution history; only the runtime does."""
 
+import json
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, get_origin
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
@@ -18,11 +19,13 @@ MAX_TOOL_CALLS = 60
 MAX_REPLANS = 3
 MAX_TASKS = 12
 MAX_BATCH = 4  # independent read-only calls in one step
+MAX_RESEARCH_PER_TASK = 6  # reads per task: more than this is the same search reworded
 MAX_INVALID_STREAK = 3
 MAX_INVALID_TOTAL = 8  # rejected steps in a whole run, so alternating good and bad steps can't burn the budget
 
 READ_ONLY = {"get_node", "search_nodes", "search_sources", "search_papers", "get_paper", "search_paper_evidence", "web_search"}
 MUTATING = {"branch_node", "write_node", "merge_nodes", "delete_node", "ask_node"}
+SEARCHES = READ_ONLY - {"get_node", "search_nodes"}  # looking at the project's own tree is cheap and never capped
 OPS = {"get_research_state", "create_plan", "update_plan", "create_task", "update_task", "complete_task",
        "request_user_input", "finish_research"}
 OUTCOMES = ("satisfied", "partially_satisfied", "inconclusive", "blocked")
@@ -49,10 +52,18 @@ class State:
         """Node ids, source/evidence ids and URLs that actually appeared in a successful tool result of this run.
         `reads_only` leaves out what the agent itself wrote, which can't be evidence for its own conclusions."""
         found: set[str] = set()
+        if self.run.get("active_node_id"):  # the node the user selected was handed to the agent, so it may be cited
+            found.add(self.run["active_node_id"].lower())
+        written: set[str] = set()
         for s in self.steps:
-            if s["kind"] == "tool" and s["status"] == "succeeded" and not (reads_only and s["name"] in MUTATING):
-                found.update(_REF.findall(str(s["result"]).lower()))
-        return found
+            if s["kind"] == "tool" and s["status"] == "succeeded":
+                refs = _REF.findall(str(s["result"]).lower())
+                if s["name"] in MUTATING:
+                    written.update(refs)
+                if not (reads_only and s["name"] in MUTATING):
+                    found.update(refs)
+        # a node the agent made stays its own work even after it reads the node back
+        return found - written if reads_only else found
 
 
 # ---- argument models -------------------------------------------------------------------------------------------
@@ -196,9 +207,22 @@ assert {t["function"]["name"] for t in AGENT_TOOLS} == READ_ONLY | MUTATING, "ex
 
 # ---- rules -----------------------------------------------------------------------------------------------------
 
+def _coerce(name: str, args: dict) -> dict:
+    """Weaker models sometimes send a list argument as a JSON string; read it as the list it is. Only list fields,
+    so a text field that happens to start with '[' is never touched."""
+    out = dict(args)
+    for key, field in MODELS[name].model_fields.items():
+        if get_origin(field.annotation) is list and isinstance(out.get(key), str) and out[key].lstrip().startswith("["):
+            try:
+                out[key] = json.loads(out[key])
+            except ValueError:
+                pass
+    return out
+
+
 def parse(name: str, args: dict):
     try:
-        return MODELS[name].model_validate(args)
+        return MODELS[name].model_validate(_coerce(name, args))
     except ValidationError as exc:
         e = exc.errors()[0]
         where = ".".join(str(p) for p in e["loc"]) or "arguments"
@@ -235,6 +259,23 @@ def needs_task(state: State, names: list[str]) -> str | None:
     if any(t["status"] == "in_progress" for t in state.tasks) or not (todo := startable(state)):
         return None
     return f"No task is in progress. Start one with update_task status=in_progress before researching: {', '.join(todo)}."
+
+
+def research_used(state: State, key: str) -> int:
+    """Research calls (reads, successful or not) made during task `key`."""
+    return sum(1 for s in state.steps if s["kind"] == "tool" and s["task_key"] == key and s["name"] in SEARCHES
+               and s["status"] != "unknown")
+
+
+def research_capped(state: State, names: list[str]) -> str | None:
+    """A task gets MAX_RESEARCH_PER_TASK research calls. Past that the model is repeating searches with new wording, so
+    it is told to complete the task with what it has. Writes are not research and are never capped."""
+    live = next((t for t in state.tasks if t["status"] == "in_progress"), None)
+    asked = sum(1 for n in names if n in SEARCHES)
+    if live is None or not asked or research_used(state, live["key"]) + asked <= MAX_RESEARCH_PER_TASK:
+        return None
+    return (f"{live['key']} has used its {MAX_RESEARCH_PER_TASK} research calls. Do not search again: record what you found with "
+            "write_node if it belongs in the tree, then complete_task with what you have (or skip the task).")
 
 
 def next_hint(state: State) -> str:
@@ -287,10 +328,24 @@ def _new_tasks(state: State, tasks: list[TaskIn]) -> None:
 
 def _cited(state: State, refs: list[str], reads_only: bool = False) -> None:
     seen = state.refs(reads_only)
-    missing = [r for r in refs if r.lower() not in seen]
+    urls = [s for s in seen if s.startswith("http")]
+
+    def known(ref: str) -> bool:
+        ref = ref.lower()
+        if ref in seen:
+            return True
+        # a URL is read the way refs() read it (up to a space, quote or bracket); a bare site ("greenlancer.com") or a
+        # shortened URL counts if it is part of a URL the run retrieved
+        ref = re.split(r"[\s\"'<>)\]\\]", ref)[0]
+        site = re.sub(r"^https?://(www\.)?", "", ref).rstrip("/")
+        return "." in site and any(site in u for u in urls)
+
+    missing = [r for r in refs if not known(r)]
     if missing:
+        sample = [*urls[:3], *(s for s in seen if not s.startswith("http"))][:5]
         raise OpError("These ids never appeared in a tool result of this run: " + ", ".join(missing[:5])
-                      + ". Cite only ids and URLs you actually retrieved.")
+                      + ". Cite only ids and URLs you actually retrieved, or leave the reference out"
+                      + (f"; ones you have: {', '.join(sample)}." if sample else "."))
 
 
 def blocked_changes(tasks: list[dict]) -> list[tuple[str, str, str | None]]:
@@ -307,8 +362,9 @@ def blocked_changes(tasks: list[dict]) -> list[tuple[str, str, str | None]]:
     return changes
 
 
-def check(state: State, name: str, args: dict):
-    """Validate one operation against the state; returns the parsed arguments."""
+def check(state: State, name: str, args: dict, forced: bool = False):
+    """Validate one operation against the state; returns the parsed arguments. `forced`: the run ran out of budget and
+    this is its closing assessment, so the demands on writing results up and citing them are waived."""
     a = parse(name, args)
     run, tasks = state.run, state.tasks
     if name == "create_plan":
@@ -371,5 +427,16 @@ def check(state: State, name: str, args: dict):
             raise OpError("No task was completed, so the outcome can only be inconclusive.")
         if a.outcome == "blocked" and not any(t["status"] in ("failed", "blocked") for t in tasks):
             raise OpError("blocked needs a failed or blocked task; otherwise use partially_satisfied or inconclusive.")
+        done = [t for t in tasks if t["status"] == "completed"]
+        if a.outcome == "satisfied" and (a.unresolved_questions or any(
+                t["assessment"] and (not t["assessment"]["satisfied"] or t["assessment"]["unresolved"]) for t in done)):
+            raise OpError("satisfied needs no unresolved questions and every completed task satisfied; "
+                          "use partially_satisfied and list what is still open.")
+        if not forced and a.outcome != "inconclusive":
+            if not any(s["kind"] == "tool" and s["status"] == "succeeded" and s["name"] == "write_node" for s in state.steps):
+                raise OpError("Write your findings into the tree with write_node before finishing.")
+            if not a.evidence and any(s["kind"] == "tool" and s["status"] == "succeeded" and s["name"] in READ_ONLY
+                                      for s in state.steps):
+                raise OpError("Cite the sources behind the summary in evidence: URLs, source ids or node ids you retrieved.")
         _cited(state, a.evidence, reads_only=True)
     return a

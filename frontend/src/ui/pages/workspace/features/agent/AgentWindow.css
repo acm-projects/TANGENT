@@ -148,3 +148,9 @@
 .agent-task[data-status="unfinished"] [data-ui="icon"] {
   color: var(--color-danger);
 }
+
+/* the summary keeps the line breaks and list dashes the agent wrote */
+.agent-summary {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

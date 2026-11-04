@@ -78,7 +78,7 @@ class Rt:
             "search_nodes": {"results": [{"node_id": self.node, "title": "Baselines"}]},
             "search_sources": {"passages": [{"evidence_id": "p9:c1", "text": "Clinical network reliability fell."}]},
             "delete_node": {"ok": True, "deleted_node_ids": [self.node]},
-            "write_node": {"node_id": self.node},
+            "write_node": {"node_id": str(uuid.uuid4())},  # a new node, not the one the searches return
         }
         url = pg.admin_url.replace("postgresql://", "postgresql+asyncpg://")
         engine = create_async_engine(url, poolclass=NullPool, connect_args={"statement_cache_size": 0})
@@ -145,6 +145,7 @@ def test_autonomous_run(rt):
         tc("complete_task", task_id="t3", investigated="Searched the sources for deployments", source_refs=["p9:c1"],
            findings="One clinical study reports reliability problems after deployment.", satisfied=True, needs_more_research=False),
         tc("update_task", task_id="t2", status="skipped", reason="Superseded by the deployment evidence"),
+        tc("write_node", parent_id=node, title="Deployment evidence", body="One clinical study reports reliability problems after deployment."),
         tc("finish_research", outcome="partially_satisfied", evidence=[node, "p9:c1"],
            summary="RL looks promising in simulation, but deployment evidence is thin and comparison is inconclusive.",
            limitations=["Only one deployment study"], unresolved_questions=["Real-world latency"]),
@@ -170,13 +171,13 @@ def test_autonomous_run(rt):
     assert rt.types(rid) == [
         "run.created", "run.started", "plan.created", "task.created", "task.created", "task.started", "tool.executed",
         "task.completed", "plan.revised", "task.created", "input.requested", "input.answered", "task.started",
-        "tool.executed", "task.completed", "task.skipped", "run.completed"]
-    assert [t[0] for t in rt.tool_calls] == ["search_nodes", "search_sources"]
+        "tool.executed", "task.completed", "task.skipped", "tool.executed", "run.completed"]
+    assert [t[0] for t in rt.tool_calls] == ["search_nodes", "search_sources", "write_node"]
     # the model got the compact state, with the answer and the revised plan, after the pause
     resumed = rt.requests[7]["messages"][1]["content"]
     assert "Include non-peer-reviewed reports? -> No" in resumed and "PLAN v2" in resumed and "t3 [pending]" in resumed
     assert "GOAL (unchanged): Does RL improve" in resumed
-    assert pg_count(rt, "agent_llm_calls", rid) == 12 and not rt.script
+    assert pg_count(rt, "agent_llm_calls", rid) == 13 and not rt.script
 
 
 def pg_count(rt, table, rid):
@@ -338,10 +339,11 @@ def test_research_before_starting_a_task_is_refused_then_accepted(rt):
         tc("search_nodes", query="first"),
         tc("complete_task", task_id="t1", investigated="Searched the tree for the first thing", node_refs=[rt.node],
            findings="One node covers the first thing.", satisfied=True, needs_more_research=False),
+        tc("write_node", parent_id=rt.node, title="First thing", body="One node covers the first thing."),
         tc("finish_research", outcome="satisfied", summary="The first thing is covered by one existing node.", evidence=[rt.node]),
     ]
     rt.drive()
-    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes"]
+    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes", "write_node"]
     refused = rt.executions(rid, status="failed", kind="op")
     assert len(refused) == 1 and refused[0][0] == "search_nodes" and "Start one with update_task" in refused[0][3]["error"]
     assert rt.executions(rid, kind="tool")[0][1] == "succeeded" and rt.row(rid, "invalid_streak") == 0
@@ -360,11 +362,12 @@ def test_a_synthesis_task_completes_from_earlier_findings_without_searching(rt):
         tc("complete_task", task_id="t2", investigated="Compared the options using the first task's findings",
            findings="The first option is covered by one node; no other option was researched.", satisfied=False,
            unresolved=["the second option"], needs_more_research=False),
+        tc("write_node", parent_id=rt.node, title="Comparison", body="Only one option was researched."),
         tc("finish_research", outcome="partially_satisfied", summary="One option was researched and compared; the rest is open.",
            evidence=[rt.node]),
     ]
     rt.drive()
-    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes"]
+    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_nodes", "write_node"]
     assert rt.pg.sql("SELECT key, status FROM agent_tasks WHERE run_id = %s ORDER BY key", (rid,)) == [("t1", "completed"), ("t2", "completed")]
     assert not rt.executions(rid, status="failed", kind="op")
 
@@ -382,6 +385,7 @@ def test_restating_the_current_status_while_adding_dependencies_works_and_get_re
         tc("get_research_state"),
         tc("complete_task", task_id="t2", investigated="Compared using the first task", findings="Only one option was researched.",
            satisfied=False, unresolved=["the second option"], needs_more_research=False),
+        tc("write_node", parent_id=rt.node, title="Comparison", body="Only one option was researched."),
         tc("finish_research", outcome="partially_satisfied", summary="One option was researched and compared; the rest is open.", evidence=[rt.node]),
     ]
     rt.drive()
@@ -390,3 +394,23 @@ def test_restating_the_current_status_while_adding_dependencies_works_and_get_re
     assert rt.types(rid).count("task.started") == 2  # the second t2 call was a dependency edit, not a second start
     state_read = [r for r in rt.executions(rid, kind="op") if r[0] == "get_research_state"][0]
     assert "can be completed" in state_read[3]["next"]
+
+
+def test_a_task_that_keeps_searching_is_told_to_wrap_up(rt, monkeypatch):
+    monkeypatch.setattr(ops, "MAX_RESEARCH_PER_TASK", 2)
+    rid = rt.start()
+    rt.script += [
+        tc("create_plan", strategy="Research the first thing", tasks=[{"objective": "Research the first thing"}]),
+        tc("update_task", task_id="t1", status="in_progress"),
+        tc("search_sources", query="first"),
+        tc("search_sources", query="first thing"),
+        tc("search_sources", query="first thing again"),  # a third search in a task capped at two: refused, nothing runs
+        tc("write_node", parent_id=rt.node, title="First thing", body="What the two searches found."),
+        tc("complete_task", task_id="t1", investigated="Two searches of the sources", source_refs=["p9:c1"],
+           findings="Two searches covered the first thing.", satisfied=True, needs_more_research=False),
+        tc("finish_research", outcome="satisfied", summary="The first thing is covered by the sources.", evidence=["p9:c1"]),
+    ]
+    rt.drive()
+    assert rt.row(rid) == "completed" and [t[0] for t in rt.tool_calls] == ["search_sources", "search_sources", "write_node"]
+    refused = rt.executions(rid, status="failed", kind="op")
+    assert len(refused) == 1 and "used its 2 research calls" in refused[0][3]["error"]

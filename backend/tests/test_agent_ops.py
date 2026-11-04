@@ -112,14 +112,14 @@ def test_complete_task_needs_an_in_progress_task_a_real_result_and_real_referenc
 def test_finish_requires_closed_tasks_and_an_honest_outcome():
     fin = {"outcome": "satisfied", "summary": "RL helped in simulations; deployment evidence is missing.", "evidence": [NODE]}
     done = [task("t1", "completed")]
-    ev = [step()]
+    ev = [step(), step(name="write_node", result={"node_id": "44444444-4444-4444-8444-444444444444"})]
     assert ops.check(state(done, ev), "finish_research", fin)
     rejects(state([task("t1", "completed"), task("t2")], ev), "finish_research", fin, "Tasks still open: t2")
     rejects(state([task("t1", "skipped", reason="x")], ev), "finish_research", fin, "only be inconclusive")
     assert ops.check(state([task("t1", "skipped", reason="x")], ev), "finish_research", {**fin, "outcome": "inconclusive"})
     rejects(state(done, ev), "finish_research", {**fin, "outcome": "blocked"}, "blocked needs")
     assert ops.check(state([*done, task("t2", "failed")], ev), "finish_research", {**fin, "outcome": "blocked"})
-    rejects(state(done, []), "finish_research", fin, "never appeared")
+    rejects(state(done, [step(name="write_node", result={"node_id": NODE})]), "finish_research", fin, "never appeared")
 
 
 def test_only_one_question_at_a_time():
@@ -194,7 +194,7 @@ def test_the_agents_own_written_nodes_are_not_evidence_for_its_conclusion():
     # the node it wrote can still back a task's findings, and a node it read can back the conclusion
     assert ops.check(state([task("t1", "in_progress")], [step(name="write_node", result={"node_id": NODE})]),
                      "complete_task", DONE)
-    assert ops.check(state([task("t1", "completed")], [step()]), "finish_research", fin)
+    assert ops.check(state([task("t1", "completed")], [step(), step(name="write_node", result={"node_id": "n"})]), "finish_research", fin)
 
 
 def test_rejected_steps_are_counted_over_the_whole_run():
@@ -215,7 +215,7 @@ def test_snapshot_warns_when_the_budget_is_low_and_lists_what_the_agent_wrote():
     wrote["args"] = {"parent_id": "p", "title": "Regulatory viability", "body": "Part 57 is a proposed rule.\nIt may shrink the EPZ."}
     low = prompts.snapshot(state([task("t1", "in_progress")], [wrote], iteration=ops.MAX_ITERATIONS - 3))
     assert "LOW BUDGET: 3 steps" in low and "finish_research" in low
-    assert f"{NODE}: Regulatory viability | Part 57 is a proposed rule. It may shrink the EPZ." in low
+    assert f"{NODE} (under p): Regulatory viability | Part 57 is a proposed rule. It may shrink the EPZ." in low
     assert "LOW BUDGET" in prompts.snapshot(state(tool_calls=ops.MAX_TOOL_CALLS - 2))
 
 
@@ -274,3 +274,109 @@ def test_get_research_state_says_what_to_do_next():
     assert "can be completed" in ops.next_hint(state([task("t1", "in_progress")], [step()]))
     assert "can be completed" in ops.next_hint(state([task("t1", "completed"), task("t2", "in_progress", deps=["t1"])]))
     assert "finish_research" in ops.next_hint(state([task("t1", "completed")]))
+
+
+FIN = {"outcome": "partially_satisfied", "summary": "Solar costs are documented; the heat pump cost at school scale is not.", "evidence": [URL]}
+WEB = step(name="web_search", result={"results": [{"title": "t", "url": URL, "snippet": "s"}]})
+WROTE = step(name="write_node", result={"node_id": NODE})
+
+
+def test_satisfied_needs_nothing_unresolved():
+    gaps = {"findings": "x", "node_refs": [], "source_refs": [], "satisfied": False, "unresolved": ["the core number"]}
+    done_ok = {**gaps, "satisfied": True, "unresolved": []}
+    rejects(state([task("t1", "completed", assessment=done_ok)], [WEB, WROTE]), "finish_research",
+            {**FIN, "outcome": "satisfied", "unresolved_questions": ["the core number"]}, "satisfied needs no unresolved")
+    rejects(state([task("t1", "completed", assessment=gaps)], [WEB, WROTE]), "finish_research", {**FIN, "outcome": "satisfied"}, "satisfied needs no unresolved")
+    assert ops.check(state([task("t1", "completed", assessment=done_ok)], [WEB, WROTE]), "finish_research", {**FIN, "outcome": "satisfied"})
+    assert ops.check(state([task("t1", "completed", assessment=gaps)], [WEB, WROTE]), "finish_research", FIN)
+
+
+def test_finishing_needs_findings_written_and_sources_cited_unless_the_budget_ran_out():
+    done = [task("t1", "completed")]
+    rejects(state(done, [WEB]), "finish_research", FIN, "write_node")
+    rejects(state(done, [WEB, WROTE]), "finish_research", {**FIN, "evidence": []}, "Cite the sources")
+    assert ops.check(state(done, [WEB, WROTE]), "finish_research", FIN)
+    # nothing retrieved, nothing to cite; inconclusive needs neither; a forced finish (budget gone) waives both
+    assert ops.check(state(done, [WROTE]), "finish_research", {**FIN, "evidence": []})
+    assert ops.check(state(done, []), "finish_research", {**FIN, "outcome": "inconclusive", "evidence": []})
+    assert ops.check(state(done, [WEB]), "finish_research", {**FIN, "evidence": []}, forced=True)
+
+
+def test_a_bare_site_counts_as_cited_when_the_run_retrieved_a_url_on_it():
+    st = state([task("t1", "in_progress")], [WEB])
+    assert ops.check(st, "complete_task", {**DONE, "node_refs": [], "source_refs": ["nrc.gov", "https://www.nrc.gov/", "WWW.NRC.GOV/reactors"]})
+    rejects(st, "complete_task", {**DONE, "node_refs": [], "source_refs": ["example.com"]}, "never appeared")
+    rejects(st, "complete_task", {**DONE, "node_refs": [], "source_refs": ["nrc"]}, "never appeared")  # not a site
+
+
+def test_a_list_argument_sent_as_a_json_string_is_read_as_a_list():
+    plan = {"strategy": "Compare the two options", "tasks": '[{"objective": "Research the first option"}]'}
+    assert ops.check(state(plan=False), "create_plan", plan).tasks[0].objective == "Research the first option"
+    # a text field that starts with a bracket is left alone
+    assert ops.check(state([task("t1", "in_progress")], [step()]), "complete_task", {**DONE, "findings": "[1] one node covers the first option."}).findings.startswith("[1]")
+    rejects(state(plan=False), "create_plan", {**plan, "tasks": "[not json"}, "valid list")
+
+
+def test_the_node_the_user_selected_can_be_cited_though_no_tool_returned_it():
+    selected = "2a46178b-ad0e-4031-aaba-b0261dc84b3f"
+    st = state([task("t1", "in_progress")], [step()], active_node_id=selected)
+    assert ops.check(st, "complete_task", {**DONE, "node_refs": [selected.upper()]})
+    rejects(state([task("t1", "in_progress")], [step()]), "complete_task", {**DONE, "node_refs": [selected]}, "never appeared")
+
+
+def test_a_task_gets_a_limited_number_of_research_calls(monkeypatch):
+    monkeypatch.setattr(ops, "MAX_RESEARCH_PER_TASK", 3)
+    reads = [step(name="web_search", task_key="t1") for _ in range(3)]
+    working = state([task("t1", "in_progress")], reads)
+    assert ops.research_used(working, "t1") == 3 and ops.research_used(working, "t2") == 0
+    assert "used its 3 research calls" in ops.research_capped(working, ["web_search"])
+    assert ops.research_capped(state([task("t1", "in_progress")], reads[:2]), ["web_search"]) is None
+    assert ops.research_capped(state([task("t1", "in_progress")], reads[:2]), ["web_search", "search_papers"]) is not None  # a batch counts
+    # looking at the project's own tree is cheap and never capped, whether asked for or already done
+    assert ops.research_capped(working, ["get_node"]) is None and ops.research_capped(working, ["search_nodes"]) is None
+    tree_reads = [step(name="search_nodes", task_key="t1") for _ in range(5)]
+    assert ops.research_used(state([task("t1", "in_progress")], tree_reads), "t1") == 0
+    # writes and operations are never capped, nor is anything outside a task; failed reads count, unknown ones do not
+    assert ops.research_capped(working, ["write_node"]) is None and ops.research_capped(working, ["complete_task"]) is None
+    assert ops.research_capped(state([task("t1", "completed")], reads), ["web_search"]) is None
+    failed = [step(name="web_search", task_key="t1", status="failed", result={"error": "x"}) for _ in range(3)]
+    assert ops.research_capped(state([task("t1", "in_progress")], failed), ["web_search"]) is not None
+    unknown = [step(name="web_search", task_key="t1", status="unknown") for _ in range(3)]
+    assert ops.research_capped(state([task("t1", "in_progress")], unknown), ["web_search"]) is None
+
+
+def test_snapshot_shows_the_research_used_and_where_each_written_node_sits():
+    reads = [step(name="web_search", task_key="t1") for _ in range(ops.MAX_RESEARCH_PER_TASK - 1)]
+    text = prompts.snapshot(state([task("t1", "in_progress")], reads))
+    assert f"RESEARCH: t1 has used {ops.MAX_RESEARCH_PER_TASK - 1}/{ops.MAX_RESEARCH_PER_TASK} research calls. Do not search again" in text
+    assert "Do not search again" not in prompts.snapshot(state([task("t1", "in_progress")], reads[:1]))
+    assert "RESEARCH:" not in prompts.snapshot(state([task("t1")]))
+    assert "real structure" in prompts.system_prompt() and "parent_id" in prompts.system_prompt()
+
+
+def test_a_url_is_matched_the_way_it_was_read_and_a_bad_citation_lists_what_the_run_has():
+    long_url = "https://www.google.com/goto?url=CAESygEB6zsw&sa=U"
+    weird = "https://example.org/report(final)"  # the run reads a URL up to a bracket
+    st = state([task("t1", "in_progress")], [step(name="web_search", result={"results": [{"url": long_url}, {"url": weird}]})])
+    assert ops.check(st, "complete_task", {**DONE, "node_refs": [], "source_refs": [long_url, "https://www.google.com/goto?url=CAESygEB6zsw", weird]})
+    with pytest.raises(OpError) as err:
+        ops.check(st, "complete_task", {**DONE, "node_refs": [], "source_refs": ["https://made-up.example/page"]})
+    assert "never appeared" in str(err.value) and "leave the reference out" in str(err.value) and "google.com/goto" in str(err.value)
+
+
+def test_snapshot_lists_heading_nodes_made_with_branch_node_under_their_parent():
+    branch = step(name="branch_node", result={"node_id": NODE})
+    branch["args"] = {"node_id": "root-id", "title": "School energy options"}
+    text = prompts.snapshot(state([task("t1", "in_progress")], [branch]))
+    assert f"{NODE} (under root-id): School energy options" in text
+
+
+def test_a_node_the_agent_wrote_is_not_evidence_even_after_it_reads_it_back():
+    mine = "33333333-3333-4333-8333-333333333333"
+    steps = [step(name="write_node", result={"node_id": mine}), step(name="search_nodes", result={"results": [{"node_id": mine}, {"node_id": NODE}]}), WEB]
+    st = state([task("t1", "completed")], steps)
+    fin = {"outcome": "partially_satisfied", "summary": "The comparison is written up; the costs are not established.", "evidence": [mine]}
+    rejects(st, "finish_research", fin, "never appeared")
+    assert ops.check(st, "finish_research", {**fin, "evidence": [NODE, URL]})
+    # it may still back a task's findings (where the findings were recorded)
+    assert mine in st.refs() and mine not in st.refs(reads_only=True) and NODE in st.refs(reads_only=True)

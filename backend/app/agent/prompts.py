@@ -2,7 +2,9 @@
 
 import json
 
-from app.agent.ops import MAX_ITERATIONS, MAX_REPLANS, MAX_TASKS, MAX_TOOL_CALLS, State, startable
+from app.agent.ops import (
+    MAX_ITERATIONS, MAX_REPLANS, MAX_RESEARCH_PER_TASK, MAX_TASKS, MAX_TOOL_CALLS, State, research_used, startable,
+)
 
 RECENT_ITERATIONS = 6
 LATEST_CHARS = 3000  # the newest step's results are shown fully enough to write up; older ones are squeezed
@@ -38,12 +40,21 @@ wording; batch independent searches in one step.
 update_plan with a reason and add_tasks. Skip tasks the research made irrelevant (with a reason). You get at most \
 {replans} revisions and {tasks} tasks, {iterations} steps and {calls} tool calls in total.
 4. Record findings in the tree with write_node (one node per finding, under the node it concerns, citing evidence ids \
-inline like [p12:c7]); the tree is where work lives, not the chat. Do not branch, merge or delete unless the goal needs it. \
+inline like [p12:c7], or with the full web URL); the tree is where work lives, not the chat: finish_research is refused \
+until you have written your findings with write_node (unless the outcome is inconclusive). Give the tree a real structure, not one big note: a heading node for the topic, then child nodes for each part, so the \
+branches read like an outline. If the user names a structure, build exactly that: parents before their children; \
+write_node returns the new node's node_id, which you pass as parent_id for its children (NODES YOU WROTE lists them with \
+their parents). A heading node that will only have children is made with branch_node and a title; a node meant to hold findings \
+is made with write_node (title and body), because no tool can fill an empty node afterwards. Make the plan follow the structure: give each branch of the tree its own task that researches it AND writes \
+its nodes, and write each finding as soon as you have it, in the task that found it, not all at the end. Each task gets \
+{research} research calls, so search once per question, not repeatedly. Do not branch, merge or delete unless the goal needs it. \
 Deleting needs the user's confirmation, which the system asks for itself.
 5. finish_research when the goal has been addressed or cannot be advanced: outcome satisfied | partially_satisfied | \
 inconclusive | blocked, a summary that cites evidence ids, limitations, and unresolved questions. Complete or skip all open \
 tasks first. The summary may state only what your completed tasks, the nodes you wrote or results you retrieved support: \
-never add figures, dates or names from memory. Cite the web URLs and source ids you retrieved in `evidence`.
+never add figures, dates or names from memory. Cite the full web URLs and source ids you retrieved in `evidence`. \
+Use outcome satisfied only when nothing material is left unresolved; if you list unresolved questions, or a task says \
+the objective was not fully met, the outcome is partially_satisfied.
 6. Watch the BUDGET line. When it says LOW BUDGET, stop researching: complete or skip the open tasks and call finish_research.
 
 Rules: a tool error is information; do not repeat the same failing call. Use only node ids you were given or retrieved. \
@@ -52,7 +63,8 @@ nothing."""
 
 
 def system_prompt() -> str:
-    return SYSTEM_PROMPT.format(replans=MAX_REPLANS, tasks=MAX_TASKS, iterations=MAX_ITERATIONS, calls=MAX_TOOL_CALLS)
+    return SYSTEM_PROMPT.format(replans=MAX_REPLANS, tasks=MAX_TASKS, iterations=MAX_ITERATIONS, calls=MAX_TOOL_CALLS,
+                                research=MAX_RESEARCH_PER_TASK)
 
 
 def _clip(value, n: int) -> str:
@@ -89,6 +101,10 @@ def snapshot(st: State) -> str:
         lines.append(f"- {t['key']} [{t['status']}]{dep}: {t['objective']}{extra}")
     out.append("TASKS:\n" + ("\n".join(lines) if lines else "none"))
     for t in st.tasks:
+        if t["status"] == "in_progress":
+            used = research_used(st, t["key"])
+            out.append(f"RESEARCH: {t['key']} has used {used}/{MAX_RESEARCH_PER_TASK} research calls."
+                       + (" Do not search again: write what you found, then complete_task." if used >= MAX_RESEARCH_PER_TASK - 1 else ""))
         if t["status"] == "in_progress" and t["depends_on"]:
             out.append(f"NOTE: {t['key']} builds on {', '.join(t['depends_on'])}. If it only compares or summarises their results, "
                        "do not search again: use COMPLETED TASK RESULTS, write the comparison, then complete_task.")
@@ -104,10 +120,11 @@ def snapshot(st: State) -> str:
     unresolved = [u for t in done for u in t["assessment"]["unresolved"]]
     if unresolved:
         out.append("UNRESOLVED QUESTIONS:\n" + "\n".join(f"- {u}" for u in unresolved))
-    wrote = [s for s in st.steps if s["name"] == "write_node" and s["status"] == "succeeded"][-MAX_WROTE:]
+    wrote = [s for s in st.steps if s["name"] in ("write_node", "branch_node") and s["status"] == "succeeded"][-MAX_WROTE:]
     if wrote:
         out.append("NODES YOU WROTE:\n" + "\n".join(
-            f"- {s['result'].get('node_id')}: {s['args'].get('title')} | {_clip(' '.join(str(s['args'].get('body', '')).split()), WROTE_BODY_CHARS)}"
+            f"- {s['result'].get('node_id')} (under {s['args'].get('parent_id') or s['args'].get('node_id')}): {s['args'].get('title')} | "
+            f"{_clip(' '.join(str(s['args'].get('body', '')).split()), WROTE_BODY_CHARS)}"
             for s in wrote))
     recent = [s for s in st.steps if s["iteration"] > run["iteration"] - RECENT_ITERATIONS]
     if recent:
