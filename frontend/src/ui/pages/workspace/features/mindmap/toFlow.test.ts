@@ -76,26 +76,16 @@ describe("toFlow", () => {
     expect(pathEdges.sort()).toEqual(["a->m", "b->c", "c->m", "r->a", "r->b"]);
   });
 
-  it("draws a merge centred between its sources, one row below the deepest", () => {
-    // r -> (a, b) ; b -> (c) ; m merges c and a
+  it("draws a merge in its shallowest source's column, one row below its deepest", () => {
+    // r -> (a, b) ; b -> (c) ; m merges c and a: a is the shallower, though c is m's first parent
     const s = slice(null);
     s.nodesById = { ...s.nodesById, m: { ...meta("m", "c", 1), merge_source_ids: ["c", "a"] } };
     s.childrenByParent = { ...s.childrenByParent, c: ["m"] };
     const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
-    expect(at["c"]!.x).not.toBe(at["a"]!.x);
-    expect(at["m"]!.x).toBe((at["a"]!.x + at["c"]!.x) / 2);
+    expect(at["m"]!.x).toBe(at["a"]!.x);
     expect(at["m"]!.y).toBe(at["c"]!.y + ROW_HEIGHT);
-  });
-
-  it("centres a merge of three between the outermost of them", () => {
-    // r -> (a, b, d) ; b -> (c) ; m merges a, c and d
-    const s = slice(null);
-    s.nodesById = { ...s.nodesById, d: meta("d", "r", 3), m: { ...meta("m", "a", 1), merge_source_ids: ["a", "c", "d"] } };
-    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "d"], a: ["m"] };
-    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
-    const xs = ["a", "c", "d"].map((id) => at[id]!.x);
-    expect(at["m"]!.x).toBe((Math.min(...xs) + Math.max(...xs)) / 2);
-    expect(at["m"]!.y).toBe(3 * ROW_HEIGHT);
+    // c is a leaf of its own again, in its own column
+    expect(at["c"]!.x).not.toBe(at["a"]!.x);
   });
 
   it("moves a merge's own branches down with it", () => {
