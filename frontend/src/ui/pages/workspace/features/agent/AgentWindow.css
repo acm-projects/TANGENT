@@ -49,71 +49,77 @@
   color: inherit;
 }
 
-.agent-turns {
+.agent-body {
   flex: 1;
   min-height: 0;
-  margin: 0;
   padding: var(--space-3);
   overflow-y: auto;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .agent-hint {
   color: var(--color-text-secondary);
 }
 
-.agent-turn {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  max-width: 90%;
+.agent-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--agent-blue);
 }
 
-.agent-turn[data-role="user"] {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-
-.agent-text {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.agent-turn[data-role="user"] .agent-text {
-  background: var(--agent-blue-soft);
-  color: #1e3a8a;
-}
-
-/* one line per tool the agent ran; open it for the arguments and result */
-.agent-call {
-  font-size: var(--font-size-xs);
-  color: #1d4ed8;
-}
-
-.agent-call[data-failed] {
+.agent-status[data-status="failed"] {
   color: var(--color-danger);
 }
 
-.agent-call summary {
-  cursor: pointer;
+/* the checklist: the icon carries the state */
+.agent-task [data-ui="icon"] {
+  flex: none;
+  color: var(--color-text-secondary);
 }
 
-.agent-call pre {
-  max-height: 10rem;
-  margin: var(--space-1) 0 0;
-  padding: var(--space-2);
-  overflow: auto;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-size: var(--font-size-xs);
+.agent-task[data-status="completed"] [data-ui="icon"] {
+  color: var(--agent-blue);
+}
+
+.agent-task[data-status="failed"] [data-ui="icon"] {
+  color: var(--color-danger);
+}
+
+.agent-task[data-status="skipped"] [data-ui="text"]:first-child {
+  text-decoration: line-through;
+}
+
+.agent-activity {
+  color: var(--agent-blue);
+}
+
+.agent-activity[data-failed] {
+  color: var(--color-danger);
+}
+
+.agent-final {
+  padding: var(--space-3);
+  border-left: 3px solid var(--agent-blue);
+  background: var(--agent-blue-soft);
+}
+
+.agent-question {
+  padding: var(--space-3);
+  border-color: var(--agent-blue);
+}
+
+.agent-option input {
+  flex: none;
+  width: auto;
+  margin-top: 0.2em;
+  accent-color: var(--agent-blue);
+}
+
+.agent-other {
+  padding: var(--space-2) var(--space-3);
+}
+
+.agent-other input {
+  width: 100%;
 }
 
 .agent-error {

@@ -11,6 +11,7 @@ from sqlalchemy import event, select, text
 from sqlalchemy.engine import make_url
 from dotenv import load_dotenv
 
+from app.agent.schema import AGENT_DDL
 from app.models import Base
 
 load_dotenv()
@@ -124,6 +125,7 @@ _ADDED_COLUMNS = [
         created_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (project_id, paper_id)
     )""",
+    *AGENT_DDL,
 ]
 
 

@@ -1,0 +1,176 @@
+"""The agent runtime's rules, without a database or a model: what ops.check lets through, the one-decision-per-step
+batch policy, limits, task blocking and the snapshot the model reads. Runs in CI."""
+import os
+
+import pytest
+
+_dummies = {"DATABASE_URL": "postgresql://dummy@localhost/dummy", "JWT_SECRET_KEY": "test-secret"}
+_added = [k for k in _dummies if k not in os.environ]
+os.environ.update({k: _dummies[k] for k in _added})
+
+from app.agent import ops, prompts  # noqa: E402
+from app.agent.ops import OpError, State  # noqa: E402
+
+for _k in _added:
+    del os.environ[_k]
+
+NODE = "11111111-1111-4111-8111-111111111111"
+
+
+def run(**kw):
+    return {"id": "r", "goal": "Does RL help?", "active_node_id": None, "clarifications": [], "authorized_deletes": [],
+            "iteration": 1, "tool_calls": 0, "replans": 0, "pending_input": None, **kw}
+
+
+def task(key, status="pending", deps=(), **kw):
+    return {"key": key, "objective": f"Objective of {key}", "status": status, "depends_on": list(deps),
+            "reason": None, "assessment": None, **kw}
+
+
+def step(name="search_nodes", task_key="t1", status="succeeded", result=None, kind="tool", iteration=1):
+    return {"kind": kind, "task_key": task_key, "name": name, "status": status, "iteration": iteration,
+            "args": {}, "result": result if result is not None else {"results": [{"node_id": NODE}]}}
+
+
+def state(tasks=(), steps=(), plan=True, **kw):
+    return State(run=run(**kw), plan={"version": 1, "strategy": "s", "assumptions": []} if plan else None,
+                 tasks=list(tasks), steps=list(steps))
+
+
+def rejects(st, name, args, match):
+    with pytest.raises(OpError, match=match):
+        ops.check(st, name, args)
+
+
+PLAN = {"strategy": "Compare RL with baselines", "tasks": [{"objective": "Find the baseline approaches"}]}
+DONE = {"task_id": "t1", "investigated": "Searched the tree", "findings": "Found one relevant node about RL.",
+        "satisfied": True, "needs_more_research": False, "node_refs": [NODE]}
+
+
+def test_plan_once_and_dependencies_must_exist():
+    assert ops.check(state(plan=False), "create_plan", PLAN)
+    rejects(state(), "create_plan", PLAN, "already exists")
+    rejects(state(plan=False), "create_plan",
+            {**PLAN, "tasks": [{"objective": "First task here", "depends_on": ["t2"]}, {"objective": "Second task here"}]},
+            "Unknown dependency t2")
+    ok = {**PLAN, "tasks": [{"objective": "First task here"}, {"objective": "Second task here", "depends_on": ["t1"]}]}
+    assert ops.check(state(plan=False), "create_plan", ok)
+
+
+def test_bad_arguments_come_back_as_readable_errors():
+    rejects(state(plan=False), "create_plan", {"strategy": "x", "tasks": []}, "Bad arguments for create_plan")
+    rejects(state(), "request_user_input",
+            {"questions": [{"id": "a", "prompt": "Which one?", "type": "single", "options": [{"label": "only"}]}]},
+            "at least 2 options")
+
+
+def test_replans_need_a_reason_and_are_bounded():
+    upd = {"strategy": "Add deployment evidence", "reason": "All studies were simulations"}
+    assert ops.check(state(), "update_plan", upd)
+    rejects(state(), "update_plan", {"strategy": "Add deployment evidence"}, "reason")
+    rejects(state(replans=ops.MAX_REPLANS), "update_plan", upd, "replanning limit")
+    rejects(state(plan=False), "update_plan", upd, "no plan yet")
+
+
+def test_task_cap():
+    full = [task(f"t{i}") for i in range(1, ops.MAX_TASKS + 1)]
+    rejects(state(full), "create_task", {"objective": "One task too many"}, "At most")
+
+
+def test_cannot_start_a_task_before_its_dependencies_or_two_at_once():
+    t = [task("t1"), task("t2", deps=["t1"])]
+    rejects(state(t), "update_task", {"task_id": "t2", "status": "in_progress"}, "Dependencies not completed: t1")
+    assert ops.check(state([task("t1", "completed"), task("t2", deps=["t1"])]), "update_task",
+                     {"task_id": "t2", "status": "in_progress"})
+    rejects(state([task("t1", "in_progress"), task("t2")]), "update_task", {"task_id": "t2", "status": "in_progress"},
+            "already in progress")
+
+
+def test_skip_needs_reason_and_completed_tasks_are_immutable():
+    rejects(state([task("t1")]), "update_task", {"task_id": "t1", "status": "skipped"}, "reason is required")
+    assert ops.check(state([task("t1")]), "update_task", {"task_id": "t1", "status": "skipped", "reason": "irrelevant now"})
+    rejects(state([task("t1", "completed")]), "update_task", {"task_id": "t1", "objective": "Rewrite the objective"},
+            "cannot be changed")
+    # completion is not a status the model can set
+    rejects(state([task("t1", "in_progress")]), "update_task", {"task_id": "t1", "status": "completed"}, "Bad arguments")
+
+
+def test_complete_task_needs_an_in_progress_task_a_real_result_and_real_references():
+    working = state([task("t1", "in_progress")], [step()])
+    assert ops.check(working, "complete_task", DONE)
+    rejects(state([task("t1")], [step()]), "complete_task", DONE, "start it with update_task")
+    rejects(state([task("t1", "in_progress")]), "complete_task", DONE, "No successful research call")
+    rejects(state([task("t1", "in_progress")], [step(status="failed", result={"error": "x"})]), "complete_task", DONE,
+            "No successful research call")
+    rejects(state([task("t1", "in_progress")], [step(task_key="t2")]), "complete_task", DONE, "No successful research call")
+    rejects(working, "complete_task", {**DONE, "node_refs": ["22222222-2222-4222-8222-222222222222"]}, "never appeared")
+    rejects(working, "complete_task", {**DONE, "source_refs": ["p9:c1"]}, "never appeared")
+    cited = state([task("t1", "in_progress")], [step(name="search_sources", result={"passages": [{"evidence_id": "p9:c1"}]})])
+    assert ops.check(cited, "complete_task", {**DONE, "node_refs": [], "source_refs": ["P9:C1"]})
+
+
+def test_finish_requires_closed_tasks_and_an_honest_outcome():
+    fin = {"outcome": "satisfied", "summary": "RL helped in simulations; deployment evidence is missing.", "evidence": [NODE]}
+    done = [task("t1", "completed")]
+    ev = [step()]
+    assert ops.check(state(done, ev), "finish_research", fin)
+    rejects(state([task("t1", "completed"), task("t2")], ev), "finish_research", fin, "Tasks still open: t2")
+    rejects(state([task("t1", "skipped", reason="x")], ev), "finish_research", fin, "only be inconclusive")
+    assert ops.check(state([task("t1", "skipped", reason="x")], ev), "finish_research", {**fin, "outcome": "inconclusive"})
+    rejects(state(done, ev), "finish_research", {**fin, "outcome": "blocked"}, "blocked needs")
+    assert ops.check(state([*done, task("t2", "failed")], ev), "finish_research", {**fin, "outcome": "blocked"})
+    rejects(state(done, []), "finish_research", fin, "never appeared")
+
+
+def test_only_one_question_at_a_time():
+    q = {"questions": [{"id": "scope", "prompt": "Which scope?", "type": "single",
+                        "options": [{"label": "Narrow"}, {"label": "Broad"}]}]}
+    assert ops.check(state(), "request_user_input", q)
+    rejects(state(pending_input={"kind": "agent"}), "request_user_input", q, "already pending")
+
+
+def test_failed_or_skipped_dependencies_block_and_unblock_dependents():
+    ts = [task("t1", "failed"), task("t2", deps=["t1"]), task("t3")]
+    assert ops.blocked_changes(ts) == [("t2", "blocked", "dependency t1 is failed")]
+    ts = [task("t1", "skipped"), task("t2", "blocked", deps=["t1"])]
+    assert ops.blocked_changes(ts) == []
+    ts = [task("t1", "pending"), task("t2", "blocked", deps=["t1"])]
+    assert ops.blocked_changes(ts) == [("t2", "pending", None)]
+
+
+def test_one_decision_per_step():
+    assert ops.batch_error(["create_plan"]) is None
+    assert ops.batch_error(["write_node"]) is None
+    assert ops.batch_error(["search_nodes", "get_node", "web_search"]) is None
+    assert "plain text" in ops.batch_error([])
+    assert "Unknown tool" in ops.batch_error(["rm_rf"])
+    assert "read-only" in ops.batch_error(["search_nodes", "write_node"])
+    assert "read-only" in ops.batch_error(["create_task", "create_task"])
+    assert "At most" in ops.batch_error(["search_nodes"] * (ops.MAX_BATCH + 1))
+
+
+def test_limits():
+    assert ops.limit_reached(run()) is None
+    assert "step limit" in ops.limit_reached(run(iteration=ops.MAX_ITERATIONS))
+    assert "tool-call budget" in ops.limit_reached(run(tool_calls=ops.MAX_TOOL_CALLS))
+
+
+def test_tool_lists_are_plain_and_complete():
+    names = {t["function"]["name"] for t in ops.ALL_TOOLS}
+    assert names == ops.OPS | ops.READ_ONLY | ops.MUTATING
+    assert "$ref" not in str(ops.ORCH_TOOLS) and "anyOf" not in str(ops.ORCH_TOOLS)
+
+
+def test_snapshot_gives_goal_budget_plan_and_recent_results_not_the_tree():
+    done = task("t1", "completed", assessment={"findings": "RL beat baselines in simulation.", "node_refs": [NODE],
+                                               "source_refs": ["p9:c1"], "satisfied": True, "unresolved": ["real-world?"]})
+    st = state([done, task("t2", deps=["t1"], status="blocked", reason="dependency t1 is failed")],
+               [step(iteration=1, result={"big": "x" * 5000}), step(iteration=2, status="unknown", result={"error": "?"})],
+               iteration=2, clarifications=[{"question": "Scope?", "answer": "Narrow"}], authorized_deletes=[NODE])
+    text = prompts.snapshot(st)
+    for needle in ("GOAL (unchanged): Does RL help?", "Scope? -> Narrow", f"deleting these nodes: {NODE}", "step 2/40",
+                   "PLAN v1", "t1 [completed]", "t2 [blocked] (after t1)", "RL beat baselines", "real-world?",
+                   "OUTCOME UNKNOWN"):
+        assert needle in text
+    assert "more chars" in text  # the older step's 5000-char result is squeezed
+    assert "{replans}" not in prompts.system_prompt()

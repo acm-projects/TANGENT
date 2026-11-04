@@ -237,6 +237,72 @@ export interface AgentReply {
   model: string;
 }
 
+// ---- Agent runs (/projects/:id/agent/runs/*: backend app/agent/runs_router.py) ----
+
+export type AgentRunStatus = "queued" | "running" | "waiting_input" | "completed" | "failed" | "cancelled";
+export type AgentOutcome = "satisfied" | "partially_satisfied" | "inconclusive" | "blocked";
+export type AgentTaskStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed" | "blocked";
+
+/** A question the agent (or the runtime, before a delete) puts to the user. `text` takes free text only. */
+export interface AgentQuestion {
+  id: string;
+  prompt: string;
+  type: "single" | "multi" | "text";
+  options: { label: string; description?: string }[];
+  allow_other: boolean;
+}
+
+export interface AgentAssessment {
+  investigated: string;
+  findings: string;
+  node_refs: string[];
+  source_refs: string[];
+  satisfied: boolean;
+  unresolved: string[];
+  needs_more_research: boolean;
+}
+
+/** The agent's closing assessment of the original goal. */
+export interface AgentFinal {
+  outcome: AgentOutcome;
+  summary: string;
+  evidence: string[];
+  limitations: string[];
+  unresolved_questions: string[];
+}
+
+export interface AgentPlan {
+  version: number;
+  strategy: string;
+  assumptions: string[];
+  reason?: string | null;
+}
+
+export interface AgentTask {
+  key: string;
+  objective: string;
+  status: AgentTaskStatus;
+  depends_on: string[];
+  reason: string | null;
+  assessment: AgentAssessment | null;
+}
+
+/** POST /projects/:id/agent/runs (201) and GET .../runs/:rid: the run as it is now. */
+export interface AgentRunState {
+  run: {
+    id: string;
+    goal: string;
+    model: string;
+    status: AgentRunStatus;
+    outcome: AgentOutcome | null;
+    final: AgentFinal | null;
+    pending_input: { kind: "agent" | "confirm_delete"; questions: AgentQuestion[] } | null;
+    error: string | null;
+  };
+  plan: AgentPlan | null;
+  tasks: AgentTask[];
+}
+
 // ---- Debate mode (/debates/*: backend debate/pg/api.py; docs FRONTEND_DEBATE_MODE.md) ----
 
 export type DebateSide = "for" | "against";

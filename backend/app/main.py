@@ -13,7 +13,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from app.agent import router as agent_router
+from app.agent import router as agent_router, runs_router as agent_runs_router, worker as agent_worker
 from app.database import ensure_columns, warm_pool
 from app.papers import worker as paper_worker
 from app.routers import (
@@ -36,10 +36,13 @@ async def lifespan(_: FastAPI):
     await ensure_columns()  # before warm_pool: it reads every model column
     await warm_pool()
     ingest = asyncio.create_task(paper_worker.run_forever())  # PDF ingestion runs in this process
+    agents = [asyncio.create_task(agent_worker.run_forever()) for _ in range(agent_worker.WORKERS)]
     yield
-    ingest.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await ingest
+    for task in [ingest, *agents]:
+        task.cancel()
+    for task in [ingest, *agents]:
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 
 app = FastAPI(title="Tangent", lifespan=lifespan)
@@ -74,3 +77,4 @@ app.include_router(trees_router.router)
 app.include_router(debates_router.router)
 app.include_router(sources_router.router)
 app.include_router(agent_router.router)
+app.include_router(agent_runs_router.router)

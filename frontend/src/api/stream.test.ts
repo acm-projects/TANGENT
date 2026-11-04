@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sseFrames, streamMessage } from "./stream";
+import { AgentRunGoneError, sseFrames, streamAgentRun, streamMessage, type AgentStreamEvent } from "./stream";
 import type { StreamEvent } from "./types";
 
 describe("sseFrames", () => {
@@ -113,6 +113,32 @@ describe("streamMessage", () => {
   it("throws the server's detail message when the request is refused", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Only a leaf node can be prompted; fork it instead" }), { status: 409 }));
     await expect(streamMessage({ ...opts, onEvent: () => {} })).rejects.toThrow("Only a leaf node can be prompted");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("streamAgentRun", () => {
+  const frame = (event: string, data: object, id?: number) => `${id === undefined ? "" : `id: ${id}\n`}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  const sse = (...frames: string[]) => new Response(frames.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const opts = { baseURL: "/api", projectId: "p1", runId: "r1", lastEventId: () => 7, getAccessToken: () => "t", refresh: async () => "t2" };
+
+  it("follows the run's events from the cursor until done", async () => {
+    const fetchMock = vi.fn(async () => sse(frame("task.created", { key: "t1" }, 8), frame("done", { status: "completed" })));
+    vi.stubGlobal("fetch", fetchMock);
+    const seen: AgentStreamEvent[] = [];
+
+    await streamAgentRun({ ...opts, onEvent: (e) => seen.push(e) });
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/projects/p1/agent/runs/r1/events");
+    expect(init.headers).toMatchObject({ "Last-Event-ID": "7", Authorization: "Bearer t" });
+    expect(seen).toEqual([{ name: "task.created", id: 8, data: { key: "t1" } }, { name: "done", data: { status: "completed" } }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("gives up on a 404 instead of reconnecting forever", async () => {
+    vi.stubGlobal("fetch", async () => new Response("", { status: 404 }));
+    await expect(streamAgentRun({ ...opts, onEvent: () => {} })).rejects.toBeInstanceOf(AgentRunGoneError);
     vi.unstubAllGlobals();
   });
 });
