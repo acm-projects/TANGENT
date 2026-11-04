@@ -2,7 +2,7 @@ import type { Edge, Node as FlowNode } from "@xyflow/react";
 import type { AttachmentKind, NodeMeta } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
-import { layoutTree } from "@/store/layout";
+import { layoutTree, type Point } from "@/store/layout";
 
 /**
  * The ReactFlow adapter: tree structure in, React Flow nodes and edges out.
@@ -54,9 +54,10 @@ function mergesOf(s: StructureSlice): Map<string, string[]> {
   return out;
 }
 
-/** How merged cards are drawn: each hangs under its shallowest source, so it sits in that source's column
- * (ties: its first parent), and one row below its deepest, so it reads as coming after everything it joins.
- * Its own branches hang under it as usual. Only the drawing moves; `parent_id` is untouched. */
+/** How merged cards are drawn: one row below the deepest card each joins, so it reads as coming after
+ * everything it joins, and (centreMerges) centred between them. For the layout it hangs under its shallowest
+ * source (ties: its first parent), which keeps a column for its own branches. Only the drawing moves;
+ * `parent_id` is untouched. */
 function drawnTree(s: StructureSlice, merges: Map<string, string[]>) {
   const rows: Record<string, number> = {};
   if (!merges.size) return { children: s.childrenByParent, rows };
@@ -83,10 +84,37 @@ function drawnTree(s: StructureSlice, merges: Map<string, string[]>) {
   return { children, rows };
 }
 
+/** Slide each merged card, and the branches under it, to the middle of its sources: halfway between the
+ * leftmost and the rightmost, however many it joins. Shallowest merges first, so a merge of merges centres
+ * on where they ended up.
+ * shortcut: a card between the sources on the merge's row isn't moved aside, so the two can overlap; spread
+ * the row if that turns up in real trees. */
+function centreMerges(
+  positions: Record<string, Point>,
+  children: Record<string, string[]>,
+  merges: Map<string, string[]>,
+  rows: Record<string, number>,
+) {
+  for (const id of [...merges.keys()].sort((a, b) => rows[a]! - rows[b]!)) {
+    const xs = merges.get(id)!.flatMap((source) => (positions[source] ? [positions[source].x] : []));
+    if (!positions[id] || !xs.length) continue;
+    const dx = (Math.min(...xs) + Math.max(...xs)) / 2 - positions[id].x;
+    const seen = new Set<string>();
+    const shift = (n: string) => {
+      if (seen.has(n) || !positions[n]) return;
+      seen.add(n);
+      positions[n] = { ...positions[n], x: positions[n].x + dx };
+      children[n]?.forEach(shift);
+    };
+    shift(id);
+  }
+}
+
 export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Edge[] } {
   const merges = mergesOf(s);
   const drawn = drawnTree(s, merges);
   const positions = layoutTree(s.rootId, drawn.children, drawn.rows);
+  centreMerges(positions, drawn.children, merges, drawn.rows);
   const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
