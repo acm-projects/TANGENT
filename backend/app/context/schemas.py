@@ -14,6 +14,7 @@ class ChatMessage(BaseModel):
     content: str
     seq: int  # redundant with array index; flatten trusts array order
     created_at: datetime
+    citations: list[dict] = Field(default_factory=list)
 
 
 class PathNode(BaseModel):

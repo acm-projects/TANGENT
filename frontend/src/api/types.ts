@@ -31,6 +31,19 @@ export interface ChatMessage {
   attachments?: Attachment[];
   /** [proposed] Assistant only: reasoning time, shown as "Thought for 1m 4s". */
   thought_seconds?: number;
+  /** Verified PDF evidence used by the assistant, persisted with the reply. */
+  citations?: Citation[];
+}
+
+export interface Citation {
+  evidence_id: string;
+  title: string | null;
+  section?: string | null;
+  pages?: string;
+  kind?: "pdf" | "web";
+  url?: string;
+  source?: string;
+  date?: string;
 }
 
 /** Structure only. No chats, so the mind map loads cheaply. */
@@ -99,7 +112,7 @@ export interface TreeResponse {
 export type StreamEvent =
   | { type: "token"; text: string }
   // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
-  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean }
+  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; citations?: Citation[] }
   // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).
   | { type: "error"; message: string; fork?: ForkInfo; forkedProjectId?: string };
 

@@ -97,6 +97,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
                 key={`${item.node.id}-${message.seq}-${message.role}`}
                 message={message}
                 nodeId={item.node.id}
+                projectId={item.node.project_id}
                 // a node can't be cut while its reply is still arriving
                 onBranch={streaming !== null && isActive ? undefined : branch}
                 // only the newest reply on the card being written on can be asked again
