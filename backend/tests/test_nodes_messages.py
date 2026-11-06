@@ -83,7 +83,7 @@ def client(monkeypatch):
 
     async def fake_persist(
         user_id, write_node_id, user_text, assistant_text, model_id, response_tokens, replace_last=False,
-        author="user", extras=None,
+        author="user", extras=None, citations=None,
     ):
         extras_seen.append(extras)
         assert author == "user"  # a message sent through the route is always the user's
@@ -437,6 +437,35 @@ def test_tool_call_round_then_cited_answer(client, monkeypatch):
     assert json.loads(sent[-1]["content"]) == EVIDENCE
     assert client.persisted[0][3] == "Ranks with BM25 [p1:c0], see also [p9:c9]."
     assert client.extras[0] == {"tools": [{"name": "search_paper_evidence", "brief": "Searched T for “rank”", "ok": True}]}
+
+
+def test_web_search_results_become_clickable_citations(client, monkeypatch):
+    transport, _ = scripted_provider([
+        [tool_chunk("call_1", "web_search", '{"query": "same day voter registration Texas"}'), "data: [DONE]"],
+        [chunk("Texas does not offer same-day registration [web:1]."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+
+    async def fake_tool(name, args, project_id):
+        assert name == "web_search"
+        return {"query": args["query"], "results": [{
+            "title": "Texas Secretary of State",
+            "url": "https://www.sos.state.tx.us/elections/",
+            "snippet": "Election information",
+        }]}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "Can I register on election day?"})
+
+    evs = events(r)
+    assert evs[-1] == ("done", {"citations": [{
+        "evidence_id": "web:1",
+        "kind": "web",
+        "title": "Texas Secretary of State",
+        "url": "https://www.sos.state.tx.us/elections/",
+    }]})
+    assert client.persisted[0][3] == "Texas does not offer same-day registration [web:1]."
 
 
 def test_tool_rounds_are_bounded(client, monkeypatch):

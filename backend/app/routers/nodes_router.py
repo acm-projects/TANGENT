@@ -295,6 +295,7 @@ async def _persist(
     assistant_text: str,
     model_id: str,
     response_tokens: Optional[int],
+    citations: Optional[list[dict]] = None,
     replace_last: bool = False,
     author: str = "user",
     extras: Optional[dict] = None,
@@ -324,7 +325,8 @@ async def _persist(
                          'seq', jsonb_array_length({base}), 'created_at', CAST(:now AS text)))
                     || jsonb_build_array(jsonb_build_object(
                          'role', 'assistant', 'content', CAST(:assistant_text AS text),
-                         'seq', jsonb_array_length({base}) + 1, 'created_at', CAST(:now AS text))
+                         'seq', jsonb_array_length({base}) + 1, 'created_at', CAST(:now AS text),
+                         'citations', CAST(:citations AS jsonb))
                          || CAST(:extras AS jsonb))
                 WHERE id = :node_id AND (model IS NULL OR model = :model_id) {guard}
             """),
@@ -334,6 +336,7 @@ async def _persist(
                 "assistant_text": assistant_text,
                 "model_id": model_id,
                 "response_tokens": response_tokens,
+                "citations": json.dumps(citations or []),
                 "now": now,
                 "author": author,
                 "extras": json.dumps(extras or {}),
@@ -922,7 +925,8 @@ async def _answer(user_id, project_id, node_id, messages, prompt, model, emit, r
 
         reply: list[str] = []
         done: dict = {}
-        evidence: dict[str, dict] = {}  # evidence ids the tools returned this turn -> {title, pages}
+        evidence: dict[str, dict] = {}  # PDF evidence ids the tools returned this turn -> {title, section, pages}
+        web_evidence: dict[str, dict] = {}  # web citation ids ("web:1") the tools returned this turn -> source
         rows: list[dict] = []  # the tool calls, as the chat shows them
         thought = {"text": "", "seconds": 0.0}
         try:
@@ -1054,8 +1058,20 @@ async def _answer(user_id, project_id, node_id, messages, prompt, model, emit, r
                             row["node_id"] = result["card"]  # the question card it made: the client shows it
                         rows.append(row)
                         emit("tool", row)
+                    if name == "web_search":  # number the results so the reply can cite them as [web:1]
+                        numbered = []
+                        for item in result.get("results") or []:
+                            citation_id = f"web:{len(web_evidence) + 1}"
+                            web_evidence[citation_id] = {
+                                "title": item.get("title"), "url": item.get("url"),
+                                **({"source": item["source"]} if item.get("source") else {}),
+                                **({"date": item["date"]} if item.get("date") else {}),
+                            }
+                            numbered.append({**item, "citation_id": citation_id})
+                        result = {**result, "results": numbered}
                     for ev in result.get("evidence") or []:
-                        evidence[ev["evidence_id"]] = {"title": ev.get("title") or result.get("title"), "pages": ev["pages"]}
+                        evidence[ev["evidence_id"]] = {"title": ev.get("title") or result.get("title"),
+                                                       "section": ev.get("section"), "pages": ev["pages"]}
                     convo.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
             return None
 
@@ -1097,9 +1113,14 @@ async def _answer(user_id, project_id, node_id, messages, prompt, model, emit, r
             emit(*_error({"message": "The model only restated the question instead of answering; nothing was saved."}, fork))
             return
         cited = paper_service.citations_in(answer)
-        if cited:
-            done["citations"] = [{"evidence_id": e, **evidence[e]} for e in cited if e in evidence]
-            unverified = [e for e in cited if e not in evidence]
+        web_cited = paper_service.web_citations_in(answer)
+        citations = [{"evidence_id": e, **evidence[e]} for e in cited if e in evidence] + \
+            [{"evidence_id": e, "kind": "web", **web_evidence[e]} for e in web_cited if e in web_evidence]
+        if cited or web_cited:
+            # the stream's copy is lighter than the saved one: a PDF citation's title and pages, no section
+            done["citations"] = [{k: v for k, v in c.items() if k != "section"} if c.get("kind") != "web" else c
+                                 for c in citations]
+            unverified = [e for e in cited if e not in evidence] + [e for e in web_cited if e not in web_evidence]
             if unverified:
                 # the model cited passages no tool gave it this turn: flag them rather than vouch for them
                 log.warning("node %s: reply cites evidence no tool returned: %s", write_node_id, unverified)
@@ -1121,6 +1142,7 @@ async def _answer(user_id, project_id, node_id, messages, prompt, model, emit, r
                 model_id=model,
                 response_tokens=response_tokens,
                 replace_last=retry,
+                citations=citations,
                 author=author,
                 extras={**({"tools": rows} if rows else {}),
                         **({"reasoning": thought["text"]} if thought["text"] else {}),

@@ -26,6 +26,7 @@ class ChatMessage(BaseModel):
     # a Compacted card's summary (app/resolving.py): the model reads it in place of the thread above
     compact: Optional[bool] = None
     compacted_from: Optional[int] = None
+    citations: list[dict] = Field(default_factory=list)
 
 
 class PathNode(BaseModel):

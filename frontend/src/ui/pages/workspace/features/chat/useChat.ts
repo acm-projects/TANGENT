@@ -263,6 +263,7 @@ export function useChat() {
               content: e.content ?? s.streaming[nodeId] ?? "",
               seq: seq + 1,
               created_at: new Date().toISOString(),
+              citations: e.citations,
             });
           } else {
             s.abortStream(nodeId);

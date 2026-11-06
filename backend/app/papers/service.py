@@ -38,12 +38,13 @@ RESEARCH_SYSTEM_PROMPT = (
 
     "Research before you answer, every time: short never means unsourced. Use search_sources for the papers this "
     "project already has, search_papers to find others, and search_paper_evidence to read the passages a claim "
-    "rests on; cite each such passage inline by its evidence id in square brackets, e.g. [p12:c7]. Cite only "
-    "evidence ids a tool returned in this conversation; never invent a paper, id, page or quote. Prefer papers "
+    "rests on; cite each such passage inline by its evidence id in square brackets, e.g. [p12:c7], and never as a "
+    "Markdown link, local, file or invented URL. Before quoting a passage word for word, check it with verify_quote. "
+    "Cite only evidence ids a tool returned in this conversation; never invent a paper, id, page or quote. Prefer papers "
     "whose full_text is ready, processing or on_demand, since only those can be quoted; use an abstract-only paper "
     "(full_text: unavailable) when it is clearly more relevant or the only one, and say its claims come from the "
     "abstract; if a paper's full text is still processing, say so. For anything recent, commercial or fast-moving "
-    "(products, versions, prices, news, current guidance), use web_search and cite the pages you rely on by link. "
+    "(products, versions, prices, news, current guidance), use web_search and cite each result you rely on by its id, e.g. [web:1], never as a raw URL. "
     "If the evidence is missing, thin or conflicting, say that plainly instead of guessing. When you find a paper "
     "worth keeping for this project beyond this answer, add_source it, so the user and later cards can read and "
     "search it; papers you cite are kept anyway. "
@@ -98,6 +99,22 @@ TOOLS = [
                 "type": "object",
                 "properties": {"paper": {"type": "string"}},
                 "required": ["paper"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "verify_quote",
+            "description": "Verify that an exact quotation appears in a retrieved PDF passage. Use this before "
+                           "presenting a direct quotation. Returns the source section and page range when verified.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "evidence_id": {"type": "string", "description": "e.g. 'p12:c7' from search_paper_evidence"},
+                    "quote": {"type": "string", "description": "The exact words you intend to quote"},
+                },
+                "required": ["evidence_id", "quote"],
             },
         },
     },
@@ -161,7 +178,8 @@ TOOLS.append(web_search.TOOL)  # current news and information
 
 _PAPER_REF = re.compile(r"p(\d+)")
 EVIDENCE_ID = re.compile(r"p(\d+):c(\d+)")
-_CITATION = re.compile(r"\[(p\d+:c\d+)\]")
+_CITATION = re.compile(r"(?:\[|【)(p\d+:c\d+)(?:\]|†[^】]*】)")
+_WEB_CITATION = re.compile(r"(?:\[|【)(web:\d+)(?:\]|†[^】]*】)")
 
 
 def _clamp(value, default: int, lo: int, hi: int) -> int:
@@ -291,6 +309,10 @@ def parse_leaked_tool_calls(text: str) -> list[dict]:
 
 def citations_in(answer: str) -> list[str]:
     return list(dict.fromkeys(_CITATION.findall(answer)))
+
+
+def web_citations_in(answer: str) -> list[str]:
+    return list(dict.fromkeys(_WEB_CITATION.findall(answer)))
 
 
 # --- registry -------------------------------------------------------------------------------------------
@@ -689,3 +711,40 @@ async def verify_quote(evidence_id: str, quote: str) -> bool:
             {"p": int(m.group(1)), "i": int(m.group(2))},
         )).scalar()
     return chunk is not None and quote_matches(chunk, quote)
+
+
+async def verify_quote_tool(
+    evidence_id: str, quote: str, *, project_id: UUID | None = None, node_id: UUID | None = None
+) -> dict:
+    """Verify a quote and return citation metadata only for an accessible paper chunk."""
+    m = EVIDENCE_ID.fullmatch(evidence_id or "")
+    if not m:
+        return {"verified": False, "error": "evidence_id must look like 'p12:c7'"}
+    try:
+        row = await resolve(f"p{m.group(1)}", project_id, node_id)
+    except s2.S2Error as exc:
+        return {"verified": False, "error": str(exc)}
+    if row is None:
+        return {"verified": False, "error": f"No paper found for {evidence_id!r}"}
+    async with database.AsyncSessionLocal() as db:
+        chunk = (await db.execute(
+            text("""SELECT section, page_start, page_end, text
+                    FROM paper_chunks WHERE paper_id = :p AND idx = :i"""),
+            {"p": int(m.group(1)), "i": int(m.group(2))},
+        )).mappings().first()
+    if chunk is None:
+        return {"verified": False, "error": f"Evidence passage {evidence_id} was not retrieved"}
+    verified = quote_matches(chunk["text"], quote)
+    result = {
+        "evidence_id": evidence_id,
+        "verified": verified,
+        "title": row["title"],
+        "section": chunk["section"],
+        "pages": _pages(chunk["page_start"], chunk["page_end"]),
+    }
+    if not verified:
+        result["message"] = "The quote does not appear verbatim in that passage; do not present it as a quote."
+    return result
+
+
+_HANDLERS["verify_quote"] = verify_quote_tool

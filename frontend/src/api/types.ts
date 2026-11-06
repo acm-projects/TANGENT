@@ -41,6 +41,19 @@ export interface ChatMessage {
   compact?: boolean;
   /** with `compact`: how many cards it summarises */
   compacted_from?: number;
+  /** Verified PDF and web evidence the assistant cited, persisted with the reply. */
+  citations?: Citation[];
+}
+
+export interface Citation {
+  evidence_id: string;
+  title: string | null;
+  section?: string | null;
+  pages?: string;
+  kind?: "pdf" | "web";
+  url?: string;
+  source?: string;
+  date?: string;
 }
 
 /** A tool call a card's model made while answering, as its chat shows it. */
@@ -179,7 +192,7 @@ export type StreamEvent =
   /** the message was work under resolved cards, which it reopened (the map re-reads the tree) */
   | { type: "reopened"; ids: string[] }
   // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
-  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string }
+  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }
   // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).
   | { type: "error"; message: string; fork?: ForkInfo; forkedProjectId?: string };
 

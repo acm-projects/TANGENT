@@ -4,6 +4,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import type { ChatMessage } from "@/api/types";
+import { api } from "@/api";
 import { Button, Frame, Icon, InkPanel, Panel, Text } from "@/ui/library";
 import { ToolRow, toolIcon } from "./ToolRow";
 
@@ -29,13 +30,14 @@ type MessageBubbleProps = {
   streaming?: boolean;
   /** how a reply's markdown elements render (Gent's report links the cards it names); keep it a stable object */
   markdown?: Components;
+  projectId?: string;
 };
 
-export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false, markdown }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false, markdown, projectId }: MessageBubbleProps) {
   return message.role === "user" ? (
     <UserMessage message={message} />
   ) : (
-    <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} markdown={markdown} />
+    <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} markdown={markdown} projectId={projectId} />
   );
 });
 
@@ -91,14 +93,16 @@ function UserMessage({ message }: { message: ChatMessage }) {
   );
 }
 
-function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markdown }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
+function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markdown, projectId }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
   const [copied, setCopied] = useState(false);
+  const [citationError, setCitationError] = useState<string | null>(null);
   // a streaming reply re-parses its markdown and maths as it grows: React may skip to the latest text under load
-  const content = useDeferredValue(message.content);
+  const deferred = useDeferredValue(message.content);
+  const citations = new Map((message.citations ?? []).map((citation) => [citation.evidence_id, citation]));
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(content.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -121,6 +125,70 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markd
         </Panel>
       </Frame>
     );
+  }
+
+  const citationForLink = (label: string, href: string) => {
+    const page = href.match(/[?&#]page(?:=|%3D)(\d+)/i)?.[1] ?? label.match(/\bp(?:age)?\.?\s*(\d+)/i)?.[1];
+    return [...citations.entries()].find(([, citation]) =>
+      (!citation.title || label.includes(citation.title)) &&
+      (!page || citation.pages?.split("-")[0] === page)
+    )?.[0];
+  };
+  const content = deferred
+    .replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (markdown, label: string, href: string) => {
+      const evidenceId = citationForLink(label, href);
+      return evidenceId ? `[${label}](citation://${evidenceId})` : markdown;
+    })
+    .replace(/\[(p\d+:c\d+)\]/g, (marker, evidenceId: string) => {
+    const citation = citations.get(evidenceId);
+    if (!citation) return marker;
+    const page = citation.pages?.split("-")[0] ?? "";
+    const label = `${citation.title ?? "PDF"}${citation.section ? `, ${citation.section}` : ""}, p. ${page}`;
+    return `[${label}](citation://${evidenceId})`;
+  })
+    .replace(/\[(web:\d+)\]/g, (marker, evidenceId: string) => {
+      const citation = citations.get(evidenceId);
+      if (!citation?.url) return marker;
+      return `[${citation.title ?? "Web source"}](citation://${evidenceId})`;
+    });
+
+  async function openCitation(evidenceId: string) {
+    setCitationError(null);
+    const citation = citations.get(evidenceId);
+    if (!citation) return;
+    let tab: Window | null = null;
+    try {
+      if (citation.kind === "web" && citation.url?.match(/^https?:\/\//i)) {
+        if (!window.open(citation.url, "_blank", "noopener,noreferrer")) {
+          setCitationError("Could not open the citation. Please allow pop-ups for this site.");
+        }
+        return;
+      }
+      if (citation.kind === "web") {
+        setCitationError("Citation source is unavailable.");
+        return;
+      }
+      if (!projectId || !citation.pages) {
+        setCitationError("Citation source is unavailable.");
+        return;
+      }
+      tab = window.open("about:blank", "_blank");
+      if (!tab) {
+        setCitationError("Could not open the citation. Please allow pop-ups for this site.");
+        return;
+      }
+      const url = URL.createObjectURL(await api.sources.file(projectId, evidenceId.split(":")[0], nodeId));
+      tab.location.href = `${url}#page=${citation.pages.split("-")[0]}`;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      tab?.close();
+      setCitationError(error instanceof Error ? error.message : "Could not open the PDF.");
+    }
+  }
+
+  function citationLink(evidenceId: string) {
+    const citation = citations.get(evidenceId);
+    return citation?.kind === "web" && citation.url?.match(/^https?:\/\//i) ? citation.url : undefined;
   }
 
   return (
@@ -150,6 +218,16 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markd
           <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
         )
       )}
+      {message.citations?.map((citation) => (
+        <MetaLine
+          key={citation.evidence_id}
+          icon="menu_book"
+          text={citation.kind === "web"
+            ? `${citation.title ?? "Web source"}${citation.source ? ` · ${citation.source}` : ""}`
+            : `${citation.title ?? "PDF"}${citation.section ? ` · ${citation.section}` : ""} · page${(citation.pages ?? "").includes("-") ? "s" : ""} ${citation.pages ?? ""}`}
+        />
+      ))}
+      {citationError && <MetaLine icon="error" text={citationError} />}
       {streaming && !message.content ? (
         // before the first token: a pin reeling out string (Chat.css)
         <Text role="status" size="s" hierarchy="tertiary" className="message-thinking" content="Pulling the thread" />
@@ -158,10 +236,42 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markd
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
-            components={markdown}
-          >
-            {content || "…"}
-          </ReactMarkdown>
+            urlTransform={(url) => url}
+            components={{
+              ...markdown,
+              a: ({ href, children, ...props }) => {
+                const evidenceId = href?.startsWith("citation://") ? href.slice("citation://".length) : undefined;
+                const externalUrl = evidenceId ? citationLink(evidenceId) : href?.match(/^https?:\/\//i) ? href : undefined;
+                if (externalUrl) {
+                  return (
+                    <a {...props} href={externalUrl} target="_blank" rel="noopener noreferrer">
+                      {children}
+                    </a>
+                  );
+                }
+                if (!evidenceId) {
+                  return <a {...props} href={href ?? ""}>{children}</a>;
+                }
+                return (
+                <button
+                  type="button"
+                  className="message-citation"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void openCitation(evidenceId);
+                  }}
+                >
+                  {children}
+                </button>
+                );
+              },
+            }}
+          >{content || "…"}</ReactMarkdown>
         </div>
       )}
       {!streaming && (

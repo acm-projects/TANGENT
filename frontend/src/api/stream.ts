@@ -1,5 +1,5 @@
 import { CopyExistsError } from "./errors";
-import type { DebateInfo, ForkInfo, GentEvent, GentMessage, GentNote, GentRef, ModelUsage, StreamEvent, ToolCallRow } from "./types";
+import type { Citation, DebateInfo, ForkInfo, GentEvent, GentMessage, GentNote, GentRef, ModelUsage, StreamEvent, ToolCallRow } from "./types";
 
 /** Parse an SSE byte stream into { event, data, id } frames (`id` only on frames that carry one). */
 export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string; id?: string }> {
@@ -58,7 +58,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
     else if (event === "reasoning") opts.onEvent({ type: "reasoning", text: (JSON.parse(data) as { text: string }).text });
     else if (event === "question") opts.onEvent({ type: "question", id: (JSON.parse(data) as { id: string }).id });
     else if (event === "reopened") opts.onEvent({ type: "reopened", ids: (JSON.parse(data) as { ids: string[] }).ids });
-    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string }) });
+    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }) });
     else if (event === "error") {
       const { message, fork, forked_project_id } = JSON.parse(data) as { message: string; fork?: ForkInfo; forked_project_id?: string };
       return void opts.onEvent({ type: "error", message, fork, forkedProjectId: forked_project_id });

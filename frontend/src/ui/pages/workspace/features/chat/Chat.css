@@ -386,6 +386,16 @@
   overflow-wrap: anywhere;
 }
 
+.message-citation {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-string);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* capped at the sheet: a code line or a table can't wrap, and would otherwise
  * widen the whole reply instead of scrolling inside itself */
 .message-markdown {
