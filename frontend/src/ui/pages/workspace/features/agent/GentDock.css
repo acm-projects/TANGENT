@@ -1,0 +1,872 @@
+/* Gent's dock: one container that morphs between circle, pill and chat (GentDock.tsx). Unlayered. */
+
+.gent-dock-slot {
+  position: relative; /* Gent's questions pop up from here (GentAsk.css) */
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+/* Paper, like the rest of the app, while Gent is out working; his ink while he's home in it (InkPanel `inked`).
+ * Every colour below goes through these, so both read. */
+.gent-dock {
+  --dock-fg: var(--color-text);
+  --dock-soft: var(--color-text-muted);
+  --dock-rule: var(--color-border-strong);
+  --dock-wash: color-mix(in srgb, var(--color-text) 8%, transparent);
+  --dock-field: transparent;
+  --dock-alert: var(--color-danger);
+  pointer-events: auto;
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  --pop-from: 0 1.5rem;
+  --pop-rotate: 0deg;
+  --pop-scale: 0.7;
+}
+
+/* his work-log rows (chat/components/ToolRow) in the dock's colours */
+.gent-dock {
+  --tool-fg: var(--dock-fg);
+  --tool-alert: var(--dock-alert);
+  --tool-rule: var(--dock-rule);
+  --tool-wash: rgb(0 0 0 / 0.2);
+}
+
+.gent-dock[data-inked="true"] {
+  --dock-fg: var(--on-gent-ink);
+  --dock-soft: rgb(243 242 239 / 0.82);
+  --dock-rule: rgb(243 242 239 / 0.4);
+  --dock-wash: rgb(243 242 239 / 0.14);
+  --dock-field: rgb(0 0 0 / 0.14);
+  /* the danger colour (oxblood), lifted to read on his ink */
+  --dock-alert: color-mix(in srgb, var(--red-oxblood-dark) 55%, white);
+}
+
+.gent-dock[data-inked="false"] {
+  border: 1px solid var(--color-border);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: var(--shadow-floating);
+}
+
+/* Inside the ink every control is pale, without its paper face */
+.gent-dock [data-component="button"][data-hierarchy="tertiary"] {
+  color: var(--dock-fg);
+}
+
+.gent-dock [data-component="button"][data-hierarchy="tertiary"]:hover:not(:disabled) {
+  background: var(--dock-wash);
+}
+
+.gent-dock :is([data-ui="input"], [data-ui="textarea"], [data-ui="select"]) {
+  border-color: var(--dock-rule);
+  background: var(--dock-field);
+  color: var(--dock-fg);
+}
+
+.gent-dock :is([data-ui="input"], [data-ui="textarea"])::placeholder {
+  color: var(--dock-soft);
+}
+
+/* his status in the pill reads as his, not as a hint */
+/* his status in the field (once you focus it while he works): his own type, as on the pill, not a grey hint */
+.gent-dock .gent-field[data-busy]::placeholder {
+  color: var(--dock-fg);
+  font-family: var(--font-heading);
+}
+
+.gent-dock [data-ui="select"] option {
+  color: var(--color-text);
+}
+
+/* his socket: Gent when he's home, an empty ring of ink when he's out working */
+.gent-socket {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+}
+
+.gent-socket::before {
+  content: "";
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: inherit;
+  border: 1.5px dashed var(--dock-rule);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.gent-socket:not([data-home])::before {
+  opacity: 1;
+}
+
+.gent-socket .gent-avatar {
+  transition: scale var(--motion-spring) var(--ease-spring);
+}
+
+/* landing home: the drop splashes in the socket, and he pops up out of it */
+.gent-socket[data-home][data-phase="arriving"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--on-gent-ink);
+  animation: gent-splash 420ms var(--ease-out) forwards;
+}
+
+@keyframes gent-splash {
+  from {
+    scale: 0.2;
+    opacity: 0.9;
+  }
+  to {
+    scale: 1.5;
+    opacity: 0;
+  }
+}
+
+.gent-socket[data-home][data-phase="arriving"] .gent-avatar {
+  animation: gent-pop-up 420ms var(--ease-spring) 120ms backwards;
+}
+
+@keyframes gent-pop-up {
+  from {
+    scale: 0;
+    translate: 0 6px;
+  }
+}
+
+.gent-socket:not([data-home]) .gent-avatar,
+.gent-socket[data-phase="leaving"] .gent-avatar {
+  scale: 0;
+  transition: scale var(--motion-fast) var(--ease-out);
+}
+
+/* the avatar's pale ink on the dark panel: drawn as the paper colour */
+.gent-socket .gent-avatar {
+  --avatar-ink: var(--on-gent-ink);
+  --avatar-paper: var(--gent-ink);
+}
+
+/* ── one container, three sizes: the width springs, the chat's top rolls up, nothing remounts ── */
+
+/* the width springs in GentDock.tsx (useSpringWidth); these are the sizes it springs between */
+.gent-dock {
+  display: flex;
+  flex-direction: column;
+  width: 3.25rem;
+  max-width: 100%;
+  border-radius: 1.625rem;
+  transition:
+    border-radius var(--motion-spring) var(--ease-spring),
+    background-color var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
+}
+
+.gent-dock[data-mode="circle"] {
+  cursor: pointer;
+}
+
+/* the pill hugs what's in it: his status, or what you type */
+.gent-dock[data-mode="pill"] {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.gent-dock[data-mode="chat"] {
+  width: min(28rem, 100%);
+  border-radius: 14px;
+}
+
+/* the chat's top: rolls up out of the pill row, and fades */
+.gent-dock-top {
+  /* takes the dock's width but never sets it: the pill hugs its own row, not the history's longest line */
+  width: 0;
+  min-width: 100%;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--motion-spring) var(--ease-spring),
+    opacity var(--motion-base) var(--ease-out);
+}
+
+.gent-dock[data-mode="chat"] .gent-dock-top {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.gent-dock-top-inner {
+  min-height: 0;
+  /* never taller than Gent's layer leaves room for, above the pill row (4.5rem with the layer's padding) */
+  max-height: min(60dvh, 34rem, 100cqh - 4.5rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* the head of his case notes: his status as the title, closed off by the notebook's double rule (as the Field
+ * Notes' head is); the model as a stamped tag and the two actions sit quietly at the right */
+.gent-dock .gent-chat-head {
+  flex: none;
+  gap: var(--space-2);
+  min-height: 3rem;
+  margin: var(--space-1) var(--space-3) 0 var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 3px double var(--dock-rule);
+}
+
+.gent-dock .gent-chat-head [data-component="button"] {
+  flex: none;
+}
+
+/* narrow: the title keeps its room and the tag and actions drop to a line of their own, to the right */
+.gent-dock .gent-chat-head {
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+}
+
+.gent-dock .gent-chat-tools {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+/* the open chat keeps his status at the head, in his type (a step smaller than the pill's, beside the controls) */
+.gent-dock .gent-chat-head .gent-status {
+  flex: 1 1 8rem;
+  min-width: 0;
+  color: var(--dock-fg);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-s);
+}
+
+/* the model: a quiet control beside Clear and Collapse, his icon and its name in his ink; a wash on hover */
+.gent-dock .gent-model {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 10rem;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--dock-fg);
+  font-size: var(--font-size-s);
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+.gent-dock .gent-model [data-ui="icon"] {
+  color: inherit;
+  font-size: var(--font-size-m);
+}
+
+.gent-dock .gent-model .picker-chevron {
+  font-size: var(--font-size-s);
+  opacity: 0.7;
+}
+
+.gent-dock .gent-model:is(:hover:not(:disabled), [aria-expanded="true"]) {
+  background: var(--dock-wash);
+}
+
+/* his model list (portalled to <body>): the board's paper, a compact card lined up under his bar, his model pinned
+ * and marked in his blue */
+.gent-model-list {
+  --picker-mark: var(--color-gent);
+  width: 22rem;
+}
+
+.gent-model-list .picker-option {
+  padding-block: var(--space-1);
+}
+
+.gent-model-list .picker-option[aria-selected="true"] .picker-icon {
+  color: var(--color-gent);
+}
+
+/* while he works the model can't change: the tag stays, faded, rather than going grey */
+.gent-dock .gent-model:disabled,
+.gent-dock .gent-model[aria-disabled="true"] {
+  opacity: 0.6;
+}
+
+/* the pill row: the composer in every size */
+.gent-dock-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 3.25rem;
+  padding: 0.5rem;
+}
+
+.gent-status {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dock-soft);
+}
+
+.gent-dock .gent-field {
+  field-sizing: content;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 8ch;
+  max-width: 26rem;
+  align-self: center;
+  padding: 0.3rem 0;
+  border: 0;
+  background: none;
+  text-overflow: ellipsis;
+  cursor: text;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.gent-dock[data-mode="chat"] .gent-field {
+  max-width: none;
+}
+
+/* the circle: only his socket shows; the field stays focusable (Tab opens the pill) but takes no room */
+.gent-dock[data-mode="circle"] .gent-field {
+  flex: 0 0 0;
+  min-width: 0;
+  width: 0;
+  opacity: 0;
+}
+
+.gent-dock[data-mode="circle"] .gent-dock-actions {
+  display: none;
+}
+
+.gent-dock-actions {
+  flex: none;
+  align-self: center;
+}
+
+.gent-dock[data-mode="chat"][data-inked="true"] {
+  --color-surface-raised: rgb(0 0 0 / 0.18);
+}
+
+.gent-chat-history {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow-y: auto;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.gent-hint {
+  color: var(--dock-fg);
+}
+
+/* the card chat's own space under each message (Chat.css) would stack on this list's gap */
+.gent-chat-history .message {
+  padding-bottom: 0;
+}
+
+/* the user's task: their paper slip, laid on his ink */
+/* your message to Gent: the app's own paper and ink in either theme, not the dock's (inked, the dock's text tokens are
+ * his light-on-blue, so the bubble names the theme pair itself, as tokens/colors.css does) */
+.gent-chat-history .message-user-bubble {
+  color: light-dark(var(--ink-light), var(--ink-dark));
+  --color-text: light-dark(var(--ink-light), var(--ink-dark));
+  background:
+    linear-gradient(var(--color-string), var(--color-string)) var(--space-3) 0 / 1px 100% no-repeat,
+    var(--texture-grain),
+    light-dark(var(--paper-light), var(--paper-dark));
+}
+
+.gent-chat-history .message-meta,
+.gent-chat-history [data-ui="icon"] {
+  color: var(--dock-soft);
+}
+
+/* his work log: one collapsed row per note or tool, each with its tool's icon, hung off a pale rule */
+.gent-log {
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  list-style: none;
+  border-inline-start: 1px solid var(--dock-rule);
+}
+
+.gent-meta {
+  opacity: 0.8;
+}
+
+.gent-error {
+  color: var(--dock-alert);
+}
+
+/* Gent working (the loading pin): his ink's pale, not the user's red */
+.gent-chat-history [data-component="loading"] {
+  --color-string: var(--dock-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-dock,
+  .gent-dock-top {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* his status, read out to screen readers as it changes (it shows in the pill's placeholder) */
+.gent-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-socket[data-home][data-phase="arriving"]::after,
+  .gent-socket[data-home][data-phase="arriving"] .gent-avatar {
+    animation: none;
+  }
+}
+
+/* The chat header's controls (the model, clear, close) wait out of sight until the pointer or focus is on the dock.
+ * The pill's buttons aren't rendered at all then (GentDock.tsx), so the pill shrinks. */
+.gent-dock .gent-chat-head :is(button, .gent-model) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.gent-dock:is(:hover, :focus-within) .gent-chat-head :is(button, .gent-model) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── his states, each its own look (GentDock.tsx): always his ink; working, waiting and finished differ in shape,
+ * type, motion and marks, not only in words ── */
+
+/* The pill row is clipped to the dock's own rounded shape (a few px out, for focus rings), so nothing pokes out
+ * while the width springs or the dock morphs. The panel itself isn't clipped: its ink edge feathers past it. */
+.gent-dock {
+  --dock-round: 1.625rem;
+}
+
+.gent-dock[data-mode="chat"] {
+  --dock-round: 0 0 14px 14px;
+}
+
+.gent-dock-bar {
+  position: relative;
+  clip-path: inset(-4px round var(--dock-round));
+}
+
+/* the field steps aside while his status or his stamp shows; still focusable, and back as soon as you go to type */
+.gent-dock .gent-field[data-tucked] {
+  flex: 0 0 0;
+  min-width: 0;
+  width: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+/* working: what he's doing now, in his own type at full strength */
+.gent-now {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 24rem;
+  display: grid;
+  padding-inline: var(--space-1) var(--space-2);
+}
+
+/* the line springs up into this window as the last one leaves through its top */
+.gent-now-window {
+  display: grid;
+  overflow: clip;
+  overflow-clip-margin: 2px;
+}
+
+.gent-now-line {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--dock-fg);
+}
+
+.gent-now-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-m);
+  line-height: 1.3;
+}
+
+/* out working: his empty socket circles, like a search */
+.gent-dock[data-state="working"] .gent-socket:not([data-home])::before,
+.gent-dock[data-state="waiting"] .gent-socket:not([data-home])::before {
+  animation: gent-socket-search 7s linear infinite;
+}
+
+@keyframes gent-socket-search {
+  to {
+    rotate: 1turn;
+  }
+}
+
+/* finished: a rubber stamp pressed on the pill, the board's stamp, in his pale ink */
+.gent-stamp {
+  flex: none;
+  margin-inline: var(--space-2) var(--space-3);
+  padding: 0.15em 0.65em;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  color: var(--dock-fg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* the stamp's ink takes unevenly, like the cards' */
+  mask-image: var(--texture-grain), linear-gradient(#000, #000);
+  mask-composite: exclude;
+}
+
+.gent-stamp[data-outcome="stopped"] {
+  border-style: dashed;
+}
+
+.gent-stamp[data-outcome="error"] {
+  color: var(--dock-alert);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-dock .gent-socket::before {
+    animation: none !important;
+  }
+}
+
+/* ── the open conversation as a story: your task (your slip, red), his case notes (his ink), his report (paper) ── */
+
+/* his case notes: a phase per note of his, headed by the note in his type */
+.gent-phase {
+  list-style: none;
+}
+
+.gent-phase-box > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1);
+  border-radius: var(--radius-sm);
+  list-style: none;
+  cursor: pointer;
+}
+
+.gent-phase-box > summary::-webkit-details-marker {
+  display: none;
+}
+
+.gent-phase-box > summary:hover {
+  background: var(--dock-wash);
+}
+
+.gent-phase-box > summary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.gent-dock .gent-phase-note {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--dock-fg);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-s);
+  line-height: 1.35;
+}
+
+/* how many moves the phase took: its weight at a glance, folded or not */
+.gent-phase-count {
+  flex: none;
+  color: var(--dock-soft);
+  font-size: var(--font-size-xxs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.gent-dock .gent-phase-chevron {
+  flex: none;
+  align-self: center;
+  color: var(--dock-soft);
+  transition: rotate var(--motion-spring) var(--ease-spring);
+}
+
+.gent-phase-box[open] > summary .gent-phase-chevron {
+  rotate: 180deg;
+}
+
+/* the moves hang off his margin under the note */
+.gent-phase-box > .gent-log {
+  margin: var(--space-1) 0 var(--space-2) var(--space-2);
+}
+
+/* the phase he's in: his margin in full ink, the rest are history */
+.gent-phase[data-current] .gent-log {
+  border-inline-start-color: var(--dock-fg);
+}
+
+/* card addresses in his log stand out, so the cards can be picked out of a long run */
+.gent-addr {
+  color: var(--dock-fg);
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+/* his reply: his report, typed on the board's paper and pinned into his ink, with his blue margin; the cards it
+ * names (bold in the reply) in his blue */
+.gent-chat-history .message-assistant {
+  --color-text: light-dark(var(--ink-light), var(--ink-dark));
+  --color-text-muted: color-mix(in srgb, light-dark(var(--ink-light), var(--ink-dark)) 62%, transparent);
+  margin-inline-end: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-2) var(--space-6);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(var(--color-gent), var(--color-gent)) var(--space-4) 0 / 1px 100% no-repeat,
+    var(--texture-grain),
+    light-dark(var(--paper-light), var(--paper-dark));
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text);
+  rotate: 0.4deg;
+}
+
+.gent-chat-history .message-assistant :is(strong, b) {
+  color: var(--color-gent);
+}
+
+.gent-chat-history .message-assistant [data-ui="icon"] {
+  color: var(--color-text-muted);
+}
+
+/* how a run ended, in the conversation: the pill's stamp pressed into his ink, the reason beside it */
+.gent-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline-start: var(--space-1);
+}
+
+.gent-end .gent-stamp {
+  margin: 0;
+  rotate: -4deg;
+  animation: gent-stamp-press var(--motion-spring) var(--ease-spring) backwards;
+}
+
+@keyframes gent-stamp-press {
+  from {
+    scale: 1.6;
+    opacity: 0;
+  }
+}
+
+.gent-end .gent-meta {
+  opacity: 1;
+  color: var(--dock-soft);
+}
+
+/* an empty conversation: Gent introducing himself, in his own type */
+.gent-dock .gent-hint [data-ui="text"] {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-m);
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-end .gent-stamp {
+    animation: none;
+  }
+}
+
+/* the earlier moves of a long phase, one click away, on his margin above the latest ones */
+.gent-dock .gent-phase-more {
+  margin: var(--space-1) 0 0 var(--space-2);
+  color: var(--dock-soft);
+  font-size: var(--font-size-xs);
+}
+
+/* a card's answer arriving: a scrap of the card's paper passed into his log, the card's words in view (two lines;
+ * opening it shows the rest), tucked in from his margin with a spring */
+.gent-answer {
+  list-style: none;
+  margin: var(--space-1) 0 var(--space-2) calc(-1 * var(--space-1));
+}
+
+.gent-answer > details {
+  max-width: 32rem;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), light-dark(var(--paper-light), var(--paper-dark));
+  box-shadow: var(--shadow-floating);
+  color: light-dark(var(--ink-light), var(--ink-dark));
+  rotate: -0.5deg;
+  transform-origin: left center;
+  animation: gent-answer-in var(--motion-spring) var(--ease-spring) backwards;
+}
+
+.gent-answer:nth-child(even) > details {
+  rotate: 0.4deg;
+}
+
+.gent-answer summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.gent-answer summary::-webkit-details-marker {
+  display: none;
+}
+
+.gent-answer summary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.gent-answer-from {
+  font-size: var(--font-size-xxs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, light-dark(var(--ink-light), var(--ink-dark)) 70%, transparent);
+}
+
+/* the sender, in his blue: Gent's errand coming back */
+.gent-answer .gent-addr {
+  color: var(--color-gent);
+  letter-spacing: 0.04em;
+}
+
+.gent-answer-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.gent-answer details[open] .gent-answer-text {
+  display: block;
+}
+
+@keyframes gent-answer-in {
+  from {
+    opacity: 0;
+    translate: -0.75rem 0.25rem;
+    rotate: -4deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-answer > details {
+    animation: none;
+  }
+}
+
+/* a question card answered: the question in view, then the pick as whose choice it was */
+.gent-qa {
+  list-style: none;
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.gent-qa p {
+  margin: 0;
+}
+
+.gent-qa-q {
+  color: var(--dock-soft);
+  font-style: italic;
+}
+
+.gent-qa-q .gent-addr {
+  font-style: normal;
+}
+
+.gent-qa-a {
+  margin-top: 3px;
+  color: var(--dock-soft);
+}
+
+/* your pick: a tag of your paper with your red margin, as your picks are everywhere */
+.gent-qa-pick {
+  display: inline-block;
+  margin-inline: 2px;
+  padding: 1px var(--space-2) 1px calc(var(--space-2) + 3px);
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), light-dark(var(--paper-light), var(--paper-dark));
+  box-shadow: inset 3px 0 0 var(--color-string), var(--shadow-floating);
+  color: light-dark(var(--ink-light), var(--ink-dark));
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* his pick, for a card's model: in his own ink */
+.gent-qa[data-by="gent"] .gent-qa-pick {
+  background: var(--dock-wash);
+  box-shadow: inset 0 0 0 1px var(--dock-rule);
+  padding-inline-start: var(--space-2);
+  color: var(--dock-fg);
+}
+
+/* a card's address is a link to the card on the map, in his blue (pale on his ink, where the blue would vanish) */
+.gent-card-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-gent);
+  text-decoration: underline 1px;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.gent-dock[data-inked="true"] .gent-log .gent-card-link,
+.gent-dock[data-inked="true"] .gent-qa .gent-card-link {
+  color: var(--dock-fg);
+}
+
+.gent-card-link:hover {
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+}
+
+.gent-card-link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* a move the run ended before it came back: said so, quietly, and no longer pulsing */
+.gent-dock .tool-row[data-kind="unfinished"] :is(summary, .tool-row-head) {
+  color: var(--dock-soft);
+  font-style: italic;
+  opacity: 0.8;
+}

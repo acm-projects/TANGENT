@@ -1,0 +1,68 @@
+/* Gent travelling: the flight canvas over everything but the courtroom, and Gent at a station. Unlayered. */
+
+/* in Gent's layer: over the board and the toolbar, under the chat (Workspace.css) */
+.gent-flight {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* inside the station's own element (isolated while he's there), so it follows its pan, zoom and stacking: the
+ * ink under the station's content, his avatar over it */
+.gent-presence {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gent-outline {
+  position: absolute;
+  z-index: -1;
+}
+
+/* perched on the top centre, where the dot landed */
+.gent-perch {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  translate: -50% -78%;
+  scale: 0;
+  transition: scale var(--motion-fast) var(--ease-out);
+}
+
+.gent-perch[data-low] {
+  translate: -50% -35%;
+}
+
+.gent-perch[data-phase="here"] {
+  scale: 1;
+  transition: scale var(--motion-spring) var(--ease-spring);
+}
+
+.gent-perch .gent-avatar {
+  display: block;
+  width: calc(24px * var(--unzoom, 1));
+  height: calc(24px * var(--unzoom, 1));
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+
+/* where he went, when that's off screen: a blue arrowhead on the edge, pointing at him */
+.gent-offscreen {
+  position: fixed;
+  top: -7px;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  background: var(--color-gent);
+  clip-path: polygon(100% 50%, 0 0, 22% 50%, 0 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gent-perch {
+    transition: none;
+  }
+}

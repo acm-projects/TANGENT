@@ -26,7 +26,7 @@ auth_provider_enum = PGEnum(
 )
 
 node_type_enum = PGEnum(
-    "standard", "temporary", "debate",
+    "standard", "temporary", "debate", "question", "compact",
     name="node_type",
     create_type=False,
 )
@@ -238,6 +238,10 @@ class Node(Base):
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
     model = Column(Text, nullable=True)
     tokens = Column(Integer, nullable=False, server_default=text("0"))
+    # a question card's question, its answers and the chain it belongs to (app/questions.py); None otherwise
+    question = Column(JSONB, nullable=True)
+    # a resolved card: {"by": "user"|"gent", "at"} (app/resolving.py); None while open
+    resolved = Column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("parent_id", "fork_index", name="uq_nodes_parent_fork_index"),

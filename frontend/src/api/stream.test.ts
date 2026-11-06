@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { sseFrames, streamMessage } from "./stream";
-import type { StreamEvent } from "./types";
+import { sseFrames, streamGent, streamMessage } from "./stream";
+import type { GentEvent, StreamEvent } from "./types";
 
 describe("sseFrames", () => {
   it("parses frames split across chunk boundaries", async () => {
@@ -113,6 +113,39 @@ describe("streamMessage", () => {
   it("throws the server's detail message when the request is refused", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Only a leaf node can be prompted; fork it instead" }), { status: 409 }));
     await expect(streamMessage({ ...opts, onEvent: () => {} })).rejects.toThrow("Only a leaf node can be prompted");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("streamGent", () => {
+  const frame = (event: string, data: object) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  const sse = (...frames: string[]) =>
+    new Response(frames.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+
+  it("posts the task with the notes and relays every event until done", async () => {
+    const ref = { address: "1.2", id: "n2", title: "B" };
+    const fetchMock = vi.fn(async () => sse(
+      frame("cwd", ref),
+      frame("notes", { notes: [{ id: "n1", text: "Map", done: false }] }),
+      frame("note", { turn: 1, text: "Plan." }),
+      frame("tool", { turn: 1, id: "c1", name: "ls", args: {} }),
+      frame("result", { turn: 1, id: "c1", name: "ls", ok: true, brief: "listed", result: {} }),
+      frame("tree", {}),
+      frame("reply", { turn: 2, text: "Done." }),
+      frame("done", { cwd: "n2", notes: [], stopped: false }),
+      frame("note", { turn: 3, text: "never seen" }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const events: GentEvent[] = [];
+    await streamGent({
+      baseURL: "/api", projectId: "p1", messages: [{ role: "user", content: "go" }], notes: [], model: "m",
+      activeNodeId: "n2", getAccessToken: () => "t", refresh: async () => "t2", onEvent: (e) => events.push(e),
+    });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/projects/p1/gent");
+    expect(JSON.parse(init.body as string)).toEqual({ messages: [{ role: "user", content: "go" }], notes: [], model: "m", active_node_id: "n2" });
+    expect(events.map((e) => e.type)).toEqual(["cwd", "notes", "note", "tool", "result", "tree", "reply", "done"]);
+    expect(events[0]).toEqual({ type: "cwd", ref });
     vi.unstubAllGlobals();
   });
 });

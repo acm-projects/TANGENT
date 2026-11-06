@@ -104,3 +104,14 @@ def test_merge_messages_tagged_with_source_leaf_ids_are_collapsed_like_flatten()
     assert "<branch_a>\nUser: A1\n\nAssistant: A2\n</branch_a>" in out[0][1]
     assert "<branch_b>\nUser: B1\n\nAssistant: B2\n</branch_b>" in out[0][1]
     assert out[1] == ("user", "after merge")
+
+
+def test_a_saved_reply_keeps_its_tool_rows_and_thinking():
+    # regression: these were saved, then dropped on the way out because ChatMessage didn't declare them
+    from app.context.schemas import ChatMessage
+
+    saved = {"role": "assistant", "content": "A.", "seq": 1, "created_at": "2026-11-05T00:00:00Z",
+             "tools": [{"name": "think", "brief": "Quickly thought", "ok": True}],
+             "reasoning": "Weigh both.", "thought_seconds": 3}
+    out = ChatMessage.model_validate(saved).model_dump(mode="json")
+    assert out["tools"] == saved["tools"] and out["reasoning"] == "Weigh both." and out["thought_seconds"] == 3

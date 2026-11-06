@@ -1,5 +1,5 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
-import type { AttachmentKind, NodeMeta } from "@/api/types";
+import type { AttachmentKind, Ending, NodeMeta } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
 import { layoutTree } from "@/store/layout";
@@ -33,6 +33,14 @@ export interface MindMapNodeData extends Record<string, unknown> {
   tokens: number;
   /** A debate's verdict card (node_type "debate"). */
   debate: boolean;
+  /** A question an AI asked the user (node_type "question"). */
+  question: boolean;
+  /** A compact card (node_type "compact"): a thread's summary, where the context starts afresh. */
+  compact: boolean;
+  /** Resolved, and by whom (the stamp's colour). */
+  resolvedBy: "user" | "gent" | null;
+  /** How its branch ended (the stamp's words), when it did. */
+  ending: Ending | null;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -119,6 +127,10 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         feedsMerge: feeding.has(id),
         tokens: meta.tokens,
         debate: meta.node_type === "debate",
+        question: meta.node_type === "question",
+        compact: meta.node_type === "compact",
+        resolvedBy: meta.resolved?.by ?? null,
+        ending: meta.resolved ? (meta.resolved.kind ?? "resolved") : null,
       },
     });
     const sources = merges.get(id);

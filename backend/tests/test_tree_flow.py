@@ -327,6 +327,34 @@ def test_merge_sources_are_locked_and_delete_with_their_merge_descendants(monkey
         assert c.get(f"/nodes/{a}", headers=auth).status_code == 200
 
 
+def test_reset_from_the_root_leaves_one_blank_card(monkeypatch):
+    async def fake_llm(messages, model, **_):
+        yield {"text": "answer"}
+
+    monkeypatch.setattr(nodes_router, "stream_openrouter", fake_llm)
+
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])},
+                     headers=auth).json()["id"]
+        root = c.get(f"/projects/{pid}/tree", headers=auth).json()["tree"]["root_node_id"]
+        c.post(f"/nodes/{root}/messages", json={"content": "first"}, headers=auth)
+        a = c.post(f"/nodes/{root}/fork", headers=auth).json()["id"]
+        b = c.post(f"/nodes/{root}/fork", headers=auth).json()["id"]
+        c.post(f"/nodes/{a}/fork", headers=auth)
+        c.post("/nodes/merge", json={"source_leaf_ids": [a, b]}, headers=auth)
+
+        assert c.post(f"/nodes/{a}/reset", headers=auth).status_code == 409  # only the root resets
+        r = c.post(f"/nodes/{root}/reset", headers=auth)
+        assert r.status_code == 200 and r.json()["id"] == root and r.json()["fork"] is None
+        assert r.json()["title"] is None and r.json()["tokens"] == 0
+        tree = c.get(f"/projects/{pid}/tree", headers=auth).json()
+        assert [n["id"] for n in tree["nodes"]] == [root] and tree["tree"]["root_node_id"] == root
+        assert c.get(f"/nodes/{root}", headers=auth).json()["chats"] == []
+        assert c.post(f"/nodes/{root}/messages", json={"content": "again"}, headers=auth).status_code == 200
+
+
 def _workspace_id(user_id):
     """The API doesn't expose workspace ids, so read it straight from the table."""
     async def run():

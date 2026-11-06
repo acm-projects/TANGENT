@@ -1,0 +1,32 @@
+/* InkPanel: the ink is a canvas under the content, spilling past the box for the bleed. Inside, every text
+ * emphasis is the pale paper colour, so house Text, Icon and Button read on the blue. */
+
+@layer ui {
+  [data-component="ink-panel"] {
+    position: relative;
+    isolation: isolate;
+  }
+
+  [data-component="ink-panel"][data-inked="true"] {
+    color: var(--on-gent-ink);
+    --color-text: var(--on-gent-ink);
+    --color-text-secondary: var(--on-gent-ink);
+    --color-text-muted: rgb(243 242 239 / 0.82);
+    --color-border: rgb(243 242 239 / 0.3);
+    --color-border-strong: rgb(243 242 239 / 0.55);
+    --color-border-emphasis: var(--on-gent-ink);
+    --color-focus-ring: var(--on-gent-ink);
+    --color-selection: rgb(243 242 239 / 0.25);
+  }
+
+  .ink-panel-canvas {
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+    transition: opacity var(--motion-base) var(--ease-out);
+  }
+
+  [data-inked="false"] > .ink-panel-canvas {
+    opacity: 0;
+  }
+}

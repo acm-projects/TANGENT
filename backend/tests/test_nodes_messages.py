@@ -65,6 +65,7 @@ def fork_payload(node_id):
 @pytest.fixture
 def client(monkeypatch):
     persisted = []
+    extras_seen = []
     prepare = {"result": None, "error": None, "calls": []}
 
     class NoDb:
@@ -81,8 +82,11 @@ def client(monkeypatch):
         return prepare["result"] or (node_id, None)
 
     async def fake_persist(
-        user_id, write_node_id, user_text, assistant_text, model_id, response_tokens, replace_last=False
+        user_id, write_node_id, user_text, assistant_text, model_id, response_tokens, replace_last=False,
+        author="user", extras=None, citations=None,
     ):
+        extras_seen.append(extras)
+        assert author == "user"  # a message sent through the route is always the user's
         persisted.append(
             (user_id, write_node_id, user_text, assistant_text, model_id, response_tokens)
             + (("replace",) if replace_last else ())
@@ -100,12 +104,18 @@ def client(monkeypatch):
     monkeypatch.setattr(nodes_router, "_persist", fake_persist)
     monkeypatch.setattr(nodes_router, "_load_path", fake_path)
 
+    async def nothing_resolved(user_id, node_id):  # app/resolving.py: no resolved card above the prompted one
+        return []
+
+    monkeypatch.setattr(nodes_router, "_reopen_for_work", nothing_resolved)
+
     async def no_uploads(project_id):
         return ""
 
     monkeypatch.setattr(nodes_router.paper_service, "project_sources_note", no_uploads)
     c = TestClient(app)
     c.persisted = persisted
+    c.extras = extras_seen
     c.prepare = prepare
     yield c
     app.dependency_overrides.clear()
@@ -139,7 +149,7 @@ def test_streams_tokens_sends_history_and_persists(client, monkeypatch):
         ("token", {"text": "lo"}),
         ("done", {"usage": usage, "model": "m"}),
     ]
-    assert [m["content"] for m in seen["body"]["messages"] if m["role"] != "system"] == ["earlier q", "earlier a", "hi"]
+    assert [m["content"] for m in seen["body"]["messages"] if m["role"] != "system"] == ["[2026-01-01] earlier q", "[2026-01-01] earlier a", "hi"]  # past messages carry their date
     assert client.persisted == [
         (USER.id, NODE, "hi", "Hello", openrouter.DEFAULT_MODEL_ID, 7)
     ]
@@ -247,6 +257,7 @@ def path_row(node_id="a"):
         parent_id=None,
         title=None,
         created_at=None,
+        node_type="standard",
         merge_source_ids=[],
     )
 
@@ -412,7 +423,7 @@ def test_tool_call_round_then_cited_answer(client, monkeypatch):
     r = client.post(f"/nodes/{NODE}/messages", json={"content": "how do they rank?"})
 
     evs = events(r)
-    assert evs[0] == ("tool", {"name": "search_paper_evidence"})
+    assert evs[0] == ("tool", {"name": "search_paper_evidence", "brief": "Searched T for “rank”", "ok": True})
     assert evs[-1] == ("done", {
         "citations": [{"evidence_id": "p1:c0", "title": "T", "pages": "3"}],
         "unverified_citations": ["p9:c9"],  # cited, but no tool returned it this turn
@@ -425,6 +436,7 @@ def test_tool_call_round_then_cited_answer(client, monkeypatch):
     assert sent[-1]["role"] == "tool" and sent[-1]["tool_call_id"] == "call_1"
     assert json.loads(sent[-1]["content"]) == EVIDENCE
     assert client.persisted[0][3] == "Ranks with BM25 [p1:c0], see also [p9:c9]."
+    assert client.extras[0] == {"tools": [{"name": "search_paper_evidence", "brief": "Searched T for “rank”", "ok": True}]}
 
 
 def test_web_search_results_become_clickable_citations(client, monkeypatch):
@@ -471,8 +483,10 @@ def test_tool_rounds_are_bounded(client, monkeypatch):
     r = client.post(f"/nodes/{NODE}/messages", json={"content": "loop"})
 
     assert len(calls) == nodes_router.MAX_TOOL_ROUNDS
+    # the last round asks for the answer in words, not only by tool_choice
     assert len(bodies) == nodes_router.MAX_TOOL_ROUNDS + 1
     assert bodies[-1]["tool_choice"] == "none" and "tool_choice" not in bodies[0]
+    assert bodies[-1]["messages"][-1] == {"role": "user", "content": nodes_router.ANSWER_NOW}
     assert events(r)[-1][0] == "error"  # never answered: nothing saved
     assert client.persisted == []
 
@@ -579,3 +593,74 @@ def test_tool_call_written_as_text_is_run_not_shown(client, monkeypatch):
     assert shown == "Found one." and "tool_call" not in shown
     assert calls == [("search_papers", {"query": "polar bear pollution", "limit": 10})]
     assert client.persisted[0][3] == "Found one."
+
+
+def test_think_turns_on_quick_reasoning_for_the_next_reply_and_saves_it(client, monkeypatch):
+    reasoning = "data: " + json.dumps({"model": "m", "choices": [{"delta": {"reasoning": "Weigh both."}}]})
+    transport, bodies = scripted_provider([
+        [tool_chunk("call_1", "think", "{}"), "data: [DONE]"],
+        [reasoning, chunk("Answer."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "which is better?"})
+
+    evs = events(r)
+    assert evs[0] == ("tool", {"name": "think", "brief": "Quickly thought", "ok": True})
+    assert ("reasoning", {"text": "Weigh both."}) in evs
+    assert "reasoning" not in bodies[0] and bodies[1]["reasoning"] == {"effort": "low"}  # the next turn only
+    assert client.extras[0]["tools"] == [{"name": "think", "brief": "Quickly thought", "ok": True}]
+    assert client.extras[0]["reasoning"] == "Weigh both."
+
+
+def test_asking_the_user_announces_the_new_card_so_the_map_shows_it(client, monkeypatch):
+    transport, _ = scripted_provider([
+        [tool_chunk("call_1", "ask_user", json.dumps({"questions": [
+            {"prompt": "Which era?", "options": [{"label": "1970s"}, {"label": "Today"}]}]})), "data: [DONE]"],
+        [chunk("I asked which era you mean."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+    card = str(uuid.uuid4())
+
+    async def fake_ask(user_id, node_id, call, model):
+        return {"ok": "Asked.", "card": card}
+
+    monkeypatch.setattr(nodes_router, "_ask_user", fake_ask)
+
+    evs = events(client.post(f"/nodes/{NODE}/messages", json={"content": "who won?"}))
+    names = [e for e, _ in evs]
+    assert ("question", {"id": card}) in evs
+    assert names.index("question") < names.index("done")
+
+
+def test_a_round_that_says_nothing_new_goes_to_the_final_answer_round(client, monkeypatch):
+    transport, bodies = scripted_provider([
+        [chunk("Let me search for papers. "), tool_chunk("c", "search_papers", '{"query": "x"}'), "data: [DONE]"],
+        ["data: [DONE]"],  # ends with nothing: only its preamble would have been saved
+        [chunk("TIGIT is mostly on T cells."), "data: [DONE]"],
+    ])
+    use_provider(monkeypatch, transport)
+
+    async def fake_tool(name, args, project_id):
+        return {"results": []}
+
+    monkeypatch.setattr(nodes_router.paper_service, "call_tool", fake_tool)
+    client.post(f"/nodes/{NODE}/messages", json={"content": "TIGIT?"})
+    assert bodies[-1]["messages"][-1] == {"role": "user", "content": nodes_router.ANSWER_NOW}
+    assert bodies[-1]["tool_choice"] == "none"
+    assert client.persisted[0][3].endswith("TIGIT is mostly on T cells.")
+
+
+def test_a_reply_that_only_says_open_is_sent_back_to_research_and_never_saved(client, monkeypatch):
+    echo = [chunk("[2026-11-05] Open: Which synths define Tron?"), "data: [DONE]"]
+    transport, bodies = scripted_provider([echo, [chunk("[2026-11-05] The Jupiter-8 [p1:c0]."), "data: [DONE]"]])
+    use_provider(monkeypatch, transport)
+    client.post(f"/nodes/{NODE}/messages", json={"content": "Which synths define Tron?"})
+    assert bodies[1]["messages"][-1] == {"role": "user", "content": nodes_router.NOT_AN_ANSWER}
+    assert client.persisted[0][3] == "The Jupiter-8 [p1:c0]."  # the echo and the copied date stamp are dropped
+
+    transport, _ = scripted_provider([echo] * (nodes_router.MAX_TOOL_ROUNDS + 2))
+    use_provider(monkeypatch, transport)
+    client.persisted.clear()
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "again"})
+    assert events(r)[-1][0] == "error" and client.persisted == []

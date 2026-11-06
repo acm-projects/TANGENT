@@ -1,11 +1,12 @@
-import { memo, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { memo, useDeferredValue, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import type { ChatMessage } from "@/api/types";
 import { api } from "@/api";
-import { Button, Frame, Icon, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, InkPanel, Panel, Text } from "@/ui/library";
+import { ToolRow, toolIcon } from "./ToolRow";
 
 /* One message (Figma "ChatBubble", 16:219).
  *   User:      a filled bubble on the right, with "Uploaded x" lines above it.
@@ -27,35 +28,76 @@ type MessageBubbleProps = {
   onRetry?: () => void;
   /** true for the reply that is still arriving */
   streaming?: boolean;
+  /** how a reply's markdown elements render (Gent's report links the cards it names); keep it a stable object */
+  markdown?: Components;
   projectId?: string;
 };
 
-export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false, projectId }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false, markdown, projectId }: MessageBubbleProps) {
   return message.role === "user" ? (
     <UserMessage message={message} />
   ) : (
-    <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} projectId={projectId} />
+    <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} markdown={markdown} projectId={projectId} />
   );
 });
 
+// The message that sends a question chain's answers on (backend questions.trail_text writes it): shown as the answers
+const ANSWERS = /^My answers to your questions:\n\n([\s\S]*)\n\nContinue the research with these answers\.$/;
+
+function answersIn(content: string) {
+  const body = ANSWERS.exec(content)?.[1];
+  if (!body) return null;
+  const pairs = [...body.matchAll(/^Q: (.*)\nA: (.*)$/gm)].map((m) => ({ q: m[1], a: m[2] }));
+  return pairs.length ? pairs : null;
+}
+
 function UserMessage({ message }: { message: ChatMessage }) {
+  const answers = answersIn(message.content);
+  if (answers) {
+    return (
+      // the user's answers to a card's questions: an answer sheet, each question with the answer they ticked
+      <Frame as="li" gap="2" align="end" className="message message-user">
+        <MetaLine icon="fact_check" text="Answered the questions" />
+        <Panel hierarchy="tertiary" className="message-user-bubble message-answers">
+          <Frame as="ol" gap="2" className="message-answers-list">
+            {answers.map(({ q, a }) => (
+              <Frame as="li" gap="0" key={q}>
+                <Text size="xs" hierarchy="tertiary" content={q} />
+                <Text size="s" className="message-answers-answer" content={a} />
+              </Frame>
+            ))}
+          </Frame>
+        </Panel>
+      </Frame>
+    );
+  }
   return (
     <Frame as="li" gap="2" align="end" className="message message-user">
       {message.attachments?.map((a) => (
         <MetaLine key={a.id} icon={a.kind === "image" ? "image" : "draft"} text={`Uploaded ${a.name}`} />
       ))}
-      {message.content && (
-        <Panel hierarchy="tertiary" className="message-user-bubble">
-          <Text content={message.content} className="message-text" />
-        </Panel>
-      )}
+      {message.author === "gent" && <MetaLine icon="person_search" text="Asked by Gent" />}
+      {message.content &&
+        (message.author === "gent" ? (
+          // a question Gent asked: written in his ink
+          <InkPanel radius={8} seed={message.seq + 3} className="message-user-bubble" data-author="gent">
+            <Text content={message.content} className="message-text" />
+          </InkPanel>
+        ) : (
+          // the user's own question: a slip with their red margin and tack
+          <Panel hierarchy="tertiary" className="message-user-bubble">
+            <Text content={message.content} className="message-text" />
+          </Panel>
+        ))}
     </Frame>
   );
 }
 
-function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, projectId }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
+function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markdown, projectId }: Omit<MessageBubbleProps, "message"> & { message: ChatMessage }) {
   const [copied, setCopied] = useState(false);
   const [citationError, setCitationError] = useState<string | null>(null);
+  // a streaming reply re-parses its markdown and maths as it grows: React may skip to the latest text under load
+  const deferred = useDeferredValue(message.content);
   const citations = new Map((message.citations ?? []).map((citation) => [citation.evidence_id, citation]));
 
   async function copy() {
@@ -69,6 +111,22 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, proje
     }
   }
 
+  if (message.compact) {
+    // a compact card's summary: the thread above, pressed into one record the conversation starts afresh from
+    return (
+      <Frame as="li" gap="2" className="message message-compact">
+        <MetaLine icon="compress" text={`Compacted${message.compacted_from ? ` · ${message.compacted_from} card${message.compacted_from === 1 ? "" : "s"}` : ""}`} />
+        <Panel hierarchy="tertiary" className="message-compact-record">
+          <div className="message-text message-markdown">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        </Panel>
+      </Frame>
+    );
+  }
+
   const citationForLink = (label: string, href: string) => {
     const page = href.match(/[?&#]page(?:=|%3D)(\d+)/i)?.[1] ?? label.match(/\bp(?:age)?\.?\s*(\d+)/i)?.[1];
     return [...citations.entries()].find(([, citation]) =>
@@ -76,7 +134,7 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, proje
       (!page || citation.pages?.split("-")[0] === page)
     )?.[0];
   };
-  const content = message.content
+  const content = deferred
     .replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (markdown, label: string, href: string) => {
       const evidenceId = citationForLink(label, href);
       return evidenceId ? `[${label}](citation://${evidenceId})` : markdown;
@@ -136,8 +194,29 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, proje
   return (
     <Frame as="li" gap="1" align="start" className="message message-assistant" data-streaming={streaming || undefined}>
       {message.attachments?.map((a) => <MetaLine key={a.id} icon="image" text={`Viewed ${a.name}`} />)}
-      {message.thought_seconds !== undefined && (
-        <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
+      {(message.tools?.length ?? 0) > 0 ? (
+        // what the reply did on the way: its tool calls and quick thinking, one row each, as Gent's look
+        <ol className="message-tools" aria-label="What this reply did">
+          {message.tools!.map((row, i) =>
+            row.name === "think" ? (
+              <ToolRow
+                key={i}
+                icon={toolIcon("think")}
+                kind="think"
+                label={`Quickly thought${message.thought_seconds ? ` for ${formatDuration(message.thought_seconds)}` : ""}`}
+                pending={streaming && !message.content}
+              >
+                {message.reasoning ? <Text size="xs" className="tool-row-body" content={message.reasoning} /> : undefined}
+              </ToolRow>
+            ) : (
+              <ToolRow key={i} icon={toolIcon(row.name)} label={row.brief} failed={!row.ok} />
+            ),
+          )}
+        </ol>
+      ) : (
+        message.thought_seconds != null && (
+          <MetaLine icon="psychology" text={`Thought for ${formatDuration(message.thought_seconds)}`} />
+        )
       )}
       {message.citations?.map((citation) => (
         <MetaLine
@@ -159,6 +238,7 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, proje
             rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
             urlTransform={(url) => url}
             components={{
+              ...markdown,
               a: ({ href, children, ...props }) => {
                 const evidenceId = href?.startsWith("citation://") ? href.slice("citation://".length) : undefined;
                 const externalUrl = evidenceId ? citationLink(evidenceId) : href?.match(/^https?:\/\//i) ? href : undefined;
@@ -239,7 +319,7 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, proje
 }
 
 /* Figma "AgentAction" / "UserAction": a small muted icon + caption. */
-function MetaLine({ icon, text }: { icon: string; text: string }) {
+export function MetaLine({ icon, text }: { icon: string; text: string }) {
   return (
     <Frame direction="row" gap="1" align="center" className="message-meta">
       <Icon icon={icon} size="s" hierarchy="tertiary" />

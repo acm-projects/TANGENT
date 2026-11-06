@@ -29,7 +29,8 @@ def test_linear_path_preserves_order_and_node_boundaries():
     segs = flatten(["root", "leaf"], nodes)
     assert [s.node_id for s in segs] == ["root", "leaf"]
     out = to_provider_messages(segs, "q3")
-    assert [m["content"] for m in out] == ["q1", "a1", "q2", "a2", "q3"]
+    # context messages carry the day they were written; the new prompt is the user's own words
+    assert [m["content"] for m in out] == [f"[2026-09-29] {c}" for c in ("q1", "a1", "q2", "a2")] + ["q3"]
     assert [m["role"] for m in out] == ["user", "assistant"] * 2 + ["user"]
 
 
@@ -78,7 +79,7 @@ def test_nested_merge_renders_inline_after_shared_ancestor():
     assert "<merge>" in content
     assert '<branch from="A">' in content
     assert "after merge" in content
-    assert content.index("</merge>") < content.index("User: after merge")
+    assert content.index("</merge>") < content.index("User: [2026-09-29] after merge")
 
 
 def test_branch_title_falls_back_and_strips_quotes():

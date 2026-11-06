@@ -238,3 +238,17 @@ def test_sharing_a_merge_includes_both_parent_paths_and_project_copy(sent):
         assert set(fork["node_map"]) == {root, a, b, merge_id}
         copied = c.get(f"/projects/{fork['project_id']}/tree", headers=sharee).json()["nodes"]
         assert len(copied) == 5
+
+
+def test_a_sharees_reset_forks_and_resets_their_copy(sent):
+    with TestClient(app) as c:
+        owner, sharee, base, pid, root, a, b = project_with_branches(c)
+        assert c.post(f"{base}/share", json={"email": SHAREE}, headers=owner).status_code == 201
+        assert c.post(f"/shares/{sent[SHAREE]}/accept", headers=sharee).status_code == 200
+
+        r = c.post(f"/nodes/{root}/reset", headers=sharee)
+        assert r.status_code == 200
+        fork = r.json()["fork"]
+        assert fork and r.json()["id"] == fork["node_map"][root]
+        assert [n["id"] for n in c.get(f"/projects/{fork['project_id']}/tree", headers=sharee).json()["nodes"]] == [r.json()["id"]]
+        assert len(c.get(f"/projects/{pid}/tree", headers=owner).json()["nodes"]) == 3  # the original is untouched
