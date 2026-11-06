@@ -1,13 +1,14 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useChatLayout } from "@/store/chatLayout";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
-import { AgentWindow } from "../agent/AgentWindow";
 import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
-import { useChat } from "./useChat";
+import { QuestionRecord } from "./components/QuestionRecord";
+import { type HistoryItem, useChat } from "./useChat";
 import "./Chat.css";
 
 const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
@@ -18,30 +19,126 @@ const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumF
  *   docked     the default: floats over the right half of the map; its left
  *              edge drags to resize (pointer, or arrow keys when focused)
  *   expanded   full screen (the top-left button)
- *   collapsed  just a button to bring it back (the top-right chevron)
+ *   collapsed  nothing here: its reopen tile sits beside the Field Notes (agent/GentLayer)
  *
  * Only the history scrolls (.chat-scroll); the error, token usage and the
  * message box sit fixed below it, the box a ruled line on the sheet.
  */
 
-type Layout = "docked" | "expanded" | "collapsed";
 
 /** Narrowest the docked sheet drags to, and how far an arrow key moves it (px). */
 const MIN_WIDTH = 360;
 const KEY_STEP = 32;
 type ChatProps = { className?: string };
 
+type HistoryListProps = {
+  items: HistoryItem[];
+  activeNodeId: string | null;
+  streaming: string | null;
+  canRetry: boolean;
+  branch: (nodeId: string, seq: number) => void;
+  retry: () => Promise<void>;
+};
+
+function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }: HistoryListProps) {
+  return (
+    <>
+      {items.map((item, i) => {
+        if (item.kind === "merge") {
+          return (
+            <li key={`merge-${i}`} className="chat-merge">
+              <ol className="chat-merge-branches">
+                {item.branches.map((source) => (
+                  <li key={source.from}>
+                    <details>
+                      <summary className="chat-merge-branch-heading">
+                        <Icon icon="merge" size="s" />
+                        <span>Branch from {source.exhibit} {source.title ?? "Untitled branch"}</span>
+                      </summary>
+                      <ol className="chat-history chat-merge-history">
+                        <HistoryList
+                          items={source.items}
+                          activeNodeId={activeNodeId}
+                          streaming={streaming}
+                          canRetry={canRetry}
+                          branch={branch}
+                          retry={retry}
+                        />
+                      </ol>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+            </li>
+          );
+        }
+
+        const isActive = item.node.id === activeNodeId;
+        return (
+          <Fragment key={item.node.id}>
+            {i > 0 && (
+              <Frame as="li">
+                <BranchDivider exhibit={item.exhibit} title={item.node.title} />
+              </Frame>
+            )}
+            {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
+            {item.node.node_type === "debate" && isActive && (
+              <Frame as="li">
+                <VerdictCard nodeId={item.node.id} />
+              </Frame>
+            )}
+            {/* a question card: what was asked, and the answer that led on down this thread */}
+            {item.node.node_type === "question" && item.node.question && (
+              <QuestionRecord node={item.node} next={(() => { const n = items[i + 1]; return n?.kind === "node" ? n.node.id : undefined; })()} />
+            )}
+            {item.messages === undefined && (
+              <Frame as="li">
+                <Loading />
+              </Frame>
+            )}
+            {item.messages?.map((message, j, all) => (
+              <MessageBubble
+                key={`${item.node.id}-${message.seq}-${message.role}`}
+                message={message}
+                nodeId={item.node.id}
+                projectId={item.node.project_id}
+                // a node can't be cut while its reply is still arriving
+                onBranch={streaming !== null && isActive ? undefined : branch}
+                // only the newest reply on the card being written on can be asked again
+                onRetry={canRetry && isActive && j === all.length - 1 ? retry : undefined}
+              />
+            ))}
+            {/* only the card being written on needs the hint; an empty card above it is just its divider */}
+            {item.messages?.length === 0 && streaming === null && isActive && item.node.node_type !== "question" && (
+              <Frame as="li" className="chat-hint">
+                <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
+              </Frame>
+            )}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 export function Chat({ className }: ChatProps) {
   const chat = useChat();
-  const [layout, setLayout] = useState<Layout>("docked");
-  const [agentOpen, setAgentOpen] = useState(false);
+  const { layout, setLayout } = useChatLayout();
+  // a question card answered on the map continues its research through this chat's send
+  const continueIn = useRef(chat.continueIn);
+  continueIn.current = chat.continueIn;
+  useEffect(() => useChatLayout.setState({ continueIn: (nodeId, prompt) => continueIn.current(nodeId, prompt) }), []);
 
-  // Selecting a node brings a collapsed chat back (adjusting state during render, not in an effect).
-  const [shownNodeId, setShownNodeId] = useState(chat.activeNodeId);
-  if (chat.activeNodeId !== shownNodeId) {
-    setShownNodeId(chat.activeNodeId);
-    if (chat.activeNodeId && layout === "collapsed") setLayout("docked");
-  }
+  // "Show earlier" above a compact card's summary, for the card it was pressed on (picking another folds them again)
+  const [earlierFor, setEarlierFor] = useState<string | null>(null);
+  const folded = earlierFor === chat.activeNodeId ? 0 : chat.foldedCount;
+
+  // Selecting a node brings a collapsed chat back. An effect: the layout is a shared store, which mustn't change
+  // while rendering.
+  const activeNodeId = chat.activeNodeId;
+  useEffect(() => {
+    if (activeNodeId && useChatLayout.getState().layout === "collapsed") useChatLayout.getState().setLayout("docked");
+  }, [activeNodeId]);
   // null until the user drags: the CSS default width applies.
   const [width, setWidth] = useState<number | null>(null);
   const [resizing, setResizing] = useState(false);
@@ -59,11 +156,12 @@ export function Chat({ className }: ChatProps) {
 
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastSection = chat.history.at(-1);
+  const activeNode = chat.activeNode;
   // `layout` is in the key because reopening a collapsed panel remounts the list. Every section's count, since
   // an ancestor's (often long) history can load after the selected card's.
-  const loaded = chat.history.reduce((n, section) => n + (section.messages?.length ?? 0), 0);
-  const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming?.length ?? 0}`;
+  const loaded = chat.loadedMessageCount;
+  // A reply starting counts; its tokens don't (the observer below keeps up with them, without re-pinning per token).
+  const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming !== null}`;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -84,44 +182,10 @@ export function Chat({ className }: ChatProps) {
     };
   }, [scrollKey]);
 
-  // After the panels in both layouts, so the conversation survives opening and collapsing the chat.
-  const agentWindow = agentOpen && <AgentWindow onClose={() => setAgentOpen(false)} />;
-
-  if (layout === "collapsed") {
-    return (
-      <>
-        <Frame as="aside" className={classes} data-layout="collapsed" aria-label="Chat">
-          <Frame direction="row" gap="2">
-            <Button
-              elevation="floating"
-              label="Open chat"
-              icon="chevron_left"
-              showIcon
-              showLabel={false}
-              size="l"
-              onClick={() => setLayout("docked")}
-            />
-            {/* a stand-in for the future agent: drives the agent tools so we can see they work */}
-            <Button
-              elevation="floating"
-              label="Open agent"
-              icon="smart_toy"
-              showIcon
-              showLabel={false}
-              size="l"
-              pressed={agentOpen}
-              onClick={() => setAgentOpen((open) => !open)}
-              className="agent-launch"
-            />
-          </Frame>
-        </Frame>
-        {agentWindow}
-      </>
-    );
-  }
+  // collapsed, the chat is just its reopen tile, which sits beside the Field Notes (agent/GentLayer)
+  if (layout === "collapsed") return null;
 
   return (
-    <>
     <Panel
       as="aside"
       ref={sheetRef}
@@ -168,16 +232,18 @@ export function Chat({ className }: ChatProps) {
             onClick={() => setLayout(layout === "expanded" ? "docked" : "expanded")}
             className="chat-fold-button"
           />
-          {lastSection && (
+          {activeNode && (
             // keyed, so picking another card swaps the heading in
-            <Frame key={lastSection.node.id} gap="0" align="center" className="chat-title">
+            <Frame key={activeNode.id} gap="0" align="center" className="chat-title">
               <Text
                 as="span"
                 size="xxs"
                 className="chat-title-kicker"
-                content={`Case notes · Exhibit ${lastSection.exhibit}`}
+                content={(activeNode.merge_source_ids?.length ?? 0) > 0
+                  ? `Case notes · Joint exhibit ${chat.activeExhibit}`
+                  : `Case notes · Exhibit ${chat.activeExhibit}`}
               />
-              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={lastSection.node.title ?? "Untitled card"} />
+              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
             </Frame>
           )}
           <Button
@@ -204,43 +270,26 @@ export function Chat({ className }: ChatProps) {
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
-              {chat.history.map((section, i) => (
-                <Fragment key={section.node.id}>
-                  {i > 0 && (
-                    <Frame as="li">
-                      <BranchDivider exhibit={section.exhibit} title={section.node.title} />
-                    </Frame>
-                  )}
-                  {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
-                  {section.node.node_type === "debate" && i === chat.history.length - 1 && (
-                    <Frame as="li">
-                      <VerdictCard nodeId={section.node.id} />
-                    </Frame>
-                  )}
-                  {section.messages === undefined && (
-                    <Frame as="li">
-                      <Loading />
-                    </Frame>
-                  )}
-                  {section.messages?.map((m, j, all) => (
-                    <MessageBubble
-                      key={`${section.node.id}-${m.seq}-${m.role}`}
-                      message={m}
-                      nodeId={section.node.id}
-                      // a node can't be cut while its reply is still arriving
-                      onBranch={chat.streaming !== null && i === chat.history.length - 1 ? undefined : chat.branch}
-                      // only the newest reply on the card being written on can be asked again
-                      onRetry={chat.canRetry && i === chat.history.length - 1 && j === all.length - 1 ? chat.retry : undefined}
-                    />
-                  ))}
-                  {/* only the card being written on needs the hint; an empty card above it is just its divider */}
-                  {section.messages?.length === 0 && chat.streaming === null && i === chat.history.length - 1 && (
-                    <Frame as="li" className="chat-hint">
-                      <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
-                    </Frame>
-                  )}
-                </Fragment>
-              ))}
+              {folded > 0 && (
+                <Frame as="li" align="center" className="chat-earlier">
+                  <Button
+                    hierarchy="tertiary"
+                    size="s"
+                    icon="unfold_more"
+                    showIcon
+                    label={`Show earlier · ${folded} card${folded === 1 ? "" : "s"}`}
+                    onClick={() => setEarlierFor(chat.activeNodeId)}
+                  />
+                </Frame>
+              )}
+              <HistoryList
+                items={folded ? chat.history.slice(folded) : chat.history}
+                activeNodeId={chat.activeNodeId}
+                streaming={chat.streaming}
+                canRetry={chat.canRetry}
+                branch={chat.branch}
+                retry={chat.retry}
+              />
               {chat.streaming !== null && (
                 <MessageBubble
                   streaming
@@ -248,8 +297,9 @@ export function Chat({ className }: ChatProps) {
                     role: "assistant",
                     content: chat.streaming,
                     seq: -1,
-                    branch_source: null,
                     created_at: "",
+                    tools: chat.streamWork?.tools,
+                    reasoning: chat.streamWork?.reasoning,
                   }}
                 />
               )}
@@ -259,7 +309,7 @@ export function Chat({ className }: ChatProps) {
 
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
-        {lastSection && (
+        {activeNode && (
           // One quiet line (node, branch and, after a reply, how full the context is); open it for the full counts.
           <details className="chat-token-usage">
             <summary>
@@ -309,13 +359,11 @@ export function Chat({ className }: ChatProps) {
           modelsLoading={chat.modelsLoading}
           onModelChange={chat.setSelectedModel}
           onSend={chat.send}
-          about={lastSection?.node.title}
+          about={activeNode?.title}
           // hidden, not unmounted, with no card picked: a half-written draft survives deselecting
           className={chat.blocker === "no-selection" ? "chat-field chat-field-idle" : "chat-field"}
         />
       </Frame>
     </Panel>
-    {agentWindow}
-    </>
   );
 }

@@ -220,14 +220,20 @@ export const waiting = (v: DebateView): DebateTurn[] =>
 
 interface DebateStore {
   view: DebateView | null;
-  open(id: string): void;
+  /** The courtroom is stepped out of: the debate waits as a button on the board. */
+  minimised: boolean;
+  /** Show debate `id` from scratch; `minimised` opens it as the button rather than the courtroom. */
+  open(id: string, minimised?: boolean): void;
+  setMinimised(minimised: boolean): void;
   dispatch(a: DebateAction): void;
   close(): void;
 }
 
 export const useDebateStore = create<DebateStore>()((set) => ({
   view: null,
-  open: (id) => set({ view: emptyDebate(id) }),
+  minimised: false,
+  open: (id, minimised = false) => set({ view: emptyDebate(id), minimised }),
+  setMinimised: (minimised) => set({ minimised }),
   dispatch: (a) => set((s) => (s.view ? { view: reduceDebate(s.view, a) } : s)),
   close: () => set({ view: null }),
 }));

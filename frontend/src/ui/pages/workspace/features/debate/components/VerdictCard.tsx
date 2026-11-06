@@ -3,15 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { api, apiErrorMessage } from "@/api";
 import type { DebateBranch, DebateResult } from "@/api/types";
+import { useDebateStore } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Input, Link, Loading, Panel, Text } from "@/ui/library";
-import { createBranches } from "../debateActions";
+import { createBranches, openDebateNode } from "../debateActions";
 import "../Debate.css";
 
 /* The structured verdict behind a debate card (GET /debates/node/:id), pinned above its chat
  * (FRONTEND_DEBATE_MODE.md §8-9). The chat already holds the readable verdict; this adds what prose can't:
  * how settled it is, the scores, and the branches -- the questions the debate couldn't settle, each a
  * checkbox that becomes a new card beside the debate's.
+ *
+ * The same card closes the courtroom's record (`inCourt`, Debate.tsx), with the judge's summary under the
+ * stamp; above the chat it offers the way back into the courtroom instead.
  *
  * A contested verdict leads with the branches: on a near-tie they are the answer, and the scores are the
  * evidence that it is close. Older debate nodes have no rubric or branches; those sections just don't show. */
@@ -29,9 +33,11 @@ function warningOf(finalOutput: string) {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-export function VerdictCard({ nodeId }: { nodeId: string }) {
+export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCourt?: boolean }) {
   const [result, setResult] = useState<DebateResult | null | undefined>(undefined);
   const [open, setOpen] = useState(false);
+  const [entering, setEntering] = useState(false);
+  const [enterError, setEnterError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +71,10 @@ export function VerdictCard({ nodeId }: { nodeId: string }) {
       ? `The judge would have picked ${SIDE[judge] ?? "neither side"}.`
       : `Confidence ${pct(result.confidence)}`;
 
-  const branches = result.branches?.length ? <Branches nodeId={nodeId} initial={result.branches} /> : null;
+  const branches = result.branches?.length ? <Branches nodeId={nodeId} initial={result.branches} inCourt={inCourt} /> : null;
 
   return (
-    <Panel as="section" className="verdict" data-winner={result.winner} aria-label="Verdict">
+    <Panel as="section" className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
       <Frame gap="3">
         {warning && (
           <Panel className="verdict-warning" role="note">
@@ -79,11 +85,29 @@ export function VerdictCard({ nodeId }: { nodeId: string }) {
           </Panel>
         )}
         <Frame gap="2" align="center" className="verdict-head">
-          <Frame gap="0" align="center" className="debate-stamp" data-contested={contested || undefined}>
+          <Frame gap="0" align="center" className="debate-stamp" data-contested={contested || undefined} data-picked={picked || undefined}>
             <Text as="span" size="xxs" className="debate-kicker" content="Judgment of the court" />
             <Text as="h3" size="l" hierarchy="primary" className="debate-stamp-verdict" content={headline} />
           </Frame>
           <Text size="s" hierarchy="tertiary" className="verdict-subline" content={subline} />
+          {inCourt && result.summary && <Text className="debate-summary" content={result.summary} />}
+          {!inCourt && (
+            <Button
+              size="s"
+              icon="balance"
+              showIcon
+              label={entering ? "Entering…" : "Enter the courtroom"}
+              disabled={entering}
+              onClick={() => {
+                setEntering(true);
+                setEnterError(null);
+                openDebateNode(nodeId)
+                  .catch((e: unknown) => setEnterError(apiErrorMessage(e, "Could not open the courtroom.")))
+                  .finally(() => setEntering(false));
+              }}
+            />
+          )}
+          {enterError && <Text role="alert" size="s" className="debate-error" content={enterError} />}
         </Frame>
 
         {contested && branches}
@@ -169,8 +193,9 @@ function List({ title, items }: { title: string; items: string[] }) {
 }
 
 /** "Where to go next": tick the questions worth a card, then make them. Ticks are saved on the server
- * (debounced, optimistic) so they survive a reload; a made branch becomes a link to its card. */
-function Branches({ nodeId, initial }: { nodeId: string; initial: DebateBranch[] }) {
+ * (debounced, optimistic) so they survive a reload; a made branch becomes a link to its card. In the
+ * courtroom, making cards or opening one steps back out to the board, where they are. */
+function Branches({ nodeId, initial, inCourt }: { nodeId: string; initial: DebateBranch[]; inCourt: boolean }) {
   const [branches, setBranches] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +203,7 @@ function Branches({ nodeId, initial }: { nodeId: string; initial: DebateBranch[]
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const setActive = useTreeStore((s) => s.setActive);
   const onMap = useTreeStore((s) => s.nodesById);
+  const toBoard = () => inCourt && useDebateStore.getState().setMinimised(true);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const toggle = (id: string, on: boolean) => {
@@ -205,6 +231,7 @@ function Branches({ nodeId, initial }: { nodeId: string; initial: DebateBranch[]
       const next = await createBranches(nodeId, chosen.map((b) => b.id));
       saved.current = next;
       setBranches(next);
+      toBoard();
     } catch (e) {
       setError(apiErrorMessage(e, "Could not create the branches."));
     } finally {
@@ -245,7 +272,10 @@ function Branches({ nodeId, initial }: { nodeId: string; initial: DebateBranch[]
                     showIcon
                     label="Open card"
                     disabled={!onMap[b.created_node_id]}
-                    onClick={() => setActive(b.created_node_id)}
+                    onClick={() => {
+                      setActive(b.created_node_id);
+                      toBoard();
+                    }}
                     className="verdict-open"
                   />
                 )}

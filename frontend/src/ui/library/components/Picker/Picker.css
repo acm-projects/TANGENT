@@ -1,0 +1,143 @@
+/* Picker: a select with our own list (Picker.tsx). The trigger is quiet like Select; the list is a floating sheet of
+ * paper over the board. Consumers size and letter the trigger through their own class. */
+
+@layer ui {
+  [data-ui="picker"] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--font-size-s);
+    cursor: pointer;
+    transition:
+      border-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
+  }
+
+  [data-ui="picker"]:hover:not(:disabled),
+  [data-ui="picker"][aria-expanded="true"] {
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
+
+  [data-ui="picker"]:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  [data-ui="picker"]:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  /* locked or loading: no chevron, so it doesn't promise a list it won't open */
+  [data-ui="picker"]:disabled .picker-chevron {
+    display: none;
+  }
+
+  .picker-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .picker-chevron {
+    transition: rotate var(--motion-base) var(--ease-spring);
+  }
+
+  .picker-chevron[data-open] {
+    rotate: 180deg;
+  }
+
+  /* a sheet of the board's paper, lifted off it; options ruled apart like an index card's lines */
+  .picker-list {
+    /* the chosen option's pin: the user's red; a consumer's list can make it someone else's (Gent's blue) */
+    --picker-mark: var(--color-string);
+    position: fixed;
+    z-index: 60;
+    max-width: min(24rem, calc(100vw - 1rem));
+    max-height: min(22rem, 60vh, var(--picker-room, 100vh));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--texture-grain), var(--color-surface);
+    box-shadow: var(--shadow-lift);
+    color: var(--color-text);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  .picker-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    outline: none;
+    transition: background-color var(--motion-fast) var(--ease-out);
+  }
+
+  /* the rule between two options, inset to the text and hidden beside the one under the pointer or keys */
+  .picker-option + .picker-option::before {
+    content: "";
+    position: absolute;
+    inset: 0 var(--space-3) auto;
+    border-top: 1px solid var(--color-border);
+    transition: opacity var(--motion-fast) var(--ease-out);
+  }
+
+  .picker-option:focus::before,
+  .picker-option:focus + .picker-option::before {
+    opacity: 0;
+  }
+
+  /* the option under the pointer or the keys (hover moves the keys' place, so the two never disagree) */
+  .picker-option:focus {
+    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  }
+
+  /* the marks rank: muted at rest, in ink on the chosen option and the one in hand */
+  .picker-option .picker-icon {
+    color: var(--color-text-muted);
+    transition: color var(--motion-fast) var(--ease-out);
+  }
+
+  .picker-option:is(:focus, [aria-selected="true"]) .picker-icon {
+    color: var(--color-text);
+  }
+
+  .picker-option[aria-selected="true"] .picker-text > :first-child {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .picker-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* the chosen option is pinned: a domed pin head, as the board's pins are */
+  .picker-pin {
+    flex: none;
+    width: 0.625rem;
+    height: 0.625rem;
+    margin-inline: var(--space-2) var(--space-1);
+    border-radius: var(--radius-full);
+    background: var(--texture-pin), var(--picker-mark);
+    box-shadow: 0 1px 2px var(--color-string-shadow);
+  }
+}

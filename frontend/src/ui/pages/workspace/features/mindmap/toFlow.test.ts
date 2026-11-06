@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeMeta } from "@/api/types";
+import { ROW_HEIGHT } from "@/store/layout";
 import { UNTITLED, toFlow, type StructureSlice } from "./toFlow";
 
 const meta = (id: string, parent: string | null, fork: number, title: string | null = id): NodeMeta => ({
@@ -53,15 +54,14 @@ describe("toFlow", () => {
     expect(labels).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
   });
 
-  it("hangs a merged card under the deeper of its sources and strings it from both", () => {
-    // r -> (a, b) ; b -> (c) ; m merges a and c, and really hangs off r
+  it("lays out a merge under its first parent and strings it from both sources", () => {
+    // r -> (a, b) ; b -> (c) ; m merges a and c, and hangs under a
     const s = slice("m");
-    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
-    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "a", 1), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b"], a: ["m"] };
     const { nodes, edges } = toFlow(s);
     const at = Object.fromEntries(nodes.map((n) => [n.id, n.position]));
-    expect(at["m"]!.y).toBeGreaterThan(at["c"]!.y);
-    expect(at["m"]!.x).toBe(at["c"]!.x);
+    expect(at["m"]!.y).toBeGreaterThan(at["a"]!.y);
     expect(edges.map((e) => e.id).filter((id) => id.endsWith("m")).sort()).toEqual(["a->m", "c->m"]);
     expect(nodes.find((n) => n.id === "a")!.data.feedsMerge).toBe(true);
   });
@@ -69,28 +69,49 @@ describe("toFlow", () => {
   it("with a merged card picked, both branches it merged and its joining strings are the path", () => {
     // r -> (a, b) ; b -> (c) ; m merges a and c
     const s = slice("m");
-    s.nodesById = { ...s.nodesById, m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] } };
-    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m"] };
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "a", 1), merge_source_ids: ["a", "c"] } };
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b"], a: ["m"] };
     expect(stateById(s)).toEqual({ r: "path", a: "path", b: "path", c: "path", m: "selected" });
     const pathEdges = toFlow(s).edges.filter((e) => e.className?.includes("mindmap-edge-path")).map((e) => e.id);
     expect(pathEdges.sort()).toEqual(["a->m", "b->c", "c->m", "r->a", "r->b"]);
   });
 
-  it("draws a merged card below the deepest card it joins, counting a merged source's own drawn depth", () => {
-    // The Linear Algebra shape: m merges (a, c) so it's drawn below c; t branches off m; m2 merges (x, t),
-    // where x is as deep as t in the real tree (both at depth 2) but t is drawn two rows lower.
+  it("draws a merge in its shallowest source's column, one row below its deepest", () => {
+    // r -> (a, b) ; b -> (c) ; m merges c and a: a is the shallower, though c is m's first parent
+    const s = slice(null);
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "c", 1), merge_source_ids: ["c", "a"] } };
+    s.childrenByParent = { ...s.childrenByParent, c: ["m"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.x).toBe(at["a"]!.x);
+    expect(at["m"]!.y).toBe(at["c"]!.y + ROW_HEIGHT);
+    // c is a leaf of its own again, in its own column
+    expect(at["c"]!.x).not.toBe(at["a"]!.x);
+  });
+
+  it("moves a merge's own branches down with it", () => {
+    const s = slice(null);
+    s.nodesById = { ...s.nodesById, m: { ...meta("m", "a", 1), merge_source_ids: ["a", "c"] }, k: meta("k", "m", 1) };
+    s.childrenByParent = { ...s.childrenByParent, a: ["m"], m: ["k"] };
+    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.y).toBe(3 * ROW_HEIGHT);
+    expect(at["k"]).toEqual({ x: at["m"]!.x, y: 4 * ROW_HEIGHT });
+  });
+
+  it("keeps nested merges below everything they join", () => {
     const s = slice("m2");
     s.nodesById = {
       ...s.nodesById,
       x: meta("x", "a", 1),
-      m: { ...meta("m", "r", 3), merge_source_ids: ["a", "c"] },
+      m: { ...meta("m", "a", 2), merge_source_ids: ["a", "c"] },
       t: meta("t", "m", 1),
-      m2: { ...meta("m2", "r", 4), merge_source_ids: ["x", "t"] },
+      m2: { ...meta("m2", "x", 1), merge_source_ids: ["x", "t"] },
     };
-    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b", "m", "m2"], a: ["x"], m: ["t"] };
-    const at = Object.fromEntries(toFlow(s).nodes.map((n) => [n.id, n.position]));
-    expect(at["t"]!.y).toBeGreaterThan(at["x"]!.y);
-    expect(at["m2"]!.y).toBeGreaterThan(at["t"]!.y);
+    s.childrenByParent = { ...s.childrenByParent, r: ["a", "b"], a: ["x", "m"], m: ["t"], x: ["m2"] };
+    const { nodes, edges } = toFlow(s);
+    const at = Object.fromEntries(nodes.map((n) => [n.id, n.position]));
+    expect(at["m"]!.y).toBeGreaterThan(at["a"]!.y);
     expect(at["m2"]!.y).toBeGreaterThan(at["x"]!.y);
+    expect(edges.filter((edge) => edge.id.endsWith("m")).map((edge) => edge.id).sort()).toEqual(["a->m", "c->m"]);
+    expect(edges.filter((edge) => edge.id.endsWith("m2")).map((edge) => edge.id).sort()).toEqual(["t->m2", "x->m2"]);
   });
 });

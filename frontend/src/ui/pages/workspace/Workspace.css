@@ -1,7 +1,7 @@
 /* Page-level layout only, unlayered (DESIGN.md §2).
  *
  * Every feature sits in the same single grid cell, so they stack: the map at
- * the back, toolbar and chat floating over it. Each feature sizes itself;
+ * the back, and over it one row of toolbar, Gent's layer and chat. Each feature sizes itself;
  * this file only places them. */
 
 .workspace {
@@ -19,14 +19,26 @@
   min-height: 0;
 }
 
+/* the toolbar, Gent's layer and the chat, side by side over the map. The row itself lets clicks through to
+ * the map; only what's drawn in it takes them. */
+.workspace-row {
+  display: flex;
+  min-width: 0;
+  pointer-events: none;
+}
+
 .workspace-toolbar {
-  justify-self: start;
+  flex: none;
   z-index: 2;
 }
 
+/* shrinks rather than overflow when a toolbar panel opens beside the rail; above Gent's layer, so his flight
+ * passes under it */
 .workspace-chat {
-  justify-self: end;
-  z-index: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 /* the debate in session: bottom of the board, clear of the toolbar rail (88px, as the chat leaves it) */
@@ -35,4 +47,43 @@
   align-self: end;
   z-index: 2;
   margin: 0 0 var(--space-4) 88px;
+}
+
+/* Gent's layer: the board between the toolbar and the chat. Its own box lets everything through; only the
+ * dock and the notes take clicks. */
+.workspace-row > .workspace-gent {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  /* one bottom row: the dock centred in the board's space, the Field Notes in the right corner */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr) auto;
+  padding: var(--space-2) var(--space-2) var(--space-4);
+  pointer-events: none;
+  /* the dock's open chat sizes itself to this layer's height (GentDock.css) */
+  container: gent-layer / size;
+}
+
+/* bottom right: the Field Notes, with the folded chat's reopen tile to their right */
+.workspace-gent > .gent-layer-corner {
+  grid-area: 1 / 2;
+  align-self: end;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  min-height: 0;
+  pointer-events: auto;
+}
+
+/* bottom centre: the open chat grows up from the bottom of the board, never past it */
+.workspace-gent > .gent-dock-slot {
+  grid-area: 1 / 1;
+  align-self: end;
+  min-height: 0;
+}
+
+/* the chat in full screen covers the board, and Gent's layer with it */
+.workspace:has(.chat[data-layout="expanded"]) .workspace-gent {
+  visibility: hidden;
 }

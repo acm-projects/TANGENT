@@ -219,6 +219,13 @@
   font-family: var(--font-heading);
 }
 
+.mindmap-node-subtitle {
+  display: block;
+  padding-left: var(--space-3);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A card's token count: tucked in its bottom corner, shown only while the card
  * is pointed at, focused or picked, so cards at rest stay clean. Absolute, so
  * showing it never changes the card's height. */
@@ -290,6 +297,75 @@
   }
 }
 
+/* A debate's verdict: a judgment on certificate stock. A second rule inset
+ * inside the edge, and the court's seal pressed into the top-right corner:
+ * an ink double ring round a gavel (not red: red is for the user's own actions). */
+.mindmap-node[data-debate]::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-md) - 3px);
+  pointer-events: none;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.mindmap-node[data-debate]:is(:hover, [data-state="selected"])::after {
+  border-color: var(--color-border-strong);
+}
+
+.mindmap-node-seal {
+  position: absolute;
+  top: -0.9rem;
+  right: -0.7rem;
+  /* over the inner rule (::after), which would otherwise be drawn across it */
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  line-height: 1;
+  border: 3px double var(--color-border-emphasis);
+  border-radius: var(--radius-full);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: 1px 2px 3px var(--color-string-shadow);
+  color: var(--color-text-secondary);
+  rotate: -14deg;
+  pointer-events: none;
+}
+
+/* the ring sits crooked, the gavel inside stays upright so it reads at a glance */
+.mindmap-node-seal [data-ui="icon"] {
+  rotate: 14deg;
+}
+
+/* pressed in as the card is picked, like the pin */
+.mindmap-node[data-debate][data-state="selected"] .mindmap-node-seal {
+  animation: seal-press var(--motion-spring) var(--ease-spring);
+}
+
+@keyframes seal-press {
+  from {
+    scale: 1.35;
+    rotate: -30deg;
+  }
+}
+
+/* the token count sits inside the inner rule */
+.mindmap-node[data-debate] {
+  padding-bottom: var(--space-3);
+}
+
+.mindmap-node[data-debate] .mindmap-node-tokens {
+  right: calc(var(--space-3) + 2px);
+  bottom: calc(var(--space-1) + 4px);
+}
+
+/* the seal takes the corner a tag would, so tags shift along */
+.mindmap-node[data-debate] .mindmap-node-tag {
+  right: 2.4rem;
+}
+
 /* An attachment tag: a small slip clipped over the card's top-right corner,
  * off the title's line. Tags after the first tuck in beside it. */
 .mindmap-node-tag {
@@ -322,6 +398,124 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   pointer-events: none;
+}
+
+/* A coloured tag (TagMark.tsx): a flag or pin over the card's top-right corner, as in the tag mockup. The attachment
+   slips shift left to make room. shortcut: a debate card's seal and a tag overlap; move one if that ever matters. */
+.mindmap-node-tagmark {
+  position: absolute;
+  top: -1rem;
+  right: -0.2rem;
+  z-index: 1;
+  width: 1.9rem;
+  height: 1.9rem;
+  filter: drop-shadow(1px 2px 1.5px rgb(0 0 0 / 0.3));
+  pointer-events: none;
+}
+
+.mindmap-node-tagmark[data-shape="pin"] {
+  width: 1.75rem;
+  height: 1.75rem;
+  rotate: 32deg;
+}
+
+.mindmap-node[data-tagged] .mindmap-node-tag {
+  right: 2.2rem;
+}
+
+.mindmap-node[data-tagged] .mindmap-node-tag + .mindmap-node-tag {
+  right: 4.2rem;
+}
+
+/* The "Tag this card" popup: shape tiles and colour swatches, the picked one ringed. */
+.tag-picker-heading {
+  color: var(--color-text-secondary);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tag-picker-shape,
+.tag-picker-swatch {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.tag-picker-shape svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tag-picker-swatch {
+  border-color: transparent;
+}
+
+.tag-picker-swatch span[aria-hidden] {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid var(--color-surface);
+}
+
+.tag-picker-shape[aria-pressed="true"] {
+  border: 2px solid var(--color-text);
+  color: var(--color-text);
+}
+
+.tag-picker-swatch[aria-pressed="true"] {
+  color: var(--color-text);
+}
+
+.tag-picker-swatch[aria-pressed="true"] span[aria-hidden] {
+  outline: 1.5px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* A resolved card: a rubber stamp pressed across its foot, in the hand that resolved it (the user's red, Gent's blue). */
+.mindmap-node-resolved {
+  position: absolute;
+  bottom: -0.7rem;
+  left: var(--space-4);
+  z-index: 1;
+  --stamp-ink: var(--color-string);
+  padding: 0.1em 0.6em;
+  border: 2px solid var(--stamp-ink);
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  color: var(--stamp-ink);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.mindmap-node-resolved[data-by="gent"] {
+  --stamp-ink: var(--color-gent);
+}
+
+/* A branch that ended without finding anything (a dead lead, a duplicate, off topic): a struck-through stamp, and the
+   card itself fades back so the eye goes to the lines that held. */
+.mindmap-node-resolved:not([data-ending="resolved"]) {
+  text-decoration: line-through;
+  border-style: dashed;
+}
+
+.mindmap-node:is([data-ending="dead_lead"], [data-ending="duplicate"], [data-ending="off_topic"]) {
+  opacity: 0.6;
+}
+
+/* A compact card: a thread pressed into one summary, filed on manila stock with a seal like the verdict's. */
+.mindmap-node[data-compact] {
+  background: var(--texture-grain), var(--color-folder);
+  border-style: dashed;
 }
 
 /* ── the hover actions ────────────────────────────────────── */
@@ -554,7 +748,22 @@
   --drag-ink: var(--color-danger);
 }
 
+/* compact, resolve, reopen: the user's own moves on the card, in their red */
+.mindmap-node[data-drag-action="compact"],
+.drag-action[data-action="compact"],
+.mindmap-node:is([data-drag-action="resolve"], [data-drag-action="reopen"]),
+.drag-action:is([data-action="resolve"], [data-action="reopen"]) {
+  --drag-ink: var(--color-string);
+}
+
 /* the string to the pointer and the tip beside it, over everything */
+/* The "Mark as" menu a drag to the right drops at the pointer (MarkMenu.tsx): a short column of choices. */
+.mark-menu {
+  position: fixed;
+  z-index: 50;
+  translate: var(--space-2) -50%;
+}
+
 .drag-action {
   --drag-ink: var(--color-border-emphasis);
   position: fixed;
@@ -646,4 +855,83 @@
     var(--texture-pin),
     var(--color-string);
   box-shadow: 1px 2px 2px var(--color-string-shadow);
+}
+
+/* ── a question card's question (components/QuestionPrompt.tsx) ── */
+
+/* the question, inside its card under the title: a dashed rule, then the choices */
+.question-prompt {
+  width: 17rem;
+  max-width: 100%;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border-strong);
+  white-space: normal;
+  text-align: start;
+  cursor: default;
+}
+
+.question-kicker {
+  color: var(--color-text-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.question-option {
+  min-width: 0;
+}
+
+.question-option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* a single-choice option is a button: a click picks it, Answer sends it */
+.question-choice {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out);
+}
+
+.question-choice:hover:not(:disabled) {
+  border-color: var(--color-border-emphasis);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.question-choice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* the choice the user picked: red, as the user's own choices are everywhere */
+.question-choice[aria-pressed="true"] {
+  border-color: var(--color-string);
+  background: color-mix(in srgb, var(--color-string) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-string);
+}
+
+.question-other {
+  width: 100%;
+}
+
+/* where an answer went before; Gent's own answers in his blue */
+.question-branch[data-author="gent"] {
+  color: var(--color-gent);
+}
+
+.question-error {
+  color: var(--color-danger);
 }

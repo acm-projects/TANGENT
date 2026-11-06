@@ -1,5 +1,5 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
-import type { AttachmentKind, NodeMeta } from "@/api/types";
+import type { AttachmentKind, Ending, NodeMeta, NodeTag } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
 import { layoutTree } from "@/store/layout";
@@ -26,11 +26,23 @@ export interface MindMapNodeData extends Record<string, unknown> {
   hasChildren: boolean;
   /** Its place in the case, outline-numbered like exhibits: "1", "1.2", "1.2.1". */
   exhibit: string;
-  /** A merged card hangs below it (draw the outgoing dot). Not a child: deleting this card leaves the merge. */
+  /** The parent exhibit labels for a joint exhibit. */
+  subtitle: string | null;
+  /** This card is a parent of a merge (draw the outgoing dot). */
   feedsMerge: boolean;
   tokens: number;
   /** A debate's verdict card (node_type "debate"). */
   debate: boolean;
+  /** A question an AI asked the user (node_type "question"). */
+  question: boolean;
+  /** A compact card (node_type "compact"): a thread's summary, where the context starts afresh. */
+  compact: boolean;
+  /** Resolved, and by whom (the stamp's colour). */
+  resolvedBy: "user" | "gent" | null;
+  /** How its branch ended (the stamp's words), when it did. */
+  ending: Ending | null;
+  /** Its coloured tag, if it has one. */
+  tag: NodeTag | null;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -52,11 +64,12 @@ function mergesOf(s: StructureSlice): Map<string, string[]> {
   return out;
 }
 
-/** The tree as it's drawn: a merged card is laid out under the deepest of its sources (the first, on a tie)
- * rather than under its real parent, so it sits below every card it joins and the join reads down the board.
- * Depth is the drawn one: a merged card is drawn deeper than its real depth, and so is everything under it. */
-function drawnChildren(s: StructureSlice, merges: Map<string, string[]>): Record<string, string[]> {
-  if (!merges.size) return s.childrenByParent;
+/** How merged cards are drawn: each hangs under its shallowest source, so it sits in that source's column
+ * (ties: its first parent), and one row below its deepest, so it reads as coming after everything it joins.
+ * Its own branches hang under it as usual. Only the drawing moves; `parent_id` is untouched. */
+function drawnTree(s: StructureSlice, merges: Map<string, string[]>) {
+  const rows: Record<string, number> = {};
+  if (!merges.size) return { children: s.childrenByParent, rows };
   const depths = new Map<string, number>();
   const depth = (id: string): number => {
     const known = depths.get(id);
@@ -68,19 +81,22 @@ function drawnChildren(s: StructureSlice, merges: Map<string, string[]>): Record
     depths.set(id, d);
     return d;
   };
-  const out = { ...s.childrenByParent };
+  const children = { ...s.childrenByParent };
   for (const [id, sources] of merges) {
     const parent = s.nodesById[id]!.parent_id;
-    const under = sources.reduce((a, b) => (depth(b) > depth(a) ? b : a));
-    if (parent) out[parent] = (out[parent] ?? []).filter((c) => c !== id);
-    out[under] = [...(out[under] ?? []), id];
+    const under = sources.reduce((a, b) => (depth(b) < depth(a) ? b : a));
+    rows[id] = depth(id);
+    if (under === parent) continue;
+    if (parent) children[parent] = (children[parent] ?? []).filter((c) => c !== id);
+    children[under] = [...(children[under] ?? []), id];
   }
-  return out;
+  return { children, rows };
 }
 
 export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Edge[] } {
   const merges = mergesOf(s);
-  const positions = layoutTree(s.rootId, drawnChildren(s, merges));
+  const drawn = drawnTree(s, merges);
+  const positions = layoutTree(s.rootId, drawn.children, drawn.rows);
   const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
@@ -107,11 +123,17 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         state: stateOf(id),
         tags: meta.attachment_kinds ?? [],
         hasParent: meta.parent_id !== null,
-        hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0,
+        hasChildren: (s.childrenByParent[id]?.length ?? 0) > 0 || feeding.has(id),
         exhibit: exhibits[id],
+        subtitle: merges.has(id) ? merges.get(id)!.map((source) => exhibits[source]).filter(Boolean).join(" + ") : null,
         feedsMerge: feeding.has(id),
         tokens: meta.tokens,
         debate: meta.node_type === "debate",
+        question: meta.node_type === "question",
+        compact: meta.node_type === "compact",
+        resolvedBy: meta.resolved?.by ?? null,
+        ending: meta.resolved ? (meta.resolved.kind ?? "resolved") : null,
+        tag: meta.tag ?? null,
       },
     });
     const sources = merges.get(id);

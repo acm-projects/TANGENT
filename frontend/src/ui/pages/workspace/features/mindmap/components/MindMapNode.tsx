@@ -1,16 +1,23 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
-import { createContext, memo, useContext, useEffect, useRef, useState, type MouseEvent } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from "react";
 import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
+import { ENDING_LABELS } from "@/api/types";
+import type { Ending, NodeTag } from "@/api/types";
 import { spring } from "@/ui/library/tokens/motion";
+import { nodeStation, useGentStation } from "@/store/gentStations";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
 import { StartDebate } from "../../debate/components/StartDebate";
 import { SharePanel } from "../../toolbar/components/SharePanel";
-import { confirmedForks, deleteNode, forkNode, isPending, loadChats } from "../nodeActions";
+import { compactNode, confirmedForks, deleteNode, forkNode, isPending, loadChats, reopenNode, resetProject, resolveNode, tagNode } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 import { useDragAction } from "./DragAction";
+import { MarkMenu } from "./MarkMenu";
+import { QuestionPrompt } from "./QuestionPrompt";
+import { TagMark } from "./TagMark";
+import { TagPicker } from "./TagPicker";
 
 /* One node on the map (Figma "Node": Default / Path / Selected / Hover, with
  * optional PDF and image tags): a card pinned to the board. A real <button>, so
@@ -50,18 +57,25 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const merge = useContext(Merge);
   const project = useContext(MapProject);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // a station Gent can visit: he inks the card's outline and perches on it (features/agent/travel)
+  const gentStation = useGentStation<HTMLElement>(nodeStation(id));
   // a fork the server hasn't confirmed has nothing to fork from yet (deleting it is queued: nodeActions.ts)
   const busy = isPending(id);
   const [peeled, setPeeled] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  // the tray's fan menus (More, and how to end the branch): one open at a time
+  const [menu, setMenu] = useState<"more" | "ending" | null>(null);
+  // where a drag to the right let go: the "Mark as" menu opens there
+  const [markAt, setMarkAt] = useState<{ x: number; y: number } | null>(null);
+  const closeMark = useCallback(() => setMarkAt(null), []);
   // Right-click pins the tray out: it stays until Escape or a click elsewhere, not just while hovered.
   const [pinned, setPinned] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [debating, setDebating] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const release = () => {
     setPinned(false);
     setPeeled(false);
-    setMoreOpen(false);
+    setMenu(null);
   };
   useEffect(() => {
     if (!pinned) return;
@@ -92,13 +106,72 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const remove = act(() => deleteNode(id), "Could not delete the node.");
+  // the root can't be deleted; its delete starts the project over (every other card goes, it goes blank)
+  const isRoot = !data.hasParent;
+  const reset = act(() => resetProject(id), "Could not reset the project.");
+  const others = useTreeStore((s) => (isRoot ? Object.keys(s.nodesById).length - 1 : 0));
+  // the first message titles a card, and its chats may not be loaded yet: either says there is something to reset
+  const rootHasChats = useTreeStore((s) => (s.chatsByNode[id]?.length ?? 0) > 0 || Boolean(s.nodesById[id]?.title));
+  const blankRoot = isRoot && others === 0 && data.tokens === 0 && !rootHasChats;
   // while its reply is arriving, the card's pin pulses (MindMap.css)
   const thinking = useTreeStore((s) => id in s.streaming);
+  // Compact waits on the card's model writing the summary: the pin pulses meanwhile, as for a reply.
+  const [summing, setSumming] = useState(false);
+  const summarise = (action: () => Promise<void>, fallback: string) =>
+    act(async () => {
+      setSumming(true);
+      try {
+        await action();
+      } finally {
+        setSumming(false);
+      }
+    }, fallback);
+  // a question card or a compact card has no conversation of its own to compact
+  const summable = !data.question && !data.compact && !busy && !thinking && !summing;
+  // resolving is only a marker: any card that isn't mid-write can take it
+  const resolvable = !busy && !thinking && !summing;
+  const compact = summarise(() => compactNode(id), "Could not compact this card.");
+  const end = (kind: Ending) => act(() => resolveNode(id, kind), `Could not mark this card ${ENDING_LABELS[kind].toLowerCase()}.`);
+  const reopen = act(() => reopenNode(id), "Could not reopen this card.");
+  // the merged cards a delete would take with it: worked out only while the confirm is open, not on every store
+  // change (a streaming reply changes the store every token, and every card would walk the whole tree)
+  const mergeNames = useTreeStore((s) => {
+    if (!confirmingDelete) return "";
+    const gone = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const removed of gone) {
+        for (const child of s.childrenByParent[removed] ?? []) {
+          if (!gone.has(child)) {
+            gone.add(child);
+            changed = true;
+          }
+        }
+      }
+      for (const node of Object.values(s.nodesById)) {
+        if (!gone.has(node.id) && node.merge_source_ids?.some((source) => gone.has(source))) {
+          gone.add(node.id);
+          changed = true;
+        }
+      }
+    }
+    return Object.values(s.nodesById)
+      .filter((node) => gone.has(node.id) && node.merge_source_ids?.length)
+      .map((node) => node.title ?? node.id)
+      .join(", ");
+  });
+  // a question card shows its question until it's answered, and again whenever it's picked (to answer another way)
+  const asking = useTreeStore((s) => {
+    const node = s.nodesById[id];
+    return node?.node_type === "question" && node.question && (!node.question.answers.length || s.activeNodeId === id) ? node : null;
+  });
   // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
   const unread = useTreeStore((s) => Boolean(s.unread[id]));
   // An empty branch (no messages, nothing under it, no reply on its way) has nothing to lose, so it goes without asking.
   const requestDelete = (e?: MouseEvent) => {
     e?.stopPropagation();
+    if (isRoot) return blankRoot ? undefined : setConfirmingDelete(true); // a reset always asks first
     if (data.hasChildren || thinking) return setConfirmingDelete(true);
     // a card not opened since the page loaded has no chats in the store yet: look before deciding (asks if that fails)
     loadChats(id).then(
@@ -111,8 +184,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     onBranch: () => {
       if (!busy) fork();
     },
-    onDelete: data.hasParent ? requestDelete : undefined,
+    onDelete: isRoot && blankRoot ? undefined : requestDelete,
     onMerge: (other) => merge.run(id, other),
+    onCompact: summable ? compact : undefined,
+    onResolve: resolvable && !data.resolvedBy ? setMarkAt : undefined,
+    onReopen: data.resolvedBy ? reopen : undefined,
+    resets: isRoot,
   });
 
   const openShare = (e: MouseEvent) => {
@@ -121,11 +198,27 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     setSharing(true);
   };
 
+  const openTag = (e: MouseEvent) => {
+    e.stopPropagation();
+    release();
+    setTagging(true);
+  };
+  const tag = (next: NodeTag | null) => act(() => tagNode(id, next), "Could not tag this card.")();
+
   // Listed bottom-up. Merging has its own button in the tray.
   const moreOptions = [
-    ...(data.hasParent ? [{ icon: "delete", label: "Delete", onClick: requestDelete }] : []),
+    isRoot
+      ? { icon: "restart_alt", label: "Reset project", disabled: blankRoot, onClick: requestDelete }
+      : { icon: "delete", label: "Delete", onClick: requestDelete },
     { icon: "ios_share", label: "Share branch", disabled: !project, onClick: openShare },
+    { icon: "flag", label: "Tag", disabled: busy, onClick: openTag },
   ];
+  // How the branch ended. In the tray's fan they're listed bottom-up: Resolved nearest the button.
+  const endingOptions = (["resolved", "dead_lead", "off_topic"] as const).map((kind) => ({
+    icon: ENDING_ICONS[kind],
+    label: ENDING_LABELS[kind],
+    onClick: end(kind),
+  }));
 
   return (
     <Frame
@@ -133,7 +226,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       ref={wrapRef}
       className="mindmap-node-wrap"
       data-peeled={peeled || undefined}
-      data-more={moreOpen || undefined}
+      data-more={menu !== null || undefined}
       onContextMenu={(e) => {
         e.preventDefault();
         setPinned(true);
@@ -167,22 +260,38 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           opacity: 1,
           transition: peeled ? spring.peel : undefined,
         }}
-        whileHover={{ y: onPath ? -8 : -4, rotate: rest + tilt * 1.5, transition: spring.lift }}
+        // a card holding its question stays put while its choices are clicked
+        whileHover={asking ? undefined : { y: onPath ? -8 : -4, rotate: rest + tilt * 1.5, transition: spring.lift }}
         // pressed onto its pin as it's picked
-        whileTap={{ y: 0, scale: 0.97, rotate: 0, transition: spring.lift }}
+        whileTap={asking ? undefined : { y: 0, scale: 0.97, rotate: 0, transition: spring.lift }}
         transition={{ ...spring.pin, delay: stagger ? Math.max(0, positionAbsoluteY / ROW_HEIGHT) * 0.12 : 0 }}
       >
         <Panel
-          as="button"
-          type="button"
+          // a card asking its question holds the choices and Answer button, which can't sit inside a <button>
+          {...(asking
+            ? {
+                as: "div" as const,
+                tabIndex: 0,
+                role: "group",
+                "aria-label": `Question card: ${data.title}`,
+                onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) =>
+                  e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), useTreeStore.getState().setActive(id)),
+              }
+            : { as: "button" as const, type: "button" as const })}
           elevation="floating"
           className="mindmap-node nopan"
           data-state={data.state}
           data-root={!data.hasParent || undefined}
-          data-thinking={thinking || undefined}
+          data-debate={data.debate || undefined}
+          data-question={data.question || undefined}
+          data-compact={data.compact || undefined}
+          data-ending={data.ending ?? undefined}
+          data-tagged={data.tag ? true : undefined}
+          data-thinking={thinking || summing || undefined}
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
           data-merge-from={merge.from === id || undefined}
+          ref={gentStation}
           {...drag.handlers}
           aria-current={data.state === "selected" ? "true" : undefined}
           // the native tooltip would pop up over a drag in progress
@@ -201,21 +310,48 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               </motion.span>
             )}
           </AnimatePresence>
+          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged ${data.tag.color}`} />}
           {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
+          {data.compact && (
+            <>
+              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Compacted" />
+              {/* the thread above, pressed into one summary: the conversation starts afresh from here */}
+              <span className="mindmap-node-seal" aria-label="A compacted thread" role="img">
+                <Icon icon="compress" size="m" />
+              </span>
+            </>
+          )}
+          {data.debate && (
+            <>
+              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Judgment" />
+              {/* the court's seal pressed into the corner: this card is a debate's verdict */}
+              <span className="mindmap-node-seal" aria-label="A debate's verdict" role="img">
+                <Icon icon="gavel" size="m" />
+              </span>
+            </>
+          )}
+          {data.question && (
+            <>
+              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Question for you" />
+              {/* a question an AI asked: answer it on the slip below, and each answer branches from here */}
+              <span className="mindmap-node-seal" aria-label="A question for you" role="img">
+                <Icon icon="question_mark" size="m" />
+              </span>
+            </>
+          )}
           <Frame direction="row" gap="2" align="center">
             <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
             <Text as="span" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
-            {data.debate && (
-              <Panel elevation="floating" className="mindmap-node-tag" aria-label="A debate's verdict">
-                <Icon icon="gavel" size="s" />
-              </Panel>
-            )}
             {data.tags.map((tag) => (
               <Panel key={tag} elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
                 <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />
               </Panel>
             ))}
           </Frame>
+          {data.subtitle && (
+            <Text as="span" size="xxs" className="mindmap-node-subtitle" content={data.subtitle} />
+          )}
+          {asking && <QuestionPrompt node={asking} />}
           <Text
             as="span"
             size="xs"
@@ -223,6 +359,21 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             content={`${data.tokens.toLocaleString()} tokens`}
             aria-label={`${data.tokens.toLocaleString()} tokens used on this node`}
           />
+          <AnimatePresence>
+            {data.resolvedBy && (
+              // a rubber stamp across the card's foot: red when the user resolved it, Gent's blue when he did
+              <motion.span
+                className="mindmap-node-resolved"
+                data-by={data.resolvedBy}
+                data-ending={data.ending ?? "resolved"}
+                initial={{ scale: 2.2, rotate: -18, opacity: 0 }}
+                animate={{ scale: 1, rotate: -4, opacity: 1, transition: spring.pin }}
+                exit={{ scale: 0.6, opacity: 0, transition: spring.lift }}
+              >
+                <Text as="span" size="xxs" content={`${ENDING_LABELS[data.ending ?? "resolved"]}${data.resolvedBy === "gent" ? " by Gent" : ""}`} />
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Panel>
       </motion.div>
       <Frame
@@ -240,15 +391,15 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         onPointerLeave={() => {
           if (pinned) return;
           setPeeled(false);
-          setMoreOpen(false);
+          setMenu(null);
         }}
         onFocus={() => setPeeled(true)}
         onBlur={(e) => {
           if (pinned || e.currentTarget.contains(e.relatedTarget)) return;
           setPeeled(false);
-          setMoreOpen(false);
+          setMenu(null);
         }}
-        onKeyDown={(e) => e.key === "Escape" && setMoreOpen(false)}
+        onKeyDown={(e) => e.key === "Escape" && setMenu(null)}
       >
         <Button
           size="l"
@@ -291,78 +442,71 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             setDebating(true);
           }}
         />
-        <Frame gap="0" align="center" className="mindmap-node-more">
-          {/* Listed bottom-up: the first option sits just above More. Each slides up out from
-              behind More, one after another, and tucks back in when the menu closes. */}
-          <Frame gap="2" align="center" className="mindmap-node-more-list" role="group" aria-label="More actions">
-            <AnimatePresence>
-              {moreOpen &&
-                moreOptions.map((option, i) => {
-                  const tucked = { opacity: 0, y: `${(i + 1) * 115}%`, scale: 0.7 };
-                  return (
-                    <motion.div
-                      key={option.icon}
-                      initial={tucked}
-                      animate={{ opacity: 1, y: 0, scale: 1, transition: { ...spring.pin, delay: i * 0.06 } }}
-                      exit={{ ...tucked, transition: { ...spring.lift, delay: (moreOptions.length - 1 - i) * 0.04 } }}
-                    >
-                      <Button
-                        size="l"
-                        title={option.label}
-                        elevation="floating"
-                        showIcon
-                        showLabel={false}
-                        icon={option.icon}
-                        label={option.label}
-                        disabled={option.disabled}
-                        onClick={option.onClick}
-                      />
-                    </motion.div>
-                  );
-                })}
-            </AnimatePresence>
-          </Frame>
+        {data.resolvedBy ? (
           <Button
             size="l"
-            title="More"
+            title="Reopen"
             elevation="floating"
             showIcon
             showLabel={false}
-            icon="more_vert"
-            label="More"
-            aria-expanded={moreOpen}
-            onClick={(e) => {
-              e.stopPropagation();
-              setMoreOpen((open) => !open);
-            }}
+            icon="undo"
+            label="Reopen"
+            onClick={reopen}
           />
-        </Frame>
+        ) : (
+          resolvable && (
+            <Fan
+              open={menu === "ending"}
+              onToggle={() => setMenu((m) => (m === "ending" ? null : "ending"))}
+              icon="task_alt"
+              label="Mark as"
+              options={endingOptions}
+            />
+          )
+        )}
+        <Fan
+          open={menu === "more"}
+          onToggle={() => setMenu((m) => (m === "more" ? null : "more"))}
+          icon="more_vert"
+          label="More"
+          options={moreOptions}
+        />
       </Frame>
       {drag.overlay}
+      <MarkMenu at={markAt} options={endingOptions} onClose={closeMark} />
       {/* Outside the tray: the tray and its menu close when the pointer leaves, the popup must not. */}
       <Popup open={sharing} onClose={() => setSharing(false)} title={`"${data.title}"`}>
         {/* Mounted only while open: the panel loads this branch's shares when it mounts. */}
         {sharing && project && <SharePanel {...project} branchNodeId={id} onClose={() => setSharing(false)} />}
       </Popup>
+      <Popup open={tagging} onClose={() => setTagging(false)} title="Tag this card">
+        {/* Mounted only while open, so the shape starts from the card's tag each time. */}
+        {tagging && <TagPicker tag={data.tag} onTag={tag} onClose={() => setTagging(false)} />}
+      </Popup>
       <Popup open={debating} onClose={() => setDebating(false)} title={`Bring "${data.title}" to court`}>
         {/* Mounted only while open, so the form starts fresh each time. */}
         {debating && project && <StartDebate projectId={project.projectId} nodeId={id} onClose={() => setDebating(false)} />}
       </Popup>
-      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title="Delete this branch?">
+      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title={isRoot ? "Reset this project?" : "Delete this branch?"}>
         <Text
-          content={`"${data.title}"${data.hasChildren ? " and every branch under it" : ""} will be deleted. This can't be undone.`}
+          content={
+            isRoot
+              ? `${others ? `All ${others} other card${others === 1 ? "" : "s"} and their chats will be deleted, and this` : "This"} card starts over empty. Sources are kept. This can't be undone.`
+              : `"${data.title}"${data.hasChildren ? " and every branch under it" : ""}${mergeNames ? `, including merged cards ${mergeNames}` : ""} will be deleted. This can't be undone.`
+          }
         />
         <Frame direction="row" gap="2" justify="end">
           <Button label="Cancel" onClick={() => setConfirmingDelete(false)} />
           <DangerButton
             data-primary
-            label="Hold to delete"
-            icon="delete"
+            label={isRoot ? "Hold to reset" : "Hold to delete"}
+            icon={isRoot ? "restart_alt" : "delete"}
             commitTime={800}
             showIcon
             onHold={() => {
               setConfirmingDelete(false);
-              remove();
+              if (isRoot) reset();
+              else remove();
             }}
           />
         </Frame>
@@ -370,3 +514,68 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     </Frame>
   );
 });
+
+const ENDING_ICONS: Record<Ending, string> = {
+  resolved: "task_alt",
+  dead_lead: "block",
+  off_topic: "wrong_location",
+};
+
+type FanOption = { icon: string; label: string; disabled?: boolean; onClick: (e: MouseEvent) => void };
+
+/** A tray button that fans its options up out from behind it, one after another, and tucks them back in when it
+ * closes. Options are listed bottom-up: the first sits just above the button. */
+function Fan({ open, onToggle, icon, label, options }: {
+  open: boolean;
+  onToggle: () => void;
+  icon: string;
+  label: string;
+  options: FanOption[];
+}) {
+  return (
+    <Frame gap="0" align="center" className="mindmap-node-more">
+      <Frame gap="2" align="center" className="mindmap-node-more-list" role="group" aria-label={`${label} options`}>
+        <AnimatePresence>
+          {open &&
+            options.map((option, i) => {
+              const tucked = { opacity: 0, y: `${(i + 1) * 115}%`, scale: 0.7 };
+              return (
+                <motion.div
+                  key={option.icon}
+                  initial={tucked}
+                  animate={{ opacity: 1, y: 0, scale: 1, transition: { ...spring.pin, delay: i * 0.06 } }}
+                  exit={{ ...tucked, transition: { ...spring.lift, delay: (options.length - 1 - i) * 0.04 } }}
+                >
+                  <Button
+                    size="l"
+                    title={option.label}
+                    elevation="floating"
+                    showIcon
+                    showLabel={false}
+                    icon={option.icon}
+                    label={option.label}
+                    disabled={option.disabled}
+                    onClick={option.onClick}
+                  />
+                </motion.div>
+              );
+            })}
+        </AnimatePresence>
+      </Frame>
+      <Button
+        size="l"
+        title={label}
+        elevation="floating"
+        showIcon
+        showLabel={false}
+        icon={icon}
+        label={label}
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      />
+    </Frame>
+  );
+}
