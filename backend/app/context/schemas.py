@@ -2,7 +2,11 @@ from datetime import datetime
 from uuid import UUID
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# How a branch can end (a card's `resolved` stamp): kind -> the stamp's label. Every ending settles the branch; only
+# "resolved" found something. A stamp without a kind is "resolved".
+ENDINGS = {"resolved": "Resolved", "dead_lead": "Dead lead", "off_topic": "Off topic"}
 
 Role = Literal["user", "assistant"]
 
@@ -14,6 +18,14 @@ class ChatMessage(BaseModel):
     content: str
     seq: int  # redundant with array index; flatten trusts array order
     created_at: datetime
+    author: Optional[Literal["user", "gent"]] = None  # who asked (user messages only); older rows have none
+    # assistant only: what the reply did on the way (nodes_router._persist); pydantic drops undeclared fields
+    tools: Optional[list[dict]] = None  # [{name, brief, ok}]
+    reasoning: Optional[str] = None
+    thought_seconds: Optional[float] = None
+    # a Compacted card's summary (app/resolving.py): the model reads it in place of the thread above
+    compact: Optional[bool] = None
+    compacted_from: Optional[int] = None
 
 
 class PathNode(BaseModel):
@@ -26,6 +38,7 @@ class PathNode(BaseModel):
     title: Optional[str] = None
     created_at: Optional[datetime] = None
     merge_source_ids: list[str] = Field(default_factory=list)
+    node_type: Optional[str] = None
 
 
 # --- GET /trees/:id, GET /nodes/:id (mirrors frontend/src/api/types.ts) -------------------------
@@ -49,6 +62,17 @@ class NodeMeta(BaseModel):
     created_at: datetime
     # a merged node's two source leaves (node_merge_sources); filled in by the tree endpoints only
     merge_source_ids: list[UUID] = []
+    # a question card's question (app/questions.py)
+    question: Optional[dict] = None
+    # how a card's branch ended: {by, at, kind}, kind one of ENDINGS (app/resolving.py)
+    resolved: Optional[dict] = None
+
+    @field_validator("model")
+    @classmethod
+    def _current_variant(cls, value: Optional[str]) -> Optional[str]:
+        # a card saved with the free (or paid) model variant shows as the one this server runs, so its picker matches
+        from app.core.openrouter import model_id
+        return model_id(value)
 
 
 class NodeOut(NodeMeta):

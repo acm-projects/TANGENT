@@ -3,7 +3,7 @@
 // keep the names so nothing downstream changes.
 
 // Open unions: known values autocomplete, unknown ones still type-check until the team freezes them.
-export type NodeType = "chat" | "question" | "poll" | "document" | "standard" | "debate" | (string & {});
+export type NodeType = "chat" | "question" | "poll" | "document" | "standard" | "debate" | "compact" | (string & {});
 export type NodeStatus = "active" | (string & {});
 
 // [proposed] fields below are what the Figma wireframe displays but the
@@ -27,10 +27,27 @@ export interface ChatMessage {
   content: string;
   seq: number;
   created_at: string;
+  /** User messages: who asked it -- the user, or Gent through his ask tools. Older messages have none (the user). */
+  author?: "user" | "gent";
   /** [proposed] Files the user attached to this message. */
   attachments?: Attachment[];
-  /** [proposed] Assistant only: reasoning time, shown as "Thought for 1m 4s". */
-  thought_seconds?: number;
+  /** Assistant only: how long its quick thinking took. */
+  thought_seconds?: number | null;
+  /** Assistant only: the tool calls the reply made, one line each (null on replies without any). */
+  tools?: ToolCallRow[] | null;
+  /** Assistant only: its quick thinking, when the model shows it. */
+  reasoning?: string | null;
+  /** A compact card's summary of the thread above it (backend app/resolving.py): the context starts here. */
+  compact?: boolean;
+  /** with `compact`: how many cards it summarises */
+  compacted_from?: number;
+}
+
+/** A tool call a card's model made while answering, as its chat shows it. */
+export interface ToolCallRow {
+  name: string;
+  brief: string;
+  ok: boolean;
 }
 
 /** Structure only. No chats, so the mind map loads cheaply. */
@@ -54,6 +71,62 @@ export interface NodeMeta {
   merge_source_ids?: string[];
   /** A branch made from a debate's "where to go next": the debate it came out of. */
   branch_of_debate_id?: string | null;
+  /** A question card's question (node_type "question"; backend app/questions.py). */
+  question?: QuestionCardData | null;
+  /** How the card's branch ended: a marker that it is settled, who set it and how (no kind: resolved; backend
+   * app/resolving.py). */
+  resolved?: { by: "user" | "gent"; at: string; kind?: Ending } | null;
+}
+
+/** How a branch can end (backend ENDINGS): only "resolved" found something. */
+export type Ending = "resolved" | "dead_lead" | "off_topic";
+export const ENDING_LABELS: Record<Ending, string> = {
+  resolved: "Resolved", dead_lead: "Dead lead", off_topic: "Off topic",
+};
+
+/** One multiple-choice question an AI asked the user, on its own card. Each answer opens a branch: the chain's next
+ * question card, or after the last, the card where the research continues with the whole trail. */
+export interface QuestionCardData {
+  prompt: string;
+  type: "single" | "multi";
+  options: { label: string; description?: string }[];
+  /** the option the asker would pick */
+  recommended: string | null;
+  /** "intent": what the user wants (only they answer); "angle": a research direction (Gent may answer) */
+  about: "intent" | "angle";
+  /** the questions answered before this one in its chain */
+  trail: { prompt: string; answer: string | string[] }[];
+  asker: { by: "node" | "gent"; model?: string | null; origin?: string };
+  /** the chain's first card */
+  chain: string;
+  /** every way it was answered, each with the branch it opened */
+  answers: { answer: string | string[]; node_id: string; by: "user" | "gent" }[];
+}
+
+/** POST /nodes/:id/answer */
+export interface AnswerResult {
+  /** the branch the answer opened (or had opened before: `existing`) */
+  node: NodeMeta;
+  existing: boolean;
+  /** the chain's last question: `node` is where the research continues */
+  final: boolean;
+  /** a card's model asked: send this in `node` to continue the research */
+  continue_prompt: string | null;
+  fork: ForkInfo | null;
+}
+
+/** POST /nodes/:id/compact */
+export interface CompactResult {
+  /** the new compact card, under the card compacted */
+  node: NodeMeta;
+  fork: ForkInfo | null;
+}
+
+/** POST /nodes/:id/resolve and /reopen */
+export interface ResolveResult {
+  /** the card, stamped resolved (or no longer) */
+  node: NodeMeta;
+  fork: ForkInfo | null;
 }
 
 /** Returned when a write created the sharee's own copy of a shared project. */
@@ -98,8 +171,15 @@ export interface TreeResponse {
 /** SSE events emitted by POST /nodes/:id/messages */
 export type StreamEvent =
   | { type: "token"; text: string }
+  /** a tool call finished, or the model's quick thinking, as it arrives */
+  | ({ type: "tool" } & ToolCallRow)
+  | { type: "reasoning"; text: string }
+  /** the model asked the user: a question card was made under this one (the map re-reads the tree) */
+  | { type: "question"; id: string }
+  /** the message was work under resolved cards, which it reopened (the map re-reads the tree) */
+  | { type: "reopened"; ids: string[] }
   // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
-  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean }
+  | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string }
   // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).
   | { type: "error"; message: string; fork?: ForkInfo; forkedProjectId?: string };
 
@@ -218,24 +298,71 @@ export interface AcceptInviteResponse {
   workspace_slug: string;
 }
 
-/** POST /projects/:id/agent -- app/agent/router.py. The client keeps the conversation and sends it all each time. */
-export interface AgentMessage {
+/** POST /projects/:id/gent -- app/agent/router.py. The client keeps the conversation and the Field Notes and
+ * sends both with each task; the run streams GentEvents back. */
+export interface GentMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-/** A tool the agent ran; `result.error` is set when it failed. */
-export interface AgentToolCall {
-  name: string;
-  arguments: Record<string, unknown>;
-  result: Record<string, unknown> & { error?: string };
+/** One Field Notes item. `id` is Gent's handle for it (never shown); null for one the user just added. */
+export interface GentNote {
+  id: string | null;
+  text: string;
+  done: boolean;
+  /** who wrote it: the Field Notes mark it in the margin (red the user's, blue Gent's); absent for older items */
+  by?: "user" | "gent";
 }
 
-export interface AgentReply {
-  reply: string;
-  tool_calls: AgentToolCall[];
-  model: string;
+/** A card a project search found: its exhibit address, id, title and a snippet round the match. */
+export interface ProjectSearchResult {
+  address: string | null;
+  id: string;
+  title: string;
+  snippet: string;
 }
+
+/** A node as Gent names it: its card label ("1.2", "J1"), id and title. */
+export interface GentRef {
+  address: string | null;
+  id: string;
+  title: string;
+}
+
+/** One of the questions Gent puts on the user's dock (ask_user): like a question card's, without the card. */
+export type GentQuestion = Pick<QuestionCardData, "prompt" | "type" | "options" | "recommended" | "about">;
+
+export type GentEvent =
+  /** Gent put questions on the user's dock and waits for the answers (POST .../gent/answer), then `asked` */
+  | { type: "ask"; id: string; questions: GentQuestion[] }
+  | { type: "asked"; id: string; answers: { prompt: string; answer: string | string[] }[] }
+  /** a question card was answered (by the user, or by Gent) */
+  | { type: "question_answered"; id: string; chain: string; question: string; answer: string | string[]; branch: string; final: boolean; existing: boolean; by: "user" | "gent" }
+  /** stored only (the thread's history): the task the user gave, and what they told him mid-run */
+  | { type: "task"; text: string }
+  | { type: "said"; text: string }
+  | { type: "note"; turn: number; text: string }
+  | { type: "reasoning"; turn: number; depth: "quick" | "deep"; text: string }
+  | { type: "tool"; turn: number; id: string; name: string; args: Record<string, unknown> | null }
+  | { type: "result"; turn: number; id: string; name: string; ok: boolean; brief: string; result: Record<string, unknown> }
+  /** a tool a procedure (bulk_ask) played, under that procedure's call */
+  | { type: "step"; turn: number; parent: string; name: string; args: Record<string, unknown>; ok: boolean; brief: string }
+  /** the server steered Gent (app/agent/nudges.py): a reminder, or a finish sent back with the reason */
+  | { type: "nudge"; turn: number; name: string; text: string }
+  /** a node Gent asked starts answering, and the answer's text as it streams (shown in that node's chat) */
+  | { type: "node_start"; id: string; address: string; question: string }
+  | { type: "node_token"; id: string; text: string }
+  | ({ type: "node_tool"; id: string } & ToolCallRow)
+  | { type: "node_reasoning"; id: string; text: string }
+  /** a node Gent asked has answered (asks run in the background) */
+  | { type: "answer"; address: string; id: string; preview?: string; error?: string }
+  | { type: "cwd"; ref: GentRef }
+  | { type: "notes"; notes: GentNote[] }
+  | { type: "tree" }
+  | { type: "fork"; fork: ForkInfo & { node_id: string } }
+  | { type: "reply"; turn: number; text: string }
+  | { type: "done"; cwd: string; notes: GentNote[]; stopped: boolean; tokens?: number }
+  | { type: "error"; message: string };
 
 // ---- Debate mode (/debates/*: backend debate/pg/api.py; docs FRONTEND_DEBATE_MODE.md) ----
 

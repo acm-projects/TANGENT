@@ -1,4 +1,5 @@
 import { Frame } from "@/ui/library";
+import { GentLayer } from "./features/agent/GentLayer";
 import { Chat } from "./features/chat/Chat";
 import { Debate } from "./features/debate/Debate";
 import { MindMap } from "./features/mindmap/MindMap";
@@ -7,7 +8,7 @@ import "./Workspace.css";
 
 /* The /{slug}/{projectId} screen (Figma "Normal" and "Node 1-5"): the mind map
  * fills the screen, the toolbar floats over its left edge and the chat panel
- * over its right half.
+ * over its right half, and Gent's layer over the board between them.
  *
  * A server component that only arranges (Rule 8). The three features never
  * talk to each other directly: they share state through src/store/treeStore
@@ -19,8 +20,12 @@ export function Workspace({ slug, projectId }: WorkspaceProps) {
   return (
     <Frame as="main" gap="0" className="workspace">
       <MindMap slug={slug} projectId={projectId} className="workspace-map" />
-      <Toolbar slug={slug} projectId={projectId} className="workspace-toolbar" />
-      <Chat className="workspace-chat" />
+      {/* one row over the map: Gent's layer takes whatever the toolbar and the chat leave between them */}
+      <div className="workspace-row">
+        <Toolbar slug={slug} projectId={projectId} className="workspace-toolbar" />
+        <GentLayer className="workspace-gent" />
+        <Chat className="workspace-chat" />
+      </div>
       <Debate projectId={projectId} className="workspace-debate" />
     </Frame>
   );

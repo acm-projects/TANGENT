@@ -13,6 +13,15 @@ const planFixtures = JSON.parse(
   plan: unknown[];
 }[];
 
+// Gent addresses nodes by these labels, so the backend numbers the same fixture (tests/test_agent_tools.py)
+const exhibitFixtures = JSON.parse(
+  readFileSync(new URL("../../../backend/tests/fixtures/exhibits.json", import.meta.url), "utf8"),
+) as {
+  name: string;
+  nodes: { id: string; parent: string | null; fork: number; created_at: string; merge_source_ids?: string[] }[];
+  addresses: Record<string, string>;
+}[];
+
 const node = (id: string, parent: string | null, fork: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: fork, node_type: null,
   status: "active", title: null, summary: null, model: null, tokens: 0, created_by_id: "u", created_at: "",
@@ -268,6 +277,13 @@ describe("selectExhibits", () => {
     expect(selectExhibits({ rootId: "r", nodesById, childrenByParent })).toEqual({ r: "1", a: "1.1", b: "1.2", c: "1.2.1" });
   });
 
+  it.each(exhibitFixtures)("matches the backend's numbering: $name", ({ nodes, addresses }) => {
+    useTreeStore.getState().hydrateTree("r", nodes.map((n) => ({
+      ...node(n.id, n.parent, n.fork), created_at: n.created_at, merge_source_ids: n.merge_source_ids,
+    })));
+    expect(selectExhibits(useTreeStore.getState())).toEqual(addresses);
+  });
+
   it("is empty with no tree", () => {
     expect(selectExhibits({ rootId: null, nodesById: {}, childrenByParent: {} })).toEqual({});
   });
@@ -345,5 +361,48 @@ describe("selectThreadPlan", () => {
       expect(actual.length).toBe(new Set(actual).size);
       expect(new Set(actual)).toEqual(expected);
     }
+  });
+});
+
+describe("refreshStructure", () => {
+  it("keeps live streams, cached chats and the selection while the tree changes under them", () => {
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("gone", "r", 2)]);
+    s.setActive("a");
+    s.setChats("a", []);
+    s.setChats("gone", []);
+    s.beginStream("a", { role: "user", content: "q", seq: 0, created_at: "" });
+    s.beginStream("fresh", { role: "user", author: "gent", content: "q2", seq: 0, created_at: "" }); // its branch isn't on the map yet
+    s.appendToken("a", "partial");
+    s.refreshStructure("r", [node("r", null, 0), node("a", "r", 1), node("b", "r", 3)]);
+    const after = useTreeStore.getState();
+    expect(after.activeNodeId).toBe("a");
+    expect(after.streaming).toEqual({ a: "partial", fresh: "" });
+    expect(Object.keys(after.chatsByNode).sort()).toEqual(["a", "fresh"]);
+    expect(after.childrenByParent["r"]).toEqual(["a", "b"]);
+  });
+});
+
+describe("a streaming reply's tool calls and thinking", () => {
+  it("are kept on the reply when it lands, and dropped if it fails", () => {
+    const s = () => useTreeStore.getState();
+    s().hydrateTree("r", [node("r", null, 0)]);
+    s().beginStream("r", { role: "user", content: "q", seq: 0, created_at: "" });
+    s().addStreamTool("r", { name: "think", brief: "Quickly thought", ok: true });
+    s().appendReasoning("r", "Weigh ");
+    s().appendReasoning("r", "both.");
+    s().addStreamTool("r", { name: "web_search", brief: "Searched the web", ok: true });
+    s().endStream("r", { role: "assistant", content: "A.", seq: 1, created_at: "" });
+    expect(s().chatsByNode.r?.[1]).toMatchObject({
+      content: "A.",
+      reasoning: "Weigh both.",
+      tools: [{ name: "think" }, { name: "web_search" }],
+    });
+    expect(s().streamWork.r).toBeUndefined();
+
+    s().beginStream("r", { role: "user", content: "q2", seq: 2, created_at: "" });
+    s().addStreamTool("r", { name: "web_search", brief: "x", ok: false });
+    s().abortStream("r");
+    expect(s().streamWork.r).toBeUndefined();
   });
 });

@@ -51,8 +51,10 @@ export function Debate({ projectId, className }: DebateProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
+  // A reload picks the project's debate up as the court button, never by walking into the court: a finished one only
+  // shows while its card is picked, so a deleted or long-done debate doesn't pop up over the board.
   useEffect(() => {
-    void resumeDebate(projectId);
+    void resumeDebate(projectId, true);
     return leaveDebate;
   }, [projectId]);
 

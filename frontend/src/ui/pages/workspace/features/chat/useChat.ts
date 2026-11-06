@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectExhibits, selectIsLeaf, selectThreadPlan, type ThreadPlanItem, useTreeStore } from "@/store/treeStore";
-import { forkNode, isPending, redirectToCopy, splitNode, switchToFork } from "../mindmap/nodeActions";
+import { forkNode, isPending, redirectToCopy, refreshTree, splitNode, switchToFork } from "../mindmap/nodeActions";
 import { uploadAttachments } from "./attachments";
 
 /**
@@ -59,7 +59,7 @@ function buildHistory(
 }
 
 /** Why the message box is disabled, or null when the user can send. */
-export type SendBlocker = "no-selection" | "not-leaf" | "streaming" | "pending" | null;
+export type SendBlocker = "no-selection" | "not-leaf" | "question" | "streaming" | "pending" | null;
 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
@@ -80,6 +80,8 @@ export function useChat() {
   const childrenByParent = useTreeStore((s) => s.childrenByParent);
   // The active node's partial reply, or null when it isn't streaming. Other nodes' streams don't re-render this.
   const streaming = useTreeStore((s) => (s.activeNodeId ? (s.streaming[s.activeNodeId] ?? null) : null));
+  // ...and its tool calls and quick thinking so far
+  const streamWork = useTreeStore((s) => (s.activeNodeId ? s.streamWork[s.activeNodeId] : undefined));
   const [localError, setError] = useState<string | null>(null);
   // Survives a project switch, which remounts the page and drops local state.
   const notice = useTreeStore((s) => s.notice);
@@ -137,6 +139,9 @@ export function useChat() {
 
   const exhibits = selectExhibits({ rootId, nodesById, childrenByParent });
   const history = buildHistory(plan, nodesById, chatsByNode, exhibits);
+  // Under a compact card the model's context starts at its summary, so the history does too: the cards above it fold.
+  const compactAt = history.findLastIndex((item) => item.kind === "node" && item.node.node_type === "compact");
+  const foldedCount = Math.max(0, compactAt);
 
   const blocker: SendBlocker = !activeNodeId
     ? "no-selection"
@@ -147,7 +152,10 @@ export function useChat() {
       : // A UI hint only. The server is what actually enforces it (ARCHITECTURE.md §8).
         !isLeaf
         ? "not-leaf"
-        : null;
+        : // a question card is answered on its card, not written on
+          nodesById[activeNodeId]?.node_type === "question"
+          ? "question"
+          : null;
 
   /** Send a prompt to the selected leaf and stream the reply into the store. */
   async function send(content: string, files: File[] = []) {
@@ -227,6 +235,18 @@ export function useChat() {
         onEvent: (e) => {
           const s = useTreeStore.getState();
           if (e.type === "token") s.appendToken(nodeId, e.text);
+          else if (e.type === "tool") s.addStreamTool(nodeId, { name: e.name, brief: e.brief, ok: e.ok });
+          else if (e.type === "reasoning") s.appendReasoning(nodeId, e.text);
+          else if (e.type === "reopened") {
+            // the message was work under resolved cards: their stamps come off (and untouched compact cards go)
+            const projectId = s.nodesById[nodeId]?.project_id;
+            if (projectId) void refreshTree(projectId).catch(() => {});
+          }
+          else if (e.type === "question") {
+            // the model asked instead of answering: its question card goes on the map now, not at the next reload
+            const projectId = s.nodesById[nodeId]?.project_id;
+            if (projectId) void refreshTree(projectId).catch(() => {});
+          }
           else if (e.type === "done" && e.fork) {
             switched = true;
             s.abortStream(nodeId);
@@ -240,7 +260,7 @@ export function useChat() {
             setUsageModel(e.model ?? activeModel);
             s.endStream(nodeId, {
               role: "assistant",
-              content: s.streaming[nodeId] ?? "",
+              content: e.content ?? s.streaming[nodeId] ?? "",
               seq: seq + 1,
               created_at: new Date().toISOString(),
             });
@@ -303,10 +323,13 @@ export function useChat() {
     historyIds,
     loadedMessageCount,
     history,
+    /** how many history items above the nearest compact card are folded away (0: none) */
+    foldedCount,
     nodeModel,
     nodeTokens,
     branchTokens,
     streaming,
+    streamWork,
     blocker,
     error,
     models,
@@ -322,5 +345,7 @@ export function useChat() {
     canRetry,
     retry,
     branch,
+    /** A question card's last answer opened `nodeId`: the asking model continues its research there. */
+    continueIn: (nodeId: string, prompt: string) => void ask(nodeId, prompt, false),
   };
 }

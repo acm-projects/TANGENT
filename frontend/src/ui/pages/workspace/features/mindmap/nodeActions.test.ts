@@ -8,11 +8,17 @@ const get = vi.fn();
 const split = vi.fn();
 const join = vi.fn();
 const merge = vi.fn();
+const reset = vi.fn();
+const answer = vi.fn();
+const forProject = vi.fn();
 vi.mock("@/api", () => ({
-  api: { nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids) } },
+  api: {
+    nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids), reset: (id: string) => reset(id), answer: (...a: unknown[]) => answer(...a) },
+    trees: { forProject: (id: string) => forProject(id) },
+  },
   forkedProjectIdOf: () => null,
 }));
-const { deleteNode, forkNode, isPending, loadChats, mergeNodes, splitNode } = await import("./nodeActions");
+const { answerQuestion, deleteNode, forkNode, isPending, loadChats, mergeNodes, refreshTree, resetProject, splitNode } = await import("./nodeActions");
 
 const node = (id: string, parent: string | null, idx: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: idx, node_type: null,
@@ -327,5 +333,73 @@ describe("ready to type after a branch or merge", () => {
     merge.mockResolvedValueOnce({ ...node("m", "t", 1), merge_source_ids: ["t", "b"], fork: null });
     expect(await asks(() => mergeNodes("t", "b"))).toBe(true);
     expect(await asks(() => mergeNodes("a", "b"))).toBe(false); // a has a branch: not a leaf
+  });
+});
+
+describe("resetProject (optimistic)", () => {
+  const chat = { role: "user" as const, content: "hi", seq: 0, created_at: "" };
+  beforeEach(() => {
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [{ ...node("r", null, 0), title: "Start", tokens: 9 }, node("a", "r", 1), node("b", "a", 1)]);
+    s.setChats("r", [chat]);
+    s.setActive("b");
+  });
+
+  it("leaves one blank root at once, selected, and keeps it when the server agrees", async () => {
+    let answer!: (n: NodeMeta & { fork: null }) => void;
+    reset.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const done = resetProject("r");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById)).toEqual(["r"]);
+    expect(s.nodesById["r"]).toMatchObject({ title: null, tokens: 0 });
+    expect(s.chatsByNode["r"]).toEqual([]);
+    expect(s.activeNodeId).toBe("r");
+    answer({ ...node("r", null, 0), fork: null });
+    await done;
+    expect(reset).toHaveBeenCalledWith("r");
+    expect(Object.keys(useTreeStore.getState().nodesById)).toEqual(["r"]);
+  });
+
+  it("puts the whole map back, chats and selection included, if the server refuses", async () => {
+    reset.mockRejectedValueOnce(new Error("no"));
+    await expect(resetProject("r")).rejects.toThrow("no");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById).sort()).toEqual(["a", "b", "r"]);
+    expect(s.chatsByNode["r"]).toEqual([chat]);
+    expect(s.activeNodeId).toBe("b");
+  });
+
+  it("goes to the sharee's copy when the reset forked the project", async () => {
+    const fork = { project_id: "p2", workspace_slug: "me", node_map: { r: "r2" }, tree_map: {} };
+    reset.mockResolvedValueOnce({ ...node("r2", null, 0), fork });
+    await resetProject("r");
+    expect(useTreeStore.getState().pendingSwitch).toEqual({ slug: "me", projectId: "p2", nodeId: "r2" });
+  });
+});
+
+describe("question cards reach the map without a reload", () => {
+  const card = { ...node("q", "r", 0), node_type: "question" as const };
+  beforeEach(() => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
+    useTreeStore.getState().setProject({ id: "p" } as never);
+  });
+
+  it("refreshTree puts a card the server made on the map and keeps a reply streaming", async () => {
+    useTreeStore.getState().beginStream("r", { role: "user", content: "who won?", seq: 0, created_at: "" });
+    forProject.mockResolvedValueOnce({ tree: { root_node_id: "r" }, nodes: [node("r", null, 0), card] });
+    await refreshTree("p");
+    expect(useTreeStore.getState().nodesById.q?.node_type).toBe("question");
+    expect("r" in useTreeStore.getState().streaming).toBe(true);
+  });
+
+  it("answering adds the branch it opened (the next question) and selects it", async () => {
+    const next = { ...node("q2", "q", 0), node_type: "question" as const };
+    answer.mockResolvedValueOnce({ node: next, existing: false, final: false, continue_prompt: null, fork: null });
+    forProject.mockResolvedValueOnce({ tree: { root_node_id: "r" }, nodes: [node("r", null, 0), card, next] });
+    useTreeStore.getState().addNode(card);
+    const done = await answerQuestion("q", "Today");
+    expect(done).toEqual({ nodeId: "q2", continuePrompt: null });
+    expect(useTreeStore.getState().nodesById.q2).toBeDefined();
+    expect(useTreeStore.getState().activeNodeId).toBe("q2");
   });
 });

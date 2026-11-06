@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, NodeMeta, ProjectDetail } from "@/api/types";
+import type { ChatMessage, NodeMeta, ProjectDetail, ToolCallRow } from "@/api/types";
 
 /**
  * Two slices, on purpose:
@@ -35,17 +35,27 @@ interface ContentSlice {
   chatsByNode: Record<string, ChatMessage[]>;
   /** nodeId -> reply text so far; a key is present exactly while that node is streaming. */
   streaming: Record<string, string>;
+  /** nodeId -> the tool calls and quick thinking of the reply streaming there (only once it has some) */
+  streamWork: Record<string, { tools: ToolCallRow[]; reasoning: string }>;
   /** Nodes whose reply finished while another node was selected; cleared when the node is selected. */
   unread: Record<string, true>;
   setChats(nodeId: string, chats: ChatMessage[]): void;
+  /** Re-read structure while work is under way (Gent editing the tree): unlike hydrateTree, nodes that still exist
+   *  keep their cached chats, live streams and unread marks, and the selection stays if its node survived. */
+  refreshStructure(rootId: string, nodes: NodeMeta[]): void;
   beginStream(nodeId: string, userMessage: ChatMessage): void;
   appendToken(nodeId: string, text: string): void;
+  addStreamTool(nodeId: string, row: ToolCallRow): void;
+  appendReasoning(nodeId: string, text: string): void;
   /** Commit the streamed text as an assistant message (server persists on stream end). */
   endStream(nodeId: string, assistantMessage: ChatMessage): void;
   abortStream(nodeId: string): void;
   /** Bumped to ask the message box for focus: a branch or merge just made a card to write on. */
   composeAt: number;
   requestCompose(): void;
+  /** Ask the map to fly to a card (search): the id, and a stamp so the same card can be asked for twice. */
+  flyTo: { id: string; at: number } | null;
+  requestFlyTo(id: string): void;
 }
 
 /**
@@ -85,8 +95,10 @@ export const useTreeStore = create<TreeState>()((set) => ({
   activeNodeId: null,
   chatsByNode: {},
   streaming: {},
+  streamWork: {},
   unread: {},
   composeAt: 0,
+  flyTo: null,
   project: null,
   pendingSwitch: null,
   notice: null,
@@ -105,7 +117,30 @@ export const useTreeStore = create<TreeState>()((set) => ({
         if (n.parent_id) (childrenByParent[n.parent_id] ??= []).push(n.id);
       }
       for (const k of Object.keys(childrenByParent)) childrenByParent[k]!.sort(byForkIndex(nodesById));
-      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: {}, unread: {} };
+      return { rootId, nodesById, childrenByParent, activeNodeId: rootId, chatsByNode: {}, streaming: {}, streamWork: {}, unread: {} };
+    }),
+
+  refreshStructure: (rootId, nodes) =>
+    set((s) => {
+      const nodesById: Record<string, NodeMeta> = {};
+      const childrenByParent: Record<string, string[]> = {};
+      for (const n of nodes) {
+        nodesById[n.id] = n;
+        if (n.parent_id) (childrenByParent[n.parent_id] ??= []).push(n.id);
+      }
+      for (const k of Object.keys(childrenByParent)) childrenByParent[k]!.sort(byForkIndex(nodesById));
+      // a stream can start before its new branch reaches the map: keep it, it belongs to a node about to appear
+      const keep = <T,>(m: Record<string, T>, alsoStreaming = false) =>
+        Object.fromEntries(Object.entries(m).filter(([id]) => id in nodesById || (alsoStreaming && id in s.streaming)));
+      return {
+        rootId,
+        nodesById,
+        childrenByParent,
+        activeNodeId: s.activeNodeId && s.activeNodeId in nodesById ? s.activeNodeId : rootId,
+        chatsByNode: keep(s.chatsByNode, true),
+        streaming: keep(s.streaming, true),
+        unread: keep(s.unread),
+      };
     }),
 
   addNode: (node) =>
@@ -243,6 +278,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
     }),
 
   requestCompose: () => set((s) => ({ composeAt: s.composeAt + 1 })),
+  requestFlyTo: (id) => set({ flyTo: { id, at: Date.now() } }),
 
   setChats: (nodeId, chats) => set((s) => ({ chatsByNode: { ...s.chatsByNode, [nodeId]: chats } })),
 
@@ -256,14 +292,32 @@ export const useTreeStore = create<TreeState>()((set) => ({
   appendToken: (nodeId, text) =>
     set((s) => (nodeId in s.streaming ? { streaming: { ...s.streaming, [nodeId]: s.streaming[nodeId] + text } } : s)),
 
+  addStreamTool: (nodeId, row) =>
+    set((s) => {
+      if (!(nodeId in s.streaming)) return s;
+      const work = s.streamWork[nodeId] ?? { tools: [], reasoning: "" };
+      return { streamWork: { ...s.streamWork, [nodeId]: { ...work, tools: [...work.tools, row] } } };
+    }),
+
+  appendReasoning: (nodeId, text) =>
+    set((s) => {
+      if (!(nodeId in s.streaming)) return s;
+      const work = s.streamWork[nodeId] ?? { tools: [], reasoning: "" };
+      return { streamWork: { ...s.streamWork, [nodeId]: { ...work, reasoning: work.reasoning + text } } };
+    }),
+
   endStream: (nodeId, assistantMessage) =>
     set((s) => {
       if (!(nodeId in s.streaming)) return s;
       const streaming = { ...s.streaming };
       delete streaming[nodeId];
+      const { [nodeId]: work, ...streamWork } = s.streamWork;
+      // the reply keeps the tool calls and thinking it streamed (the saved copy has them too)
+      const message = work ? { ...assistantMessage, tools: work.tools, ...(work.reasoning && { reasoning: work.reasoning }) } : assistantMessage;
       return {
-        chatsByNode: { ...s.chatsByNode, [nodeId]: [...(s.chatsByNode[nodeId] ?? []), assistantMessage] },
+        chatsByNode: { ...s.chatsByNode, [nodeId]: [...(s.chatsByNode[nodeId] ?? []), message] },
         streaming,
+        streamWork,
         unread: nodeId === s.activeNodeId ? s.unread : { ...s.unread, [nodeId]: true },
       };
     }),
@@ -273,7 +327,8 @@ export const useTreeStore = create<TreeState>()((set) => ({
       if (!(nodeId in s.streaming)) return s;
       const streaming = { ...s.streaming };
       delete streaming[nodeId];
-      return { streaming };
+      const { [nodeId]: _dropped, ...streamWork } = s.streamWork;
+      return { streaming, streamWork };
     }),
 }));
 
@@ -370,7 +425,20 @@ export function selectThreadPlan(s: Pick<TreeState, "nodesById">, id: string): T
 }
 
 /** Tree cards keep gapless outline numbers; merges use independent joint-exhibit labels. */
+let exhibitsCache: { key: unknown[]; out: Record<string, string> } | null = null;
+
 export function selectExhibits(
+  s: Pick<TreeState, "rootId" | "nodesById" | "childrenByParent">,
+): Record<string, string> {
+  // subscribers call this on every store change (a streaming reply is one per token): renumber only when the tree changed
+  const key = [s.rootId, s.nodesById, s.childrenByParent];
+  if (exhibitsCache?.key.every((k, i) => k === key[i])) return exhibitsCache.out;
+  const out = numberExhibits(s);
+  exhibitsCache = { key, out };
+  return out;
+}
+
+function numberExhibits(
   s: Pick<TreeState, "rootId" | "nodesById" | "childrenByParent">,
 ): Record<string, string> {
   const out: Record<string, string> = {};

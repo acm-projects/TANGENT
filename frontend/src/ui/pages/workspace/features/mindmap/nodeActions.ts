@@ -1,6 +1,6 @@
 import { api, forkedProjectIdOf } from "@/api";
 import type { ForkInfo } from "@/api";
-import type { NodeMeta } from "@/api/types";
+import type { Ending, NodeMeta } from "@/api/types";
 import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
 
 /* The map's per-node actions, shared with the chat's "branch" button.
@@ -15,6 +15,36 @@ export function switchToFork(fork: ForkInfo, nodeId: string | null, notice?: str
 export async function redirectToCopy(copyId: string) {
   const { workspace_slug } = await api.projects.get(copyId);
   useTreeStore.getState().requestSwitch({ slug: workspace_slug, projectId: copyId, nodeId: null }, "You already have your own copy.");
+}
+
+/** Read the tree again after the server added cards (Gent's work, a question an AI asked): the map takes the new
+ * structure and keeps the selection, cached chats and replies still streaming. */
+let refreshes = 0;
+
+export async function refreshTree(projectId: string) {
+  const mine = ++refreshes;
+  const { tree, nodes } = await api.trees.forProject(projectId);
+  if (mine !== refreshes) return; // a newer re-read was sent meanwhile: an older answer must not undo it
+  const store = useTreeStore.getState();
+  if (store.project?.id !== projectId || !tree.root_node_id) return; // the user moved on meanwhile
+  store.refreshStructure(tree.root_node_id, nodes);
+}
+
+/** Answer a question card. The branch the answer opens (or opened before) joins the map and is selected; the card
+ * is re-read so its list of answers shows the new branch. Resolves to that branch and, when a card's model asked, the
+ * prompt that continues its research there (null when a fork moved the user into their copy). */
+export async function answerQuestion(nodeId: string, answer: string | string[]) {
+  const res = await api.nodes.answer(nodeId, answer);
+  if (res.fork) {
+    switchToFork(res.fork, res.node.id);
+    return null;
+  }
+  // the new branch (the chain's next question card, or where the research goes on) and the card's answer links
+  const projectId = useTreeStore.getState().project?.id;
+  if (projectId) await refreshTree(projectId).catch(() => {});
+  if (!useTreeStore.getState().nodesById[res.node.id]) useTreeStore.getState().addNode(res.node);
+  useTreeStore.getState().setActive(res.node.id);
+  return { nodeId: res.node.id, continuePrompt: res.continue_prompt };
 }
 
 /** A node's chats: from the store, or the first time this visit from the server, which the store then keeps. */
@@ -304,6 +334,31 @@ async function mergeBranches(a: string, b: string) {
   useTreeStore.getState().replaceNode(temp.id, real);
 }
 
+/** Start the project over from its root card: every other card goes and the root is blank again. Optimistic: the
+ * map is cleared at once and put back exactly as it was if the server refuses. A sharee's reset lands in their new
+ * copy, so go there. */
+export async function resetProject(rootId: string) {
+  const before = useTreeStore.getState();
+  const root = before.nodesById[rootId];
+  if (!root) return;
+  const saved = {
+    rootId: before.rootId, nodesById: before.nodesById, childrenByParent: before.childrenByParent,
+    activeNodeId: before.activeNodeId, chatsByNode: before.chatsByNode, unread: before.unread,
+  };
+  const blank = { ...root, title: null, summary: null, tokens: 0, model: null };
+  useTreeStore.setState({
+    nodesById: { [rootId]: blank }, childrenByParent: {}, activeNodeId: rootId, chatsByNode: { [rootId]: [] }, unread: {},
+  });
+  try {
+    const { fork, ...meta } = await api.nodes.reset(rootId);
+    if (fork) return switchToFork(fork, meta.id);
+    useTreeStore.getState().updateNode(meta);
+  } catch (e) {
+    useTreeStore.setState(saved);
+    throw e;
+  }
+}
+
 /** Delete a node and everything branching from it. Optimistic: the branch goes at once and is put
  * back (with its chats, and the selection if it was inside) if the server refuses.
  * A placeholder fork goes at once too; its delete is sent as soon as the server confirms the real node. */
@@ -363,6 +418,52 @@ export async function deleteNode(nodeId: string) {
     // removeNode moved a selection inside the branch to its parent; put it back unless the user has moved on
     const parent = nodes[0]?.parent_id ?? null;
     if (previous && ids.includes(previous) && now().activeNodeId === parent) now().setActive(previous);
+    throw e;
+  }
+}
+
+/** The map after a compact or resolve: the server's new compact card joins it (re-read with the rest of the tree). */
+async function withCompactCard(compact: NodeMeta) {
+  const projectId = useTreeStore.getState().project?.id;
+  if (projectId) await refreshTree(projectId).catch(() => {});
+  if (!useTreeStore.getState().nodesById[compact.id]) useTreeStore.getState().addNode(compact);
+}
+
+/** Compact a card: its model summarises the thread down to it into a new compact card under it, which is selected,
+ * so the conversation goes on from the summary. Not optimistic: the summary is the model's to write. */
+export async function compactNode(nodeId: string) {
+  const res = await api.nodes.compact(nodeId);
+  if (res.fork) return switchToFork(res.fork, res.node.id);
+  await withCompactCard(res.node);
+  useTreeStore.getState().setActive(res.node.id);
+}
+
+/** End a card's branch as `kind`: a marker that it is settled. Stamped at once (optimistic, put back on failure). */
+export async function resolveNode(nodeId: string, kind: Ending = "resolved") {
+  const before = useTreeStore.getState().nodesById[nodeId];
+  if (!before) return;
+  useTreeStore.getState().updateNode({ ...before, resolved: { by: "user", at: new Date().toISOString(), kind } });
+  try {
+    const res = await api.nodes.resolve(nodeId, kind);
+    if (res.fork) return switchToFork(res.fork, res.node.id);
+    useTreeStore.getState().updateNode(res.node);
+  } catch (e) {
+    if (useTreeStore.getState().nodesById[nodeId]) useTreeStore.getState().updateNode(before);
+    throw e;
+  }
+}
+
+/** Reopen a resolved card: the stamp comes off at once (back on failure). */
+export async function reopenNode(nodeId: string) {
+  const before = useTreeStore.getState().nodesById[nodeId];
+  if (!before?.resolved) return;
+  useTreeStore.getState().updateNode({ ...before, resolved: null });
+  try {
+    const res = await api.nodes.reopen(nodeId);
+    if (res.fork) return switchToFork(res.fork, res.node.id);
+    useTreeStore.getState().updateNode(res.node);
+  } catch (e) {
+    if (useTreeStore.getState().nodesById[nodeId]) useTreeStore.getState().updateNode(before);
     throw e;
   }
 }

@@ -71,6 +71,15 @@
     scale var(--motion-spring) var(--ease-spring);
 }
 
+/* a tile on the board's right edge: the tag slides out to its left */
+.toolbar-tile[data-tip="left"]::before {
+  left: auto;
+  right: calc(100% + var(--space-3));
+  translate: 1rem -50%;
+  rotate: 6deg;
+  transform-origin: right center;
+}
+
 .toolbar-tile:is(:hover, :focus-visible)::before {
   opacity: 1;
   translate: 0 -50%;
@@ -126,9 +135,88 @@
   overflow-y: auto;
 }
 
+/* Search: the same column, its results scrolling under the field */
+.search {
+  width: 22rem;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+
 /* A panel is a case folder: a manila band heads it, bled to its edges. */
-.toolbar-panel.sources {
+.toolbar-panel:is(.sources, .search) {
   padding-top: 0;
+}
+
+.search-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* each result an index card: its exhibit number, its title, and the words round the match */
+.search-result {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--texture-grain), var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  border-color: var(--color-border-emphasis);
+  box-shadow: var(--shadow-floating);
+}
+
+/* the card picked: red, as the user's selection is everywhere */
+.search-result[aria-current] {
+  border-color: var(--color-string);
+}
+
+.search-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.search-result-address {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.search-result-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-heading);
+}
+
+.search-result-snippet {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+/* the matched words, marked as with a highlighter on the page */
+.search-result-snippet mark {
+  padding-inline: 0.1em;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-string) 22%, transparent);
+  color: inherit;
+}
+
+.search-error {
+  color: var(--color-danger);
 }
 
 .toolbar-panel-head {

@@ -1,12 +1,13 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useChatLayout } from "@/store/chatLayout";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
-import { AgentWindow } from "../agent/AgentWindow";
 import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
+import { QuestionRecord } from "./components/QuestionRecord";
 import { type HistoryItem, useChat } from "./useChat";
 import "./Chat.css";
 
@@ -18,13 +19,12 @@ const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumF
  *   docked     the default: floats over the right half of the map; its left
  *              edge drags to resize (pointer, or arrow keys when focused)
  *   expanded   full screen (the top-left button)
- *   collapsed  just a button to bring it back (the top-right chevron)
+ *   collapsed  nothing here: its reopen tile sits beside the Field Notes (agent/GentLayer)
  *
  * Only the history scrolls (.chat-scroll); the error, token usage and the
  * message box sit fixed below it, the box a ruled line on the sheet.
  */
 
-type Layout = "docked" | "expanded" | "collapsed";
 
 /** Narrowest the docked sheet drags to, and how far an arrow key moves it (px). */
 const MIN_WIDTH = 360;
@@ -87,6 +87,10 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
                 <VerdictCard nodeId={item.node.id} />
               </Frame>
             )}
+            {/* a question card: what was asked, and the answer that led on down this thread */}
+            {item.node.node_type === "question" && item.node.question && (
+              <QuestionRecord node={item.node} next={(() => { const n = items[i + 1]; return n?.kind === "node" ? n.node.id : undefined; })()} />
+            )}
             {item.messages === undefined && (
               <Frame as="li">
                 <Loading />
@@ -104,7 +108,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
               />
             ))}
             {/* only the card being written on needs the hint; an empty card above it is just its divider */}
-            {item.messages?.length === 0 && streaming === null && isActive && (
+            {item.messages?.length === 0 && streaming === null && isActive && item.node.node_type !== "question" && (
               <Frame as="li" className="chat-hint">
                 <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
               </Frame>
@@ -118,15 +122,22 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
 
 export function Chat({ className }: ChatProps) {
   const chat = useChat();
-  const [layout, setLayout] = useState<Layout>("docked");
-  const [agentOpen, setAgentOpen] = useState(false);
+  const { layout, setLayout } = useChatLayout();
+  // a question card answered on the map continues its research through this chat's send
+  const continueIn = useRef(chat.continueIn);
+  continueIn.current = chat.continueIn;
+  useEffect(() => useChatLayout.setState({ continueIn: (nodeId, prompt) => continueIn.current(nodeId, prompt) }), []);
 
-  // Selecting a node brings a collapsed chat back (adjusting state during render, not in an effect).
-  const [shownNodeId, setShownNodeId] = useState(chat.activeNodeId);
-  if (chat.activeNodeId !== shownNodeId) {
-    setShownNodeId(chat.activeNodeId);
-    if (chat.activeNodeId && layout === "collapsed") setLayout("docked");
-  }
+  // "Show earlier" above a compact card's summary, for the card it was pressed on (picking another folds them again)
+  const [earlierFor, setEarlierFor] = useState<string | null>(null);
+  const folded = earlierFor === chat.activeNodeId ? 0 : chat.foldedCount;
+
+  // Selecting a node brings a collapsed chat back. An effect: the layout is a shared store, which mustn't change
+  // while rendering.
+  const activeNodeId = chat.activeNodeId;
+  useEffect(() => {
+    if (activeNodeId && useChatLayout.getState().layout === "collapsed") useChatLayout.getState().setLayout("docked");
+  }, [activeNodeId]);
   // null until the user drags: the CSS default width applies.
   const [width, setWidth] = useState<number | null>(null);
   const [resizing, setResizing] = useState(false);
@@ -148,7 +159,8 @@ export function Chat({ className }: ChatProps) {
   // `layout` is in the key because reopening a collapsed panel remounts the list. Every section's count, since
   // an ancestor's (often long) history can load after the selected card's.
   const loaded = chat.loadedMessageCount;
-  const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming?.length ?? 0}`;
+  // A reply starting counts; its tokens don't (the observer below keeps up with them, without re-pinning per token).
+  const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming !== null}`;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -169,44 +181,10 @@ export function Chat({ className }: ChatProps) {
     };
   }, [scrollKey]);
 
-  // After the panels in both layouts, so the conversation survives opening and collapsing the chat.
-  const agentWindow = agentOpen && <AgentWindow onClose={() => setAgentOpen(false)} />;
-
-  if (layout === "collapsed") {
-    return (
-      <>
-        <Frame as="aside" className={classes} data-layout="collapsed" aria-label="Chat">
-          <Frame direction="row" gap="2">
-            <Button
-              elevation="floating"
-              label="Open chat"
-              icon="chevron_left"
-              showIcon
-              showLabel={false}
-              size="l"
-              onClick={() => setLayout("docked")}
-            />
-            {/* a stand-in for the future agent: drives the agent tools so we can see they work */}
-            <Button
-              elevation="floating"
-              label="Open agent"
-              icon="smart_toy"
-              showIcon
-              showLabel={false}
-              size="l"
-              pressed={agentOpen}
-              onClick={() => setAgentOpen((open) => !open)}
-              className="agent-launch"
-            />
-          </Frame>
-        </Frame>
-        {agentWindow}
-      </>
-    );
-  }
+  // collapsed, the chat is just its reopen tile, which sits beside the Field Notes (agent/GentLayer)
+  if (layout === "collapsed") return null;
 
   return (
-    <>
     <Panel
       as="aside"
       ref={sheetRef}
@@ -291,8 +269,20 @@ export function Chat({ className }: ChatProps) {
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
+              {folded > 0 && (
+                <Frame as="li" align="center" className="chat-earlier">
+                  <Button
+                    hierarchy="tertiary"
+                    size="s"
+                    icon="unfold_more"
+                    showIcon
+                    label={`Show earlier · ${folded} card${folded === 1 ? "" : "s"}`}
+                    onClick={() => setEarlierFor(chat.activeNodeId)}
+                  />
+                </Frame>
+              )}
               <HistoryList
-                items={chat.history}
+                items={folded ? chat.history.slice(folded) : chat.history}
                 activeNodeId={chat.activeNodeId}
                 streaming={chat.streaming}
                 canRetry={chat.canRetry}
@@ -307,6 +297,8 @@ export function Chat({ className }: ChatProps) {
                     content: chat.streaming,
                     seq: -1,
                     created_at: "",
+                    tools: chat.streamWork?.tools,
+                    reasoning: chat.streamWork?.reasoning,
                   }}
                 />
               )}
@@ -372,7 +364,5 @@ export function Chat({ className }: ChatProps) {
         />
       </Frame>
     </Panel>
-    {agentWindow}
-    </>
   );
 }

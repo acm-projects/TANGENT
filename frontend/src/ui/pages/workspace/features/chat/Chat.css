@@ -42,13 +42,6 @@
   --pop-scale: 0.94;
 }
 
-.chat[data-layout="collapsed"] > * {
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  --pop-from: 2rem 0;
-  --pop-rotate: 20deg;
-  --pop-scale: 0.4;
-}
-
 /* while dragging, the sheet follows the pointer exactly */
 .chat[data-resizing] {
   transition: none;
@@ -643,6 +636,17 @@
     box-shadow var(--motion-fast) var(--ease-out);
 }
 
+/* a question Gent asked: his ink note on the sheet (InkPanel draws it), not a slip of the user's paper */
+.message-user-bubble[data-author="gent"] {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+
+.message-user-bubble[data-author="gent"]::before {
+  content: none;
+}
+
 .message-user-bubble:hover {
   rotate: 0deg;
   box-shadow: var(--shadow-lift);
@@ -673,6 +677,16 @@
 
 .message-meta {
   color: var(--color-text-muted);
+}
+
+/* a reply's tool calls and quick thinking (components/ToolRow), above its text */
+.message-tools {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0 0 0 var(--space-2);
+  list-style: none;
+  border-inline-start: 1px solid var(--color-border);
 }
 
 /* "Thought for 1m 4s" is rubber-stamped on the file, inked a little unevenly */
@@ -1127,4 +1141,82 @@
   to {
     --chat-scroll-fade: 2rem;
   }
+}
+
+/* ── a question card in the history (components/QuestionRecord.tsx) ── */
+
+.question-record {
+  max-width: min(32rem, 100%);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+}
+
+.question-record-kicker {
+  color: var(--color-text-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.question-record-options {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.question-record-options li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+/* the answer that led down this thread: red, the user's pick (blue when Gent answered) */
+.question-record-options li[data-chosen] {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.question-record-options li[data-chosen] [data-ui="icon"] {
+  color: var(--color-string);
+}
+
+.question-record[data-by="gent"] li[data-chosen] [data-ui="icon"] {
+  color: var(--color-gent);
+}
+
+/* the answers message: an answer sheet, each question small above the answer the user gave */
+.message-answers-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-answers-answer {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.message-answers-answer::before {
+  content: "✓ ";
+  color: var(--color-string);
+}
+
+/* ── compact cards (components/MessageBubble.tsx; the fold in Chat.tsx) ── */
+
+/* the thread above a compact card, folded behind one line */
+.chat-earlier {
+  padding-block: var(--space-1);
+  border-bottom: 1px dashed var(--color-border-strong);
+}
+
+/* a compact card's summary: filed on manila stock, like its card on the map */
+.message-compact-record {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--texture-grain), var(--color-folder);
 }

@@ -31,7 +31,7 @@ def _branch_markup(source: str, plan: Sequence[PlanItem], nodes: Mapping[str, Pa
     for item in plan:
         if isinstance(item, str):
             node = nodes[item]
-            body.extend(f"{message.role.capitalize()}: {message.content}" for message in node.chats)
+            body.extend(f"{message.role.capitalize()}: {_dated(message)}" for message in node.chats)
         else:
             body.append(_nested_merge(item["merge"], nodes))
     return f'<branch from="{_branch_title(source, nodes)}">\n' + "\n".join(body) + "\n</branch>"
@@ -43,13 +43,26 @@ def _nested_merge(branches: Sequence[dict], nodes: Mapping[str, PathNode]) -> st
     ) + "\n</merge>"
 
 
+def _dated(message) -> str:
+    """The message as the model reads it, headed by the day it was written: research spans days, and a later card
+    or a merge must be able to tell an old answer from a fresh one. The stored message and the chat stay as they are."""
+    return f"[{message.created_at:%Y-%m-%d}] {message.content}"
+
+
+def _message(message) -> LLMMessage:
+    """A Compacted card's summary stands in for the conversation above it (app/resolving.py)."""
+    if message.compact:
+        return LLMMessage("user", "A summary of the conversation so far (compacted):\n\n" + _dated(message))
+    return LLMMessage(message.role, _dated(message))
+
+
 def flatten(plan: Sequence[PlanItem], nodes: Mapping[str, PathNode]) -> list[Segment]:
     """Render card messages and merge blocks in the supplied reading order."""
     segments: list[Segment] = []
     for item in plan:
         if isinstance(item, str):
             node = nodes[item]
-            messages = tuple(LLMMessage(message.role, message.content) for message in node.chats)
+            messages = tuple(_message(message) for message in node.chats)
             if messages:
                 segments.append(Segment(item, messages))
             continue
