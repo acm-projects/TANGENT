@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # "resolved" found something. A stamp without a kind is "resolved".
 ENDINGS = {"resolved": "Resolved", "dead_lead": "Dead lead", "off_topic": "Off topic"}
 
+# A card's coloured tag (`nodes.tag` = {shape, color}); the colours carry no fixed meaning.
+TAG_COLORS = ("ochre", "sage", "slate", "plum")
+TAG_SHAPES = ("flag", "pin")
+
 Role = Literal["user", "assistant"]
 
 
@@ -67,6 +71,8 @@ class NodeMeta(BaseModel):
     question: Optional[dict] = None
     # how a card's branch ended: {by, at, kind}, kind one of ENDINGS (app/resolving.py)
     resolved: Optional[dict] = None
+    # the card's coloured tag: {shape, color} (TAG_SHAPES, TAG_COLORS)
+    tag: Optional[dict] = None
 
     @field_validator("model")
     @classmethod

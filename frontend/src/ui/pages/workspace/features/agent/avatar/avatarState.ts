@@ -30,7 +30,8 @@ const BY_TOOL: Record<string, GentAvatarState> = {
   merge: "working",
   rm: "working",
   compact: "writing",
-  resolve: "writing",
+  resolve: "writing", // no longer his tool: kept so old chats still replay
+  tag: "writing",
   reopen: "working",
   selected: "reading",
   sources: "reading",

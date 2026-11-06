@@ -1,5 +1,5 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
-import type { AttachmentKind, Ending, NodeMeta } from "@/api/types";
+import type { AttachmentKind, Ending, NodeMeta, NodeTag } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
 import { layoutTree } from "@/store/layout";
@@ -41,6 +41,8 @@ export interface MindMapNodeData extends Record<string, unknown> {
   resolvedBy: "user" | "gent" | null;
   /** How its branch ended (the stamp's words), when it did. */
   ending: Ending | null;
+  /** Its coloured tag, if it has one. */
+  tag: NodeTag | null;
 }
 
 export type MindMapFlowNode = FlowNode<MindMapNodeData, "tangent">;
@@ -131,6 +133,7 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         compact: meta.node_type === "compact",
         resolvedBy: meta.resolved?.by ?? null,
         ending: meta.resolved ? (meta.resolved.kind ?? "resolved") : null,
+        tag: meta.tag ?? null,
       },
     });
     const sources = merges.get(id);

@@ -400,6 +400,84 @@
   pointer-events: none;
 }
 
+/* A coloured tag (TagMark.tsx): a flag or pin over the card's top-right corner, as in the tag mockup. The attachment
+   slips shift left to make room. shortcut: a debate card's seal and a tag overlap; move one if that ever matters. */
+.mindmap-node-tagmark {
+  position: absolute;
+  top: -1rem;
+  right: -0.2rem;
+  z-index: 1;
+  width: 1.9rem;
+  height: 1.9rem;
+  filter: drop-shadow(1px 2px 1.5px rgb(0 0 0 / 0.3));
+  pointer-events: none;
+}
+
+.mindmap-node-tagmark[data-shape="pin"] {
+  width: 1.75rem;
+  height: 1.75rem;
+  rotate: 32deg;
+}
+
+.mindmap-node[data-tagged] .mindmap-node-tag {
+  right: 2.2rem;
+}
+
+.mindmap-node[data-tagged] .mindmap-node-tag + .mindmap-node-tag {
+  right: 4.2rem;
+}
+
+/* The "Tag this card" popup: shape tiles and colour swatches, the picked one ringed. */
+.tag-picker-heading {
+  color: var(--color-text-secondary);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tag-picker-shape,
+.tag-picker-swatch {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.tag-picker-shape svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tag-picker-swatch {
+  border-color: transparent;
+}
+
+.tag-picker-swatch span[aria-hidden] {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid var(--color-surface);
+}
+
+.tag-picker-shape[aria-pressed="true"] {
+  border: 2px solid var(--color-text);
+  color: var(--color-text);
+}
+
+.tag-picker-swatch[aria-pressed="true"] {
+  color: var(--color-text);
+}
+
+.tag-picker-swatch[aria-pressed="true"] span[aria-hidden] {
+  outline: 1.5px solid var(--color-text);
+  outline-offset: 2px;
+}
+
 /* A resolved card: a rubber stamp pressed across its foot, in the hand that resolved it (the user's red, Gent's blue). */
 .mindmap-node-resolved {
   position: absolute;

@@ -27,6 +27,8 @@ const DOING: Record<string, (args: Record<string, unknown>, here: string) => str
     a.kind && a.kind !== "resolved"
       ? `Marking ${String(a.card ?? here)} as ${String(a.kind).replace("_", " ")}`
       : `Marking ${String(a.card ?? here)} as resolved`,
+  tag: (a, here) =>
+    a.color === "none" ? `Taking the tag off ${String(a.card ?? here)}` : `Tagging ${String(a.card ?? here)} ${String(a.color ?? "")}`.trim(),
   reopen: (a, here) => `Reopening ${String(a.card ?? here)}`,
   selected: () => "Checking which card you picked",
   sources: () => "Looking through the sources",

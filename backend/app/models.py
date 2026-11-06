@@ -242,6 +242,8 @@ class Node(Base):
     question = Column(JSONB, nullable=True)
     # a resolved card: {"by": "user"|"gent", "at"} (app/resolving.py); None while open
     resolved = Column(JSONB, nullable=True)
+    # a coloured tag: {"shape": "flag"|"pin", "color": "ochre"|"sage"|"slate"|"plum"} (schemas.TAG_*); None untagged
+    tag = Column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("parent_id", "fork_index", name="uq_nodes_parent_fork_index"),

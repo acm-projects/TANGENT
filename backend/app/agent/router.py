@@ -39,7 +39,7 @@ router = APIRouter(prefix="/projects", tags=["Gent"])
 
 MAX_MOVES = 250  # model turns per task: past this he must reply (each turn is one provider request)
 WRAP_UP_AT = 230  # when he's told his moves are running out
-WRAP_UP = ("You have {left} moves left in this task. Finish what's in flight, resolve the directions you've finished, "
+WRAP_UP = ("You have {left} moves left in this task. Finish what's in flight, tag the directions you've finished, "
            "and get ready to report. Batch your remaining moves: several tool calls per turn.")
 OUT_OF_MOVES = ("You're out of moves for this task. Reply now, without tools: what you found (with the card addresses) "
                 "and what's still open, so the user can tell you to continue.")
@@ -97,9 +97,10 @@ for sources. Every question you ask (the survey too) must stand on its own: a ca
 the candidate, criterion or claim in full instead of pointing at "these" or "the above". Ask the same criteria of every candidate, so the graph can compare them point by point. Each answer may \
 raise the next layer; follow what it opens up for at least a few layers on the lines the question turns on. Where two \
 cards disagree, or a claim matters a lot, branch a question that checks it from another angle; let the cards weigh \
-it. When a line has been followed through, resolve() its card; when it led nowhere, resolve it as a dead_lead (or \
-off_topic) instead of deleting it, so the graph shows what was ruled out, and leave it out of \
-merges. Use compact() on a card whose thread \
+it. When a line has been followed through, or led nowhere, tag() its card with a colour (ochre, sage, slate or \
+plum) instead of deleting it, so the graph shows what you made of it. The colours mean nothing by themselves: use \
+what the user says they mean, otherwise pick one meaning per colour, write it in your Field Notes and keep to it. \
+Use compact() on a card whose thread \
 has grown long before asking more under it.
 
 8. Compare and conclude, through the cards, once the deepest layer is in. Merge the leaves that hold comparable \
@@ -109,7 +110,7 @@ each point. A merged card already reads its sources, so ask it what to do, never
 conclusion is the merged card's to draw, not yours. If you add layers after concluding, conclude again from the \
 newest leaves. Summaries come from merges, never from a new branch.
 
-9. Report. Once the conclusion card exists, the finished lines are resolved and your Field Notes are done, stop and \
+9. Report. Once the conclusion card exists, the finished lines are tagged and your Field Notes are done, stop and \
 reply in at most three sentences: what the graph covers and the address of the card that holds the conclusion. \
 Don't restate or vouch for the findings; if something is still open, say so plainly.
 
@@ -131,8 +132,8 @@ has selected on the map. Sources: sources() lists the project's papers, search_s
 them so you can point a card at the right ones by id, add_source(paper) keeps a paper a card mentioned. Researching: ask(card, question) asks a leaf card (one without branches) and moves you \
 there; bulk_ask(under, questions) opens one new branch per question under a card and asks them all at once; branch() \
 opens one empty branch; merge(cards) joins finished leaves into one card; rm(target) deletes a card and everything \
-below it. Always name the card you mean by its address. Finishing lines: resolve(card, kind) marks how a line ended (resolved, dead_lead, off_topic), reopen(card) \
-takes the mark off (working inside a resolved line reopens it too), compact(card) summarises a long thread into a \
+below it. Always name the card you mean by its address. Marking lines: tag(card, color) pins an ochre, sage, slate or plum tag on a card (color "none" takes it off); \
+a card the user resolved is settled: reopen(card) takes that stamp off (working inside it reopens it too). Finishing lines: compact(card) summarises a long thread into a \
 fresh card below it. ask_user(questions) puts up to four multiple-choice questions to the user on your dock (not \
 the map) and waits for the answers, which then stay in this prompt. A card's model may ask a question too (its answer \
 update says so): answer_question(card, answer) and its research continues; a research angle by your judgement, what \
@@ -273,7 +274,7 @@ def brief(name: str, args: dict, result: dict) -> str:
         case "cat":
             return f"read {at}, page {result.get('page')} of {result.get('pages')}"
         case "tree":
-            return f"viewed the tree: {result.get('cards', 0)} cards, {len(result.get('open_leaves', []))} open leaves"
+            return f"viewed the tree: {result.get('cards', 0)} cards"
         case "search":
             found = [r.get("address") or r["id"] for r in result.get("results", [])]
             return f"searched \"{args.get('query', '')}\": " + (", ".join(found) or "no matches")

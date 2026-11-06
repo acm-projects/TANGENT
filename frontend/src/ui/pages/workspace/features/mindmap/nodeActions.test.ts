@@ -11,14 +11,16 @@ const merge = vi.fn();
 const reset = vi.fn();
 const answer = vi.fn();
 const forProject = vi.fn();
+const tag = vi.fn();
+const untag = vi.fn();
 vi.mock("@/api", () => ({
   api: {
-    nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids), reset: (id: string) => reset(id), answer: (...a: unknown[]) => answer(...a) },
+    nodes: { tag: (...a: unknown[]) => tag(...a), untag: (id: string) => untag(id), fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids), reset: (id: string) => reset(id), answer: (...a: unknown[]) => answer(...a) },
     trees: { forProject: (id: string) => forProject(id) },
   },
   forkedProjectIdOf: () => null,
 }));
-const { answerQuestion, deleteNode, forkNode, isPending, loadChats, mergeNodes, refreshTree, resetProject, splitNode } = await import("./nodeActions");
+const { answerQuestion, deleteNode, forkNode, isPending, loadChats, mergeNodes, refreshTree, resetProject, splitNode, tagNode } = await import("./nodeActions");
 
 const node = (id: string, parent: string | null, idx: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: idx, node_type: null,
@@ -54,6 +56,28 @@ describe("forkNode (optimistic)", () => {
     const s = useTreeStore.getState();
     expect(s.childrenByParent["r"]).toEqual(["a"]);
     expect(s.activeNodeId).toBe("a");
+  });
+});
+
+describe("tagNode (optimistic)", () => {
+  const pin = { shape: "pin", color: "slate" } as const;
+  beforeEach(() => useTreeStore.getState().hydrateTree("r", [node("r", null, 0), { ...node("a", "r", 1), tag: { shape: "flag", color: "sage" } }]));
+
+  it("tags at once and keeps the server's card", async () => {
+    tag.mockResolvedValueOnce({ node: { ...node("a", "r", 1), tag: pin }, fork: null });
+    const done = tagNode("a", pin);
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual(pin);
+    await done;
+    expect(tag).toHaveBeenCalledWith("a", pin);
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual(pin);
+  });
+
+  it("untags with null, and puts the old tag back if the server refuses", async () => {
+    untag.mockRejectedValueOnce(new Error("nope"));
+    const done = tagNode("a", null);
+    expect(useTreeStore.getState().nodesById["a"].tag).toBeNull();
+    await expect(done).rejects.toThrow("nope");
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual({ shape: "flag", color: "sage" });
   });
 });
 

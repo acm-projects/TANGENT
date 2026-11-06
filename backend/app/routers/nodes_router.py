@@ -493,6 +493,32 @@ async def reopen_node(node_id: UUID, db: AsyncSession = Depends(get_db_session),
     return ResolveOut(node=NodeMeta.model_validate(node), fork=info)
 
 
+class TagIn(BaseModel):
+    shape: Literal["flag", "pin"]  # schemas.TAG_SHAPES
+    color: Literal["ochre", "sage", "slate", "plum"]  # schemas.TAG_COLORS
+
+
+@router.put("/{node_id}/tag", response_model=ResolveOut)
+async def tag_node(node_id: UUID, body: TagIn, db: AsyncSession = Depends(get_db_session),
+                   user: User = Depends(get_current_user)):
+    """Pin a coloured tag on the card."""
+    node, info = await _write_card(db, node_id, user.id)
+    node.tag = body.model_dump()
+    await db.commit()
+    await db.refresh(node)
+    return ResolveOut(node=NodeMeta.model_validate(node), fork=info)
+
+
+@router.delete("/{node_id}/tag", response_model=ResolveOut)
+async def untag_node(node_id: UUID, db: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)):
+    """Take the card's tag off."""
+    node, info = await _write_card(db, node_id, user.id)
+    node.tag = None
+    await db.commit()
+    await db.refresh(node)
+    return ResolveOut(node=NodeMeta.model_validate(node), fork=info)
+
+
 _RESET_SQL = text("""
     WITH RECURSIVE doomed(id) AS (
       SELECT id FROM nodes WHERE parent_id = :root

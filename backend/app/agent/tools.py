@@ -24,7 +24,7 @@ from sqlalchemy import text, update
 from sqlalchemy.future import select
 
 from app import database
-from app.context.schemas import ENDINGS
+from app.context.schemas import ENDINGS, TAG_COLORS
 from app.papers import service as paper_service
 from app import questions as qmod
 from app.branch_scope import visible_to
@@ -49,7 +49,7 @@ MAX_BRANCHES = 4  # past this many branches on one card, Gent is told to dig und
 SAME_CARD = ("Not asked: {at} already holds one of your answers. Follow-ups belong in branches: bulk_ask them under {at}, so each "
              "line of the story gets its own card.")
 MULTITASK = ("Not waiting yet: these answers are in and nothing is under them: {cards}. Work on them while the "
-             "others answer: read them and bulk_ask what they raise, or resolve the lines that are done. Call wait() "
+             "others answer: read them and bulk_ask what they raise, or tag the lines that are done. Call wait() "
              "again when there is truly nothing else to do.")
 MAX_SOURCES = 60  # sources listed at once
 RM_CONFIRM = ("Not deleted yet: {at} holds research ({cards} have answers). Deleting throws it away for good. Only "
@@ -113,8 +113,8 @@ GENT_TOOLS = [
           {"card": {**_WHERE, "description": 'The card to read (default ".", where you are)'},
            "page": {"type": "integer", "description": "Page number, from 1 (default 1)"}}),
     _tool("tree", "The whole tree at a glance (or one branch of it): every card as an indented outline with its "
-                  "address, title and state (answered, empty, answering, a question, its ending stamp, what a merge "
-                  "joins), and the open leaves that still need you. Use it before deciding where to dig next and "
+                  "address, title and state (answered, empty, answering, a question, its ending stamp, its colour tag, what a merge "
+                  "joins). Use it before deciding where to dig next and "
                   "before you conclude, so no branch is forgotten. Does not move you.",
           {"under": {**_WHERE, "description": 'Only this branch (default "/", the whole tree)'}}),
     _tool("search", "Find nodes anywhere in the tree whose title, summary or messages contain the text. "
@@ -153,13 +153,13 @@ GENT_TOOLS = [
                      "to it) into a new 'Compacted' card under it, and moves you there. Below that card, context starts "
                      "from the summary. Use it when a card's thread is getting long before asking more there.",
           {"card": {**_WHERE, "description": 'The card to compact (default ".", where you are)'}}),
-    _tool("resolve", "End a branch: the card gets a stamp saying how it ended, a marker that the branch is settled. "
-                     "Nothing else changes; you stay where you are. (compact() is separate.)",
-          {"card": {**_WHERE, "description": 'The card that heads the branch (default ".", where you are)'},
-           "kind": {"type": "string", "enum": ["resolved", "dead_lead", "off_topic"],
-                    "description": "resolved (default): dug into and cross-checked, it found something. dead_lead: "
-                                   "followed, but it led nowhere useful (no evidence, a wrong premise). off_topic: it doesn't bear on the question. The last "
-                                   "two tell later merges to leave the branch out."}}),
+    _tool("tag", "Pin a coloured tag on a card, a marker the user sees on the map. The colours mean nothing by "
+                 "themselves: use the meaning the user gave them, or pick one and keep it consistent. Nothing else "
+                 "changes; you stay where you are.",
+          {"card": {**_WHERE, "description": 'The card to tag (default ".", where you are)'},
+           "color": {"type": "string", "enum": [*TAG_COLORS, "none"],
+                     "description": "The colour word; \"none\" takes the tag off"}},
+          ["color"]),
     _tool("reopen", "Reopen a resolved branch to work in it again: the Resolved stamp comes off. (Working in it "
                            "reopens it too.)",
           {"card": {**_WHERE, "description": 'The resolved card (default ".", where you are)'}}),
@@ -203,7 +203,7 @@ GENT_TOOLS = [
 
 NOTE_TOOLS = {"todo_add", "todo_tick", "todo_edit", "todo_delete", "get_todo"}
 # changing the tree needs a plan: with no open Field Notes these are refused (looking around is always allowed)
-NEEDS_PLAN = {"ask", "branch", "bulk_ask", "merge", "rm", "compact"}  # resolve is the wrap-up: never blocked
+NEEDS_PLAN = {"ask", "branch", "bulk_ask", "merge", "rm", "compact"}  # tag is a marker: never blocked
 PLAN_FIRST = ("Plan first: your Field Notes have no open tasks. Write the steps of this task with todo_add (look, "
               "survey, branch, dig, synthesise), then do this.")
 
@@ -222,7 +222,7 @@ class Snapshot:
 
 
 _TREE_SQL = text("""
-    SELECT n.id, n.parent_id, n.title, n.summary, n.model, n.fork_index, n.created_at, n.node_type, n.resolved,
+    SELECT n.id, n.parent_id, n.title, n.summary, n.model, n.fork_index, n.created_at, n.node_type, n.resolved, n.tag,
            CASE WHEN jsonb_typeof(n.chats) = 'array' THEN jsonb_array_length(n.chats) ELSE 0 END AS messages,
            CASE WHEN jsonb_typeof(n.chats) = 'array' THEN (SELECT count(*) FROM jsonb_array_elements(n.chats) m
                 WHERE m->>'author' = 'gent') ELSE 0 END AS gent_asks
@@ -338,10 +338,10 @@ def settled(snap: Snapshot, node_id) -> bool:
     return resolved_over(snap, node_id) is not None
 
 
-def unresolved_leaves(snap: Snapshot) -> list[str]:
-    """Addresses of the leaves no resolved branch covers, unanswered question cards included."""
-    return [snap.address[n] for n, row in snap.rows.items()
-            if not snap.children.get(n) and not settled(snap, n) and n in snap.address]
+def _tag_color(snap: Snapshot, node_id) -> Optional[str]:
+    """The colour word of the card's tag, if it has one."""
+    tag = getattr(snap.rows[node_id], "tag", None)
+    return tag.get("color") if isinstance(tag, dict) else None
 
 
 def waiting_questions(snap: Snapshot) -> list[str]:
@@ -486,6 +486,8 @@ def _arrive(run: Run, snap: Snapshot, node: UUID) -> dict:
         out["merged_from"] = [_ref(snap, s) for s in snap.sources[node]]
     if told := _visit_nudge(snap, node):
         out["nudges"] = told
+    if color := _tag_color(snap, node):
+        out["tag"] = color
     return out
 
 
@@ -506,8 +508,8 @@ async def tree(run: Run, under="/") -> dict:
                 "answered" if row.messages else "empty"]
         if stamp := _resolution(snap, n):
             bits.append(ENDINGS.get(stamp["kind"], stamp["kind"]).lower())
-        elif not kids and not settled(snap, n):
-            bits.append("OPEN")
+        if color := _tag_color(snap, n):
+            bits.append(f"tagged {color}")
         if n in snap.sources:
             bits.append("merges " + " + ".join(snap.address.get(x) or "?" for x in snap.sources[n]))
         if n == here:
@@ -527,9 +529,7 @@ async def tree(run: Run, under="/") -> dict:
                 walk(c, depth + 1)
 
     walk(top, 0)
-    inside = set(_subtree(snap, top))
-    open_leaves = [a for a in unresolved_leaves(snap) if snap.by_address.get(a) in inside]
-    out = {"tree": "\n".join(lines), "cards": len(lines) + more, "open_leaves": open_leaves}
+    out = {"tree": "\n".join(lines), "cards": len(lines) + more}
     if more:
         out["more"] = f"{more} more cards not listed; tree(under=...) a branch to see them"
     return out
@@ -542,6 +542,8 @@ async def ls(run: Run) -> dict:
         r = snap.rows[node_id]
         out = {**_ref(snap, node_id), "messages": r.messages, "branches": len(snap.children.get(node_id, [])),
                "summary": (r.summary or "")[:SUMMARY_CHARS] or None}
+        if color := _tag_color(snap, node_id):
+            out["tag"] = color
         if node_id in snap.sources:
             out["merged_from"] = [snap.address.get(s) for s in snap.sources[node_id]]
         return out
@@ -754,13 +756,13 @@ async def wait(run: Run, timeout=WAIT_SECONDS, **kind) -> dict:
 
 async def _open_cards(run: Run) -> list[str]:
     """Cards he asked this run whose answers are in but which he hasn't taken further: answered, still leaves, not
-    resolved and not answering. Work he could do instead of waiting."""
+    resolved or tagged and not answering. Work he could do instead of waiting."""
     if not run.asked:
         return []
     snap, _ = await _here(run)
     return sorted(snap.address[c] for c in run.asked
                   if c in snap.rows and c in snap.address and snap.rows[c].messages and not snap.children.get(c)
-                  and c not in run.asking and not settled(snap, c))
+                  and c not in run.asking and not settled(snap, c) and not _tag_color(snap, c))
 
 
 async def _name_cards(run: Run, updates: list[dict]) -> None:
@@ -960,26 +962,19 @@ async def compact(run: Run, card=".") -> dict:
             "message": "Compacted. You are on the Compacted card: asking here or below starts from its summary."}
 
 
-async def resolve(run: Run, card=".", kind="resolved") -> dict:
+async def tag(run: Run, card=".", color="") -> dict:
     await _writable(run)
-    endings = ENDINGS
-    if kind not in endings:
-        return {"error": f"kind must be one of: {', '.join(endings)}"}
-    snap, here = await _here(run)
+    if color not in (*TAG_COLORS, "none"):
+        return {"error": f"color must be one of: {', '.join((*TAG_COLORS, 'none'))}"}
+    snap, _ = await _here(run)
     node = _resolve(snap, run, card)
-    if stamp := _resolution(snap, node):
-        return {"error": f"{snap.address[node]} is already stamped {endings.get(stamp['kind'], stamp['kind'])}; "
-                         "reopen() it first to change that"}
-    # a dead lead or off-topic card may be empty: that's often why it ends; "resolved" needs research
-    if kind == "resolved" and not snap.rows[node].messages and not snap.children.get(node):
-        what = "a merge nobody has asked yet: ask it to compare its sources" if node in snap.sources else "empty"
-        return {"error": f"{snap.address[node]} is {what}. Resolve a line once it holds research, not before."}
+    shape = (getattr(snap.rows[node], "tag", None) or {}).get("shape", "flag")  # he sets the colour; the shape stays
     async with database.AsyncSessionLocal() as db, db.begin():
         await _as_user(db, run.user_id)
-        await _resolving().resolve(db, await db.get(Node, node), run.user_id, "gent", kind)
+        (await db.get(Node, node)).tag = None if color == "none" else {"shape": shape, "color": color}
     run.emit("tree", {})
     snap, here = await _here(run)
-    return {"cwd": _ref(snap, here), "resolved": {**_ref(snap, node), "kind": kind}}
+    return {"cwd": _ref(snap, here), "tagged": {**_ref(snap, node), "color": color}}
 
 
 async def reopen(run: Run, card=".") -> dict:
@@ -1112,7 +1107,7 @@ async def get_todo(run: Run) -> dict:
     return {"notes": print_notes(run.notes)}
 
 
-_HANDLERS = {f.__name__: f for f in (cd, ls, cat, tree, search, ask, wait, branch, merge, rm, compact, resolve,
+_HANDLERS = {f.__name__: f for f in (cd, ls, cat, tree, search, ask, wait, branch, merge, rm, compact, tag,
                                      reopen, selected, sources, search_sources, add_source,
                                      think,
                                      todo_add, todo_tick, todo_edit, todo_delete, get_todo, ask_user, answer_question)}

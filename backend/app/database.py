@@ -123,6 +123,7 @@ _ADDED_COLUMNS = [
     # Compact and resolve (app/resolving.py): the Compacted card's type, and a resolved card's stamp
     "ALTER TYPE node_type ADD VALUE IF NOT EXISTS 'compact'",
     "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS resolved jsonb",
+    "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tag jsonb",
     # Gent's conversations (app/agent/thread.py): one thread per user per project, its Field Notes, and the
     # events of every run in order (notes, tools, answers, replies), replayed by the client to rebuild the chat.
     """CREATE TABLE IF NOT EXISTS gent_threads (

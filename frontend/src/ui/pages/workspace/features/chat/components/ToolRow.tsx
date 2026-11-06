@@ -32,6 +32,7 @@ export const TOOL_ICON: Record<string, string> = {
   // closing a direction: compacting a card's thread, resolving its branch, reopening it
   compact: "compress",
   resolve: "verified",
+  tag: "flag",
   reopen: "undo",
   // a card's research
   search_papers: "library_books",

@@ -15,4 +15,14 @@ describe("nodes api: compact, resolve, reopen", () => {
     await createNodesApi(client).resolve("n1", "dead_lead");
     expect(calls.map((c) => c.data)).toEqual([JSON.stringify({ kind: "resolved" }), JSON.stringify({ kind: "dead_lead" })]);
   });
+
+  it("tag PUTs the shape and colour, untag DELETEs", async () => {
+    const { client, calls } = recordingClient({});
+    await createNodesApi(client).tag("n1", { shape: "pin", color: "slate" });
+    await createNodesApi(client).untag("n1");
+    expect(calls).toEqual([
+      { method: "put", url: "/nodes/n1/tag", data: JSON.stringify({ shape: "pin", color: "slate" }) },
+      { method: "delete", url: "/nodes/n1/tag", data: undefined },
+    ]);
+  });
 });

@@ -2,7 +2,7 @@
 looks at the run and, when it applies, says something. Two moments:
 - before a turn: Gent hears it before his next move (the Field Notes check-in, how deep the research has gone);
 - at a finish: Gent tried to stop, and the reply is sent back with the reason (open tasks, up to three times;
-  leaves no resolved branch covers, twice; answers still coming or a reply too long for the chat, once).
+  answers still coming or a reply too long for the chat, once).
 
 Rules are plain functions over `Nudges` (the per-run counters), so a new nudge is one function added to a list. Every
 nudge also goes to the client as a `nudge` event, which the user can choose to see (Settings: Show Gent's nudges).
@@ -21,8 +21,7 @@ DEPTH_EVERY = 2  # layers below the start card between depth reminders
 DEPTH_LIMIT = 8  # from here on, every new layer: get to a stopping point
 REPLY_CHARS = 600  # a final reply longer than this is sent back once: the research belongs in the tree
 OPEN_NOTES_TIMES = 3  # finishing with open tasks is sent back this many times; then he may stop (no endless loop)
-UNRESOLVED_TIMES = 3  # finishing with leaves that have no ending: sent back this many times
-UNRESOLVED_LIST = 8  # leaves named in the nudge; the rest are counted
+LIST_MAX = 8  # cards named in a nudge
 
 CHECK_IN = ("Field Notes check: you are on {id} \"{text}\". If it is done, todo_tick() it off now; if the plan changed, "
             "edit, add or delete tasks to match. Then carry on.")
@@ -32,16 +31,10 @@ DEPTH_STOP = ("You are {layers} layers below where you started ({start}). You sh
               "finish the branch you are in, then merge what you have and synthesise.")
 OPEN_NOTES = ("You haven't finished: these tasks are still open: {open}. Work on them now, or todo_tick() off the ones that "
               "are done and todo_delete() the ones you've dropped. Only finish when nothing is open.")
-OPEN_NOTES_LAST = ("Still open: {open}. This is the last reminder. Finish each of them, or resolve or delete it and "
+OPEN_NOTES_LAST = ("Still open: {open}. This is the last reminder. Finish each of them, or delete it and "
                    "say why in your reply.")
-UNRESOLVED = ("These leaves of yours have no ending: {leaves}. Every leaf needs one before you finish. For each: if "
-              "its answer is missing or only restates the question, ask it again; if its line matters and isn't done, "
-              "dig further under it; otherwise mark how it ended with resolve(card, kind): resolved if it answered what "
-              "it was asked, dead_lead if it led nowhere, off_topic if it doesn't bear on the question.")
-UNRESOLVED_LAST = ("Still no ending: {leaves}. Last reminder: give each one an ending (dig, or resolve(card, kind) as "
-                   "resolved, dead_lead or off_topic) before you finish.")
 UNEXPLORED = ("These survey branches were never followed up: {cards}. Each mapped part of the question; ask what it "
-              "raised in branches under it, or resolve(card, kind=\"off_topic\") the ones that don't matter for the answer.")
+              "raised in branches under it, or leave out the ones that don't matter for the answer.")
 MIN_GENERATIONS = 3  # survey, directions, follow-ups: a question asked under one he asked is the next generation
 SHALLOW = ("Your answers are in, but your research is only {gens} layer(s) of questions deep (the deepest: {cards}). "
            "Read them critically and decide what each raises that matters for the question (a claim to check, a gap, "
@@ -190,26 +183,11 @@ def open_notes(run: tools.Run, n: Nudges, reply: str) -> Optional[str]:
     return (OPEN_NOTES_LAST if last else OPEN_NOTES).format(open="; ".join(still_open))
 
 
-def unresolved(run: tools.Run, n: Nudges, reply: str) -> Optional[str]:
-    """Finishing research with leaves no resolved branch covers. Only after he has worked the tree this run, so a
-    one-line answer to a greeting isn't sent back."""
-    if n.snap is None or not (run.asked or run.opened):
-        return None
-    mine = run.asked | run.opened  # his own cards this task: leaves the user made aren't his to resolve
-    leaves = [a for a in tools.unresolved_leaves(n.snap) if n.snap.by_address.get(a) in mine]
-    if not leaves:
-        return None
-    named = ", ".join(leaves[:UNRESOLVED_LIST]) + (f" and {len(leaves) - UNRESOLVED_LIST} more"
-                                                    if len(leaves) > UNRESOLVED_LIST else "")
-    last = n.said.get("unresolved", 0) == UNRESOLVED_TIMES - 1
-    return (UNRESOLVED_LAST if last else UNRESOLVED).format(leaves=named)
-
-
 def awaiting_user(run: tools.Run, n: Nudges, reply: str) -> Optional[str]:
-    # after tree work only, like unresolved: a greeting isn't sent back to wait
+    # after tree work only: a greeting isn't sent back to wait
     if n.snap is None or not (run.asked or run.opened) or not (cards := tools.waiting_questions(n.snap)):
         return None
-    return AWAITING_USER.format(cards=", ".join(cards[:UNRESOLVED_LIST]))
+    return AWAITING_USER.format(cards=", ".join(cards[:LIST_MAX]))
 
 
 def unasked_merge(run: tools.Run, n: Nudges, reply: str) -> Optional[str]:
@@ -231,8 +209,8 @@ def too_long(run: tools.Run, n: Nudges, reply: str) -> Optional[str]:
 
 AT_FINISH: list[Callable[[tools.Run, Nudges, str], Optional[str]]] = [still_asking, awaiting_user, unasked_merge,
                                                                        shallow_finish, unexplored, open_notes,
-                                                                       unresolved, too_long]
-TIMES = {"open_notes": OPEN_NOTES_TIMES, "unresolved": UNRESOLVED_TIMES, "awaiting_user": AWAITING_USER_TIMES}  # how often each may send him back; the rest once
+                                                                       too_long]
+TIMES = {"open_notes": OPEN_NOTES_TIMES, "awaiting_user": AWAITING_USER_TIMES}  # how often each may send him back; the rest once
 
 
 def before_turn(run: tools.Run, n: Nudges) -> list[tuple[str, str]]:

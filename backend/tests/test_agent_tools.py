@@ -34,6 +34,7 @@ def rows_of(nodes: list[dict]) -> tuple[dict, list]:
         id=n["id"], parent_id=n["parent"], title=n.get("title", n["id"].upper()), summary=n.get("summary"),
         model=n.get("model"), fork_index=n["fork"], created_at=n.get("created_at", ""), messages=n.get("messages", 0),
         gent_asks=n.get("gent_asks", 0), node_type=n.get("node_type"), resolved=n.get("resolved"),
+        tag=n.get("tag"),
     ) for n in nodes}
     links = [(n["id"], s) for n in nodes for s in n.get("merge_source_ids", [])]
     return rows, links
@@ -339,10 +340,7 @@ def test_which_resolved_branch_a_card_is_in():
     assert tools.resolved_over(snap, "k") == "a"  # resolve is a marker: everything under a is in its branch
     assert tools.resolved_over(snap, "b") is None
     assert tools.settled(snap, "k") and tools.settled(snap, "a1") and not tools.settled(snap, "b")
-    assert tools.unresolved_leaves(snap) == ["1.2.1"]  # a1 and k are under a; q is an unanswered question
-    assert tools.waiting_questions(snap) == ["1.2.1"]
-    snap = tree(*RESOLVED, N("b2", "b", 2))
-    assert tools.unresolved_leaves(snap) == ["1.2.1", "1.2.2"]
+    assert tools.waiting_questions(snap) == ["1.2.1"]  # a1 and k are under a; q is an unanswered question
 
 
 @pytest.fixture
@@ -354,10 +352,6 @@ def resolving(monkeypatch):
         calls.append(("compact", node, model))
         return SimpleNamespace(id="k")
 
-    async def resolve(db, node, user_id, by, kind="resolved"):
-        calls.append(("resolve", node, by, kind))
-        return node
-
     async def reopen(db, node, user_id):
         calls.append(("reopen", node))
 
@@ -365,7 +359,7 @@ def resolving(monkeypatch):
         calls.append(("reopen_for_work", node_id))
         return ["a"]
 
-    fake = SimpleNamespace(compact=compact, resolve=resolve, reopen=reopen, reopen_for_work=reopen_for_work,
+    fake = SimpleNamespace(compact=compact, reopen=reopen, reopen_for_work=reopen_for_work,
                            conclusion=lambda node, limit=400: "the conclusion")
     monkeypatch.setattr(tools, "_resolving", lambda: fake)
 
@@ -401,14 +395,10 @@ def test_resolved_cards_show_their_conclusion_and_visiting_one_nudges(gent, reso
     assert asyncio.run(tools.call_tool(run, "cd", {"to": "1.1"}))["resolved"] == {"by": "gent", "kind": "resolved"}
 
 
-def test_compact_resolve_and_reopen_call_the_service(gent, resolving):
+def test_compact_and_reopen_call_the_service(gent, resolving):
     run, state = gent.run, gent.state
     state["snap"] = tree(*RESOLVED)
     run.notes = [{"id": "n1", "text": "dig", "done": False}]
-    assert asyncio.run(tools.call_tool(run, "resolve", {"card": "1.1"}))["error"].startswith("1.1 is already stamped Resolved")
-    done = asyncio.run(tools.call_tool(run, "resolve", {"card": "1.2"}))
-    assert done["resolved"]["address"] == "1.2" and ("resolve", "b", "gent", "resolved") in resolving
-    assert not any(c[0] == "compact" for c in resolving)  # a marker: resolving doesn't compact
     made = asyncio.run(tools.call_tool(run, "compact", {"card": "1.2"}))
     assert made["cwd"]["address"] == "1.1.2" and made["compacted"]["address"] == "1.2"
     back = asyncio.run(tools.call_tool(run, "reopen", {"card": "1.1"}))
@@ -460,21 +450,55 @@ def test_a_question_card_is_answered_not_asked(gent):
     assert "is a question card" in out["error"] and not gent.asked
 
 
-def test_an_empty_card_cant_be_resolved(gent, resolving):
-    gent.state["snap"] = tree(*RESOLVED)
-    assert "empty" in asyncio.run(tools.call_tool(gent.run, "resolve", {"card": "1.1.1"}))["error"]
-
-
-def test_a_branch_can_end_as_a_dead_lead_even_empty_and_visiting_it_says_so(gent, resolving):
-    run = gent.run
-    gent.state["snap"] = tree(*BASIC)
-    assert "kind must be" in asyncio.run(tools.call_tool(run, "resolve", {"card": "1.2", "kind": "meh"}))["error"]
-    out = asyncio.run(tools.call_tool(run, "resolve", {"card": "1.2", "kind": "dead_lead"}))
-    assert out["resolved"]["kind"] == "dead_lead" and ("resolve", "b", "gent", "dead_lead") in resolving
-    gent.state["snap"] = tree(*BASIC[:2], N("b", "r", 2, resolved={"by": "gent", "at": "t", "kind": "dead_lead"}),
+def test_visiting_a_dead_lead_the_user_stamped_says_so(gent):
+    gent.state["snap"] = tree(*BASIC[:2], N("b", "r", 2, resolved={"by": "user", "at": "t", "kind": "dead_lead"}),
                               BASIC[3])
-    went = asyncio.run(tools.call_tool(run, "cd", {"to": "1.2.1"}))
-    assert "dead lead" in went["nudges"][0]["text"] and tools.unresolved_leaves(gent.state["snap"]) == ["1.1"]
+    went = gent.call("cd", to="1.2.1")
+    assert "dead lead" in went["nudges"][0]["text"]
+
+
+@pytest.fixture
+def tagging(monkeypatch):
+    """The node rows the tag tool writes to, by id (the session is faked)."""
+    nodes = {}
+
+    class Tx:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        def begin(self):
+            return self
+
+        async def get(self, model, node_id):
+            return nodes.setdefault(node_id, SimpleNamespace(tag=None))
+
+        async def execute(self, *a, **k):
+            return None
+
+    monkeypatch.setattr(tools.database, "AsyncSessionLocal", lambda: Tx())
+    return nodes
+
+
+def test_tag_pins_a_colour_keeps_the_shape_and_none_takes_it_off(gent, tagging):
+    gent.state["snap"] = tree(*BASIC[:2], N("b", "r", 2, tag={"shape": "pin", "color": "sage"}), BASIC[3])
+    assert "color must be" in gent.call("tag", card="1.2", color="red")["error"]
+    out = gent.call("tag", card="1.2", color="plum")
+    assert out["tagged"]["address"] == "1.2" and out["tagged"]["color"] == "plum"
+    assert tagging["b"].tag == {"shape": "pin", "color": "plum"}  # he sets the colour; the shape stays
+    gent.call("tag", card="1.1", color="slate")
+    assert tagging["a"].tag == {"shape": "flag", "color": "slate"}  # untagged: a flag
+    gent.call("tag", card="1.2", color="none")
+    assert tagging["b"].tag is None and ("tree", {}) in gent.events
+
+
+def test_tags_show_in_ls_tree_and_arriving(gent):
+    gent.state["snap"] = tree(*BASIC[:1], N("a", "r", 1, messages=2, tag={"shape": "flag", "color": "sage"}), *BASIC[2:])
+    assert next(b for b in gent.call("ls")["branches"] if b["address"] == "1.1")["tag"] == "sage"
+    assert "  1.1 A [answered, tagged sage]" in gent.call("tree")["tree"].split("\n")
+    assert gent.call("cd", to="1.1")["tag"] == "sage" and "tag" not in gent.call("cd", to="1.2")
 
 
 def test_a_merge_is_a_branch_of_every_source_and_dotdot_goes_back_the_way_in(gent):
@@ -533,7 +557,6 @@ def test_source_tools_go_through_the_paper_service(gent, monkeypatch):
 
 def test_a_card_that_feeds_a_merge_is_never_a_leaf(gent):
     gent.state["snap"] = snap = tree(*BASIC, N("m", "a", 3, merge_source_ids=["a", "c"]))
-    assert tools.unresolved_leaves(snap) == ["J1"]  # 1.1 and 1.2.1 feed J1: only the merge is a leaf
     out = gent.call("merge", nodes=["1.2.1", "1.1"])
     assert "Only leaves can be merged" in out["error"] and "1.2.1 has branches (J1)" in out["error"]
 
@@ -579,7 +602,7 @@ def test_splitting_the_start_card_again_is_refused(gent):
     assert "error" not in gent.call("bulk_ask", under="1.1", questions=["Deeper?"])
 
 
-def test_tree_outlines_every_card_with_its_state_and_the_open_leaves(gent):
+def test_tree_outlines_every_card_with_its_state(gent):
     gent.state["snap"] = tree(N("r", None, 0), N("a", "r", 1, messages=2, title="Speakers"),
                               N("b", "r", 2, resolved={"by": "gent", "at": "t", "kind": "dead_lead"}),
                               N("c", "b", 1, messages=2), N("d", "r", 3), N("m", "a", 4, merge_source_ids=["a", "d"]))
@@ -588,8 +611,8 @@ def test_tree_outlines_every_card_with_its_state_and_the_open_leaves(gent):
     lines = out["tree"].split("\n")
     assert lines[0].startswith("1 R [empty, you are here]")
     assert "  1.1 Speakers [answered]" in lines
-    assert "  1.2 B [empty, dead lead]" in lines and "    1.2.1 C [answered]" in lines  # under a dead lead: settled
-    assert "  1.3 D [answering…]" in lines  # feeds J1: not a leaf, so not open
-    assert "    J1 M [empty, OPEN, merges 1.1 + 1.3]" in lines and out["tree"].count("J1") == 1  # listed once
-    assert out["open_leaves"] == ["J1"] and out["cards"] == 6
+    assert "  1.2 B [empty, dead lead]" in lines and "    1.2.1 C [answered]" in lines
+    assert "  1.3 D [answering…]" in lines
+    assert "    J1 M [empty, merges 1.1 + 1.3]" in lines and out["tree"].count("J1") == 1  # listed once
+    assert out["cards"] == 6
     assert gent.call("tree", under="1.2")["tree"].split("\n")[0] == "1.2 B [empty, dead lead]"

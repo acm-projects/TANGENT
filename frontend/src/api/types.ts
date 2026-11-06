@@ -89,7 +89,18 @@ export interface NodeMeta {
   /** How the card's branch ended: a marker that it is settled, who set it and how (no kind: resolved; backend
    * app/resolving.py). */
   resolved?: { by: "user" | "gent"; at: string; kind?: Ending } | null;
+  /** The card's coloured tag (backend nodes.tag); the colours carry no fixed meaning. */
+  tag?: NodeTag | null;
 }
+
+export type TagColor = "ochre" | "sage" | "slate" | "plum";
+export type TagShape = "flag" | "pin";
+export interface NodeTag {
+  shape: TagShape;
+  color: TagColor;
+}
+/** Mid-tones that hold ~3:1 on paper and on the dark board; graphics only, never text colour. */
+export const TAG_HEX: Record<TagColor, string> = { ochre: "#d19a2a", sage: "#6f9a78", slate: "#5f86b3", plum: "#9a6a94" };
 
 /** How a branch can end (backend ENDINGS): only "resolved" found something. */
 export type Ending = "resolved" | "dead_lead" | "off_topic";

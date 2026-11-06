@@ -4,18 +4,20 @@ import { createContext, memo, useCallback, useContext, useEffect, useRef, useSta
 import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
 import { ENDING_LABELS } from "@/api/types";
-import type { Ending } from "@/api/types";
+import type { Ending, NodeTag } from "@/api/types";
 import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
 import { StartDebate } from "../../debate/components/StartDebate";
 import { SharePanel } from "../../toolbar/components/SharePanel";
-import { compactNode, confirmedForks, deleteNode, forkNode, isPending, loadChats, reopenNode, resetProject, resolveNode } from "../nodeActions";
+import { compactNode, confirmedForks, deleteNode, forkNode, isPending, loadChats, reopenNode, resetProject, resolveNode, tagNode } from "../nodeActions";
 import type { MindMapFlowNode } from "../toFlow";
 import { useDragAction } from "./DragAction";
 import { MarkMenu } from "./MarkMenu";
 import { QuestionPrompt } from "./QuestionPrompt";
+import { TagMark } from "./TagMark";
+import { TagPicker } from "./TagPicker";
 
 /* One node on the map (Figma "Node": Default / Path / Selected / Hover, with
  * optional PDF and image tags): a card pinned to the board. A real <button>, so
@@ -69,6 +71,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const [pinned, setPinned] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [debating, setDebating] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const release = () => {
     setPinned(false);
     setPeeled(false);
@@ -195,12 +198,20 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     setSharing(true);
   };
 
+  const openTag = (e: MouseEvent) => {
+    e.stopPropagation();
+    release();
+    setTagging(true);
+  };
+  const tag = (next: NodeTag | null) => act(() => tagNode(id, next), "Could not tag this card.")();
+
   // Listed bottom-up. Merging has its own button in the tray.
   const moreOptions = [
     isRoot
       ? { icon: "restart_alt", label: "Reset project", disabled: blankRoot, onClick: requestDelete }
       : { icon: "delete", label: "Delete", onClick: requestDelete },
     { icon: "ios_share", label: "Share branch", disabled: !project, onClick: openShare },
+    { icon: "flag", label: "Tag", disabled: busy, onClick: openTag },
   ];
   // How the branch ended. In the tray's fan they're listed bottom-up: Resolved nearest the button.
   const endingOptions = (["resolved", "dead_lead", "off_topic"] as const).map((kind) => ({
@@ -275,6 +286,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           data-question={data.question || undefined}
           data-compact={data.compact || undefined}
           data-ending={data.ending ?? undefined}
+          data-tagged={data.tag ? true : undefined}
           data-thinking={thinking || summing || undefined}
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
@@ -298,6 +310,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               </motion.span>
             )}
           </AnimatePresence>
+          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged ${data.tag.color}`} />}
           {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
           {data.compact && (
             <>
@@ -465,6 +478,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       <Popup open={sharing} onClose={() => setSharing(false)} title={`"${data.title}"`}>
         {/* Mounted only while open: the panel loads this branch's shares when it mounts. */}
         {sharing && project && <SharePanel {...project} branchNodeId={id} onClose={() => setSharing(false)} />}
+      </Popup>
+      <Popup open={tagging} onClose={() => setTagging(false)} title="Tag this card">
+        {/* Mounted only while open, so the shape starts from the card's tag each time. */}
+        {tagging && <TagPicker tag={data.tag} onTag={tag} onClose={() => setTagging(false)} />}
       </Popup>
       <Popup open={debating} onClose={() => setDebating(false)} title={`Bring "${data.title}" to court`}>
         {/* Mounted only while open, so the form starts fresh each time. */}

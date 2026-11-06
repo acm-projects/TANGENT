@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { AnswerResult, CompactResult, Ending, ForkedNode, Node, ResolveResult, SplitResult } from "../types";
+import type { AnswerResult, CompactResult, Ending, ForkedNode, Node, NodeTag, ResolveResult, SplitResult } from "../types";
 
 /** /nodes/* -- a single node with its chats, plus forking and merging. */
 export function createNodesApi({ http }: ApiClient) {
@@ -30,6 +30,10 @@ export function createNodesApi({ http }: ApiClient) {
       http.post<ResolveResult>(`/nodes/${nodeId}/resolve`, { kind }).then((r) => r.data),
     /** Reopen a resolved card: the stamp comes off. */
     reopen: (nodeId: string) => http.post<ResolveResult>(`/nodes/${nodeId}/reopen`).then((r) => r.data),
+    /** Pin a coloured tag on the card. */
+    tag: (nodeId: string, tag: NodeTag) => http.put<ResolveResult>(`/nodes/${nodeId}/tag`, tag).then((r) => r.data),
+    /** Take the card's tag off. */
+    untag: (nodeId: string) => http.delete<ResolveResult>(`/nodes/${nodeId}/tag`).then((r) => r.data),
     /** Deletes the node and its whole subtree (the root refuses: 409). */
     delete: (nodeId: string) => http.delete(`/nodes/${nodeId}`).then(() => undefined),
     /** Stops the caller's reply streaming on this node; the stream then ends with `done {stopped: true}`. */

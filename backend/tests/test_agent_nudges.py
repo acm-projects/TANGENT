@@ -78,7 +78,7 @@ def test_finish_nudges_go_in_order_open_tasks_three_times_the_rest_once():
 def test_rules_are_registered():
     assert [f.__name__ for f in nudges.BEFORE_TURN] == ["check_in", "depth", "shallow"]
     assert [f.__name__ for f in nudges.AT_FINISH] == ["still_asking", "awaiting_user", "unasked_merge", "shallow_finish", "unexplored",
-                                                     "open_notes", "unresolved", "too_long"]
+                                                     "open_notes", "too_long"]
 
 
 def test_splitting_again_from_the_start_or_above_is_nudged_after_the_first_split():
@@ -91,26 +91,6 @@ def test_splitting_again_from_the_start_or_above_is_nudged_after_the_first_split
     assert nudges.after_move(n, "branch", split("1.3")) == ("back_up", nudges.BACK_UP.format(at="1"))  # its parent
     assert nudges.after_move(n, "bulk_ask", split("1.3")) is None  # a sibling of the start isn't above it
     assert nudges.after_move(n, "ls", split("1")) is None
-
-
-def test_finishing_with_unresolved_leaves_is_sent_back_three_times_after_tree_work():
-    from types import SimpleNamespace
-
-    def row(id, parent, fork, **extra):
-        return SimpleNamespace(id=id, parent_id=parent, title=id, summary=None, model=None, fork_index=fork,
-                               created_at=f"t{fork}", messages=0, gent_asks=0, node_type=extra.get("node_type"),
-                               resolved=extra.get("resolved"))
-
-    rows = [row("r", None, 0), row("a", "r", 1, resolved={"by": "user", "at": "t"}),
-            row("k", "a", 1, node_type="compact"), row("b", "r", 2)]
-    snap = tools.build_snapshot({x.id: x for x in rows}, [])
-    r, n = run(), nudges.Nudges(snap=snap)
-    assert nudges.at_finish(r, n, "hi") is None  # no tree work this run: a greeting isn't sent back
-    r.asked.add("b")
-    assert nudges.at_finish(r, n, "done") == ("unresolved", nudges.UNRESOLVED.format(leaves="1.2"))
-    assert nudges.at_finish(r, n, "done") == ("unresolved", nudges.UNRESOLVED.format(leaves="1.2"))
-    assert nudges.at_finish(r, n, "done") == ("unresolved", nudges.UNRESOLVED_LAST.format(leaves="1.2"))
-    assert nudges.at_finish(r, n, "done") is None
 
 
 def test_shallow_research_is_told_to_go_deeper_and_cant_finish_until_three_generations():
@@ -156,7 +136,7 @@ def test_unanswered_question_cards_send_him_back_to_wait_for_the_user():
     assert nudges.at_finish(r, n, "hi") is None  # no work this run: a greeting isn't sent back
     r.opened.add("q")
     told = [nudges.at_finish(r, n, "done") for _ in range(4)]
-    assert [t[0] if t else None for t in told] == ["awaiting_user"] * 3 + ["unresolved"]
+    assert [t[0] if t else None for t in told] == ["awaiting_user"] * 3 + [None]
     assert "wait(for=\"question\")" in told[0][1] and "1.1" in told[0][1]
 
 
