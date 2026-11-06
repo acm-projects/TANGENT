@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import text, update
+from sqlalchemy import func, text, update
+from sqlalchemy.orm import aliased
 from sqlalchemy.future import select
 
 from app import database
@@ -223,6 +224,16 @@ async def branch_node(node_id, title=None, *, project_id: UUID, user_id: UUID) -
                 "title": child.title}
 
 
+async def _empty_twin(db, parent_id, title: str):
+    """An empty leaf under `parent_id` with this title (made earlier with branch_node): write_node fills it instead of
+    leaving it empty beside a copy."""
+    child = aliased(Node)
+    return (await db.execute(
+        select(Node).where(Node.parent_id == parent_id, func.lower(Node.title) == title.lower(),
+                           func.jsonb_array_length(Node.chats) == 0, ~select(child.id).where(child.parent_id == Node.id).exists())
+        .order_by(Node.fork_index).limit(1))).scalars().first()
+
+
 async def write_node(parent_id, title, body, *, project_id: UUID, user_id: UUID) -> dict:
     # shortcut: citations stay plain inline [pN:cM] text, nothing checks them against tool results; add if hallucinated ids show up
     title, body = _title(title), (body or "").strip()
@@ -234,9 +245,13 @@ async def write_node(parent_id, title, body, *, project_id: UUID, user_id: UUID)
         now = datetime.now(timezone.utc).isoformat()
         chats = [{"role": "user", "content": title, "seq": 0, "created_at": now},
                  {"role": "assistant", "content": body, "seq": 1, "created_at": now}]
-        child = await nodes_router._create_child(
-            db, tree_id=parent.tree_id, project_id=project_id, parent_id=parent.id, user_id=user_id, chats=chats)
-        child.title = title
+        child = await _empty_twin(db, parent.id, title)
+        if child:
+            child.chats = chats
+        else:
+            child = await nodes_router._create_child(
+                db, tree_id=parent.tree_id, project_id=project_id, parent_id=parent.id, user_id=user_id, chats=chats)
+            child.title = title
         await db.commit()
         return {"node_id": str(child.id), "parent_id": str(parent.id), "fork_index": child.fork_index,
                 "title": child.title}

@@ -119,7 +119,6 @@ def test_finish_requires_closed_tasks_and_an_honest_outcome():
     assert ops.check(state([task("t1", "skipped", reason="x")], ev), "finish_research", {**fin, "outcome": "inconclusive"})
     rejects(state(done, ev), "finish_research", {**fin, "outcome": "blocked"}, "blocked needs")
     assert ops.check(state([*done, task("t2", "failed")], ev), "finish_research", {**fin, "outcome": "blocked"})
-    rejects(state(done, [step(name="write_node", result={"node_id": NODE})]), "finish_research", fin, "never appeared")
 
 
 def test_only_one_question_at_a_time():
@@ -190,7 +189,8 @@ def test_the_agents_own_written_nodes_are_not_evidence_for_its_conclusion():
     fin = {"outcome": "partially_satisfied", "summary": "RL looks promising in simulation, deployment evidence is thin.",
            "evidence": [NODE]}
     wrote = state([task("t1", "completed")], [step(name="write_node", result={"node_id": NODE})])
-    rejects(wrote, "finish_research", fin, "never appeared")
+    out = ops.check(wrote, "finish_research", fin)  # dropped, not fatal: nothing was read, so no evidence is needed
+    assert out.evidence == [] and "Dropped 1 evidence" in out.limitations[-1]
     # the node it wrote can still back a task's findings, and a node it read can back the conclusion
     assert ops.check(state([task("t1", "in_progress")], [step(name="write_node", result={"node_id": NODE})]),
                      "complete_task", DONE)
@@ -376,7 +376,22 @@ def test_a_node_the_agent_wrote_is_not_evidence_even_after_it_reads_it_back():
     steps = [step(name="write_node", result={"node_id": mine}), step(name="search_nodes", result={"results": [{"node_id": mine}, {"node_id": NODE}]}), WEB]
     st = state([task("t1", "completed")], steps)
     fin = {"outcome": "partially_satisfied", "summary": "The comparison is written up; the costs are not established.", "evidence": [mine]}
-    rejects(st, "finish_research", fin, "never appeared")
+    rejects(st, "finish_research", fin, "do not count as evidence")  # only its own node cited, and sources were read
     assert ops.check(st, "finish_research", {**fin, "evidence": [NODE, URL]})
     # it may still back a task's findings (where the findings were recorded)
     assert mine in st.refs() and mine not in st.refs(reads_only=True) and NODE in st.refs(reads_only=True)
+
+
+def test_finish_drops_unverified_refs_and_falls_back_to_the_sources_the_tasks_cited():
+    # the S1 live failure: the model listed only its own nodes as evidence, 4 times, and the run failed after 42 steps
+    mine = "33333333-3333-4333-8333-333333333333"
+    cited = {"findings": "x", "node_refs": [], "source_refs": [URL, "https://never.example/seen"], "satisfied": True, "unresolved": []}
+    st = state([task("t1", "completed", assessment=cited)], [WEB, step(name="write_node", result={"node_id": mine})])
+    out = ops.check(st, "finish_research", {**FIN, "evidence": [mine]})
+    assert out.evidence == [URL]  # the unverifiable source is not borrowed either
+    assert "Dropped 1 evidence" in out.limitations[-1]
+    # a valid ref stays and nothing is dropped
+    assert ops.check(st, "finish_research", FIN).limitations == []
+    # no valid ref anywhere is still refused
+    rejects(state([task("t1", "completed")], [WEB, step(name="write_node", result={"node_id": mine})]), "finish_research",
+            {**FIN, "evidence": [mine]}, "Cite the sources")

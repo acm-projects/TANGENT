@@ -144,7 +144,7 @@ class RequestUserInput(BaseModel):
 class FinishResearch(BaseModel):
     outcome: Literal["satisfied", "partially_satisfied", "inconclusive", "blocked"]
     summary: str = Field(min_length=30, max_length=6000)
-    evidence: list[str] = Field(default_factory=list, max_length=30, description="Node ids and evidence ids behind the summary")
+    evidence: list[str] = Field(default_factory=list, max_length=30, description="Web URLs and source/evidence ids you retrieved with a search or read; not nodes you wrote")
     limitations: list[str] = Field(default_factory=list, max_length=8)
     unresolved_questions: list[str] = Field(default_factory=list, max_length=8)
 
@@ -326,7 +326,8 @@ def _new_tasks(state: State, tasks: list[TaskIn]) -> None:
         pending.append(f"t{len(state.tasks) + i + 1}")
 
 
-def _cited(state: State, refs: list[str], reads_only: bool = False) -> None:
+def _unverified(state: State, refs: list[str], reads_only: bool = False) -> tuple[list[str], set[str], list[str]]:
+    """(refs the run never retrieved, the refs it did, the retrieved URLs)"""
     seen = state.refs(reads_only)
     urls = [s for s in seen if s.startswith("http")]
 
@@ -340,7 +341,11 @@ def _cited(state: State, refs: list[str], reads_only: bool = False) -> None:
         site = re.sub(r"^https?://(www\.)?", "", ref).rstrip("/")
         return "." in site and any(site in u for u in urls)
 
-    missing = [r for r in refs if not known(r)]
+    return [r for r in refs if not known(r)], seen, urls
+
+
+def _cited(state: State, refs: list[str], reads_only: bool = False) -> None:
+    missing, seen, urls = _unverified(state, refs, reads_only)
     if missing:
         sample = [*urls[:3], *(s for s in seen if not s.startswith("http"))][:5]
         raise OpError("These ids never appeared in a tool result of this run: " + ", ".join(missing[:5])
@@ -432,11 +437,21 @@ def check(state: State, name: str, args: dict, forced: bool = False):
                 t["assessment"] and (not t["assessment"]["satisfied"] or t["assessment"]["unresolved"]) for t in done)):
             raise OpError("satisfied needs no unresolved questions and every completed task satisfied; "
                           "use partially_satisfied and list what is still open.")
+        # A finished run is never thrown away over its reference list: refs that were not retrieved by a read (the model's own
+        # nodes, invented ids) are dropped and said so in limitations; with none left, the sources the completed tasks
+        # already cited (each verified when the task closed) stand in.
+        bad = _unverified(state, a.evidence, reads_only=True)[0]
+        if bad:
+            a.evidence = [r for r in a.evidence if r not in bad]
+            a.limitations = [*a.limitations[:7], f"Dropped {len(bad)} evidence reference(s) not retrieved by a read: {', '.join(bad[:3])}"]
+        if not a.evidence:
+            cited = dict.fromkeys(r for t in done for r in (t["assessment"] or {}).get("source_refs", []))
+            a.evidence = [r for r in cited if not _unverified(state, [r], reads_only=True)[0]][:30]
         if not forced and a.outcome != "inconclusive":
             if not any(s["kind"] == "tool" and s["status"] == "succeeded" and s["name"] == "write_node" for s in state.steps):
                 raise OpError("Write your findings into the tree with write_node before finishing.")
             if not a.evidence and any(s["kind"] == "tool" and s["status"] == "succeeded" and s["name"] in READ_ONLY
                                       for s in state.steps):
-                raise OpError("Cite the sources behind the summary in evidence: URLs, source ids or node ids you retrieved.")
-        _cited(state, a.evidence, reads_only=True)
+                raise OpError("Cite the sources behind the summary in evidence: the URLs or source ids from your searches "
+                              "(nodes you wrote yourself do not count as evidence).")
     return a

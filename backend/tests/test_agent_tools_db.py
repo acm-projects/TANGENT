@@ -111,6 +111,24 @@ def test_graph_tools_end_to_end(monkeypatch):
         assert "No passage matched" in run("search_sources", query="zebra")["message"]
 
 
+def test_write_node_fills_an_empty_leaf_of_the_same_title_instead_of_leaving_a_twin():
+    with TestClient(app) as c:
+        auth = sign_up(c)
+        me = c.get("/auth/me", headers=auth).json()
+        pid = c.post("/projects/", json={"project_name": "P", "workspace_id": _workspace_id(me["id"])}, headers=auth).json()["id"]
+        root = c.get(f"/projects/{pid}/tree", headers=auth).json()["tree"]["root_node_id"]
+        run = lambda name, **args: asyncio.run(tools.call_tool(name, args, UUID(pid), UUID(me["id"])))
+        leaf = run("branch_node", node_id=root, title="Installed cost")
+        heading = run("branch_node", node_id=root, title="Reliability")
+        run("write_node", parent_id=heading["node_id"], title="Child", body="under a heading")  # a heading with a child is not a leaf
+        filled = run("write_node", parent_id=root, title="installed COST", body="Costs [p1:c1]")
+        assert filled["node_id"] == leaf["node_id"]  # the empty leaf was filled, not copied
+        assert run("write_node", parent_id=root, title="Reliability", body="x")["node_id"] != heading["node_id"]
+        again = run("write_node", parent_id=root, title="Installed cost", body="Second")
+        assert again["node_id"] != leaf["node_id"]  # a filled leaf is never overwritten
+        assert run("get_node", node_id=leaf["node_id"])["title"] == "Installed cost"
+
+
 async def _add_upload(project_id: str, status: str) -> int:
     async with database.AsyncSessionLocal() as db:
         row = (await db.execute(text("""

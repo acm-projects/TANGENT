@@ -45,7 +45,7 @@ until you have written your findings with write_node (unless the outcome is inco
 branches read like an outline. If the user names a structure, build exactly that: parents before their children; \
 write_node returns the new node's node_id, which you pass as parent_id for its children (NODES YOU WROTE lists them with \
 their parents). A heading node that will only have children is made with branch_node and a title; a node meant to hold findings \
-is made with write_node (title and body), because no tool can fill an empty node afterwards. Make the plan follow the structure: give each branch of the tree its own task that researches it AND writes \
+is made with write_node (title and body). If you already made an empty node with branch_node, write_node with the same title under the same parent fills it; never leave a node empty or write a second copy. Create each node once. Make the plan follow the structure: give each branch of the tree its own task that researches it AND writes \
 its nodes, and write each finding as soon as you have it, in the task that found it, not all at the end. Each task gets \
 {research} research calls, so search once per question, not repeatedly. Do not branch, merge or delete unless the goal needs it. \
 Deleting needs the user's confirmation, which the system asks for itself.

@@ -130,6 +130,12 @@ def test_write_node_saves_the_agents_own_text_as_a_child(monkeypatch):
     monkeypatch.setattr(tools, "_node", find)
     monkeypatch.setattr(tools, "_require_owner", owner)
     monkeypatch.setattr(nodes_router, "_create_child", create_child)
+    twin = []
+
+    async def empty_twin(db, parent_id, title):
+        return twin[0] if twin else None
+
+    monkeypatch.setattr(tools, "_empty_twin", empty_twin)
 
     out = asyncio.run(tools.call_tool("write_node", {"parent_id": str(parent), "title": " Finding ", "body": " Text [p1:c2] "}, P, U))
     assert out["title"] == "Finding" and out["parent_id"] == str(parent)
@@ -138,3 +144,9 @@ def test_write_node_saves_the_agents_own_text_as_a_child(monkeypatch):
     for bad in ({"title": " ", "body": "x"}, {"title": "t", "body": " "}, {"title": "t", "body": "x" * 20_001}):
         assert "error" in asyncio.run(tools.call_tool("write_node", {"parent_id": str(parent), **bad}, P, U))
     assert len(created) == 1
+
+    # an empty leaf of that title already exists (the model made it with branch_node): it is filled, no twin is created
+    twin.append(SimpleNamespace(id=uuid.uuid4(), fork_index=3, title="Finding", chats=[]))
+    out = asyncio.run(tools.call_tool("write_node", {"parent_id": str(parent), "title": "finding", "body": "Filled"}, P, U))
+    assert out["node_id"] == str(twin[0].id) and out["fork_index"] == 3
+    assert [m["content"] for m in twin[0].chats] == ["finding", "Filled"] and len(created) == 1
