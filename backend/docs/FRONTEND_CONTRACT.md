@@ -130,3 +130,29 @@ Same framing as the chat endpoint: `event: <name>\ndata: <json>\n\n`, plus `id: 
   including after the debate finished (you get the replay then `done`).
 - Questions: when `question_requested` arrives, show it, then `POST /debates/{id}/answer`; the stream continues.
   Send the chosen option's text (or the user's own words) as the answer, never its position number.
+
+## Expiry
+
+`debates.expires_at` defaults to 7 days after start. A scheduled sweeper marks any debate still `queued`, `running` or
+`awaiting_input` past that as `failed` with `error_code: "expired"`. Finished debates and their nodes are not deleted;
+only the SSE event rows are purged, about 10 minutes after the debate ends.
+
+## The debate transcript
+
+`GET /debates/node/{node_id}/transcript` returns the whole debate, kept for as long as the node exists:
+
+```json
+{"debate_id": "...", "proposition": "...", "for_model": "...", "against_model": "...", "rounds": 2,
+ "transcript": [{"side": "for", "phase": "opening", "round": 0,
+                 "thinking": ["..."], "argument": "...", "claims": [...], "truncated": false}]}
+```
+
+In order: research, opening, rebuttal 1..N, closing, each phase with both sides. `claims` carry the ids that a
+branch's `from_claims` refers to.
+
+It is a call of its own because it runs to tens of KB and is only wanted when someone opens the replay. The card
+(`GET /debates/node/{node_id}`) carries `transcript_turns`, a count, so the UI knows whether there is one to show
+without fetching it. Nodes from before this release have `transcript_turns: 0` and a 200 with an empty `transcript`.
+
+This is not the SSE stream. `debate_events` is still purged about 10 minutes after a debate ends, so token-by-token
+replay is only possible while a debate is recent. The transcript is the permanent record.

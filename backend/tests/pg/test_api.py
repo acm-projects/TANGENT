@@ -77,7 +77,7 @@ def test_start_validates_models_rounds_ownership_and_limits(pg):
     q = Queue()
 
     async def go():
-        async with client(app_for(pg, q)) as c:
+        async with client(app_for(pg, q, max_active_per_user=2)) as c:
             r = await c.get("/debates/models", headers=H(a["user"]))
             assert [m["id"] for m in r.json()["models"]] == [m.id for m in MODELS] and r.json()["default"] == MODELS[0].id
             assert (await c.post("/debates", json=body(a), headers={})).status_code == 401
@@ -94,6 +94,7 @@ def test_start_validates_models_rounds_ownership_and_limits(pg):
             d = (await c.get(f"/debates/{r.json()['id']}", headers=H(a["user"]))).json()
             assert d["status"] == "queued" and d["for_model"] == d["against_model"] == "anthropic/claude-x" and r.json()["model_mode"] == "same"
             assert (await c.get(f"/debates/{r.json()['id']}", headers=H(b["user"]))).status_code == 404
+            # the cap is pinned to 2 by this test's settings, so it does not drift when the default changes
             assert (await c.post("/debates", json=body(a), headers=H(a["user"]))).status_code == 202
             assert (await c.post("/debates", json=body(a), headers=H(a["user"]))).status_code == 429
 
@@ -580,6 +581,50 @@ def test_branches_are_stored_on_the_result_and_returned_by_the_node_endpoint(pg)
             assert [b["id"] for b in got] == ["b1", "b2", "b3"]
             assert got[0]["title"] == "Delivery speed vs cost" and got[2]["kind"] == "debate"
             assert all(b["selected"] is False and b["created_node_id"] is None for b in got)
+    run(go())
+
+
+def test_the_debate_itself_survives_the_event_purge(pg):
+    """The card stays light; the whole debate is readable from its own endpoint, long after the events are gone."""
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            h = H(ids["user"])
+            # what the stream leaves behind is deleted, exactly as the sweeper does it; the debate must not be
+            assert await store.purge_finished_events(pg.factory, older_than_s=0) > 0
+
+            r = await c.get(f"/debates/node/{node}/transcript", headers=h)
+            assert r.status_code == 200
+            got = r.json()
+            assert got["debate_id"] == did and got["proposition"]
+            turns = got["transcript"]
+            assert turns, "the debate came back empty after the events were purged"
+            assert {t["side"] for t in turns} == {"for", "against"}
+            assert all(t["argument"] for t in turns)
+            assert [t["round"] for t in turns] == sorted(t["round"] for t in turns)
+
+            # the card still carries only a count, not the whole thing
+            card = (await c.get(f"/debates/node/{node}", headers=h)).json()
+            assert card["transcript_turns"] == len(turns)
+            assert "transcript" not in card
+
+            assert (await c.get(f"/debates/node/{uuid.uuid4()}/transcript", headers=h)).status_code == 404
+    run(go())
+
+
+def test_another_users_debate_transcript_is_not_readable(pg):
+    ids = seed(pg)
+    other = seed(pg)  # a different owner, with their own project
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            assert (await c.get(f"/debates/node/{node}/transcript", headers=H(ids["user"]))).status_code == 200
+            assert (await c.get(f"/debates/node/{node}/transcript", headers=H(other["user"]))).status_code == 404
     run(go())
 
 

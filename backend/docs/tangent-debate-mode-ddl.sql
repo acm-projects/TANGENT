@@ -259,4 +259,6 @@ CREATE POLICY debate_results_update_owner ON debate_results
           AND p.created_by_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
     ));
 
+ALTER TABLE debate_results ADD COLUMN IF NOT EXISTS transcript jsonb NOT NULL DEFAULT '[]'::jsonb;
+
 COMMIT;

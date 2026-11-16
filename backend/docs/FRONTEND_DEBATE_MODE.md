@@ -57,12 +57,21 @@ response includes a `fork` payload exactly like chat's. The client must switch t
 | `POST /debates/{id}/control` | Interrupt: `{action: "stop"}` or `{action: "pick_side", side: "for"\|"against"}` |
 | `POST /debates/{id}/cancel` | Abort and discard (no node is created) |
 | `GET /debates/node/{node_id}` | The structured verdict behind a debate node, plus its `branches`, for the card above its chat |
+| `GET /debates/node/{node_id}/transcript` | The whole debate behind a node: every turn, both sides. Kept for good |
 | `PATCH /debates/node/{node_id}/branches` | Tick/untick branch directions. Body: `{"selected": ["b1","b3"]}` (the whole selection, not a delta) |
 | `POST /debates/node/{node_id}/branches` | Turn chosen branches into nodes. Body: `{"ids": ["b1","b3"]}`, or `{}` to use whatever is ticked. Returns 201 |
 
 Status values: `queued`, `running`, `awaiting_input`, `finalizing`, `completed`, `failed`, `cancelled`.
 Useful errors: 404 (not found or no access), 409 (action not valid in this state), 422 (bad model or body),
 429 (too many active debates), 503 (could not queue; retry).
+
+---
+
+**Auth** is the same bearer token as the rest of the app — nothing debate-specific. Every call here needs it,
+including the SSE stream, which is why `EventSource` cannot be used (section 4).
+
+**Reading a branch node's content** is not a debate endpoint: branch nodes are ordinary nodes, so they are read and
+continued through the existing node/chat API, exactly like a node the user made by hand.
 
 ---
 
@@ -225,6 +234,8 @@ When `completed` arrives a new node exists. Fetch the card with `GET /debates/no
   differ when the user picked a side, or when the written verdict and the scores disagreed)
 - `confidence` (0 to 1), `end_reason`, `models`, `citations`, `counterpoints`, `flips`
 - `branches` — the questions worth exploring next (section 9)
+- `transcript_turns` — how many turns the stored debate has. `0` on nodes from before this release. Use it to decide
+  whether to offer "replay the debate"; the turns themselves come from the transcript endpoint (section 8b)
 - `scores`: `{for, against, rubric}` out of 10. `rubric` carries `criteria` per side (evidence, scope, engagement,
   fidelity), `claim_counts`, `notes`, `gap`, `margin`, `coverage`, `verified_share`, `cited_share`, and:
   - `judge_samples` — how many independent judge runs were combined (3 by default)
@@ -262,6 +273,37 @@ Other notes:
 - The node's `chats` already contain the readable verdict including the branch list, so the chat view works before the
   card is built.
 - Citations are only the papers actually cited, not everything searched.
+
+---
+
+## 8b. Replaying the debate itself
+
+The verdict card answers "what was decided". The transcript answers "how", and it is what makes a debate node worth
+coming back to a week later.
+
+`GET /debates/node/{node_id}/transcript`:
+
+```json
+{"debate_id": "...", "proposition": "...", "for_model": "...", "against_model": "...", "rounds": 2,
+ "transcript": [
+   {"side": "for", "phase": "opening", "round": 0,
+    "thinking": ["..."], "argument": "...", "claims": [...], "truncated": false}
+ ]}
+```
+
+- Ordered: research, opening, rebuttal 1..N, closing, each phase with both sides.
+- `argument` is the full speech. `thinking` is that turn's private notes, the ones shown as thought bubbles live.
+- `claims` carry the ids a branch's `from_claims` refers to, so a branch can be traced back to the argument that
+  raised it.
+- `truncated: true` means that turn hit a safety cap; show the same "(cut short)" tag as the live view.
+
+**Fetch it only when the user asks for it.** It is tens of KB, the card is fetched every time a node opens, and the
+card's `transcript_turns` already says whether there is anything to show. A disclosure below the verdict —
+"Read the debate (10 turns)" — is the right shape.
+
+**This is not the SSE stream, and it is the only thing that lasts.** `debate_events` is purged about 10 minutes
+after a debate ends, so the live replay path works only for a recent debate. Anything older is read from here. A node
+created before this release returns 200 with an empty `transcript`; render the card alone and hide the replay.
 
 ---
 
@@ -402,6 +444,12 @@ In the verdict card, below the scores:
 - The worker restarts automatically if a step crashes or times out; the client sees nothing except a longer wait. If
   nothing arrives for several minutes, call `GET /debates/{id}` and show the status.
 - Very short or empty topics are rejected (422). Show the server message.
+- **A debate expires 7 days after it is started.** A sweeper marks anything still `queued`, `running` or
+  `awaiting_input` as `failed` with `error_code: "expired"`. In practice this only bites a debate left parked on an
+  unanswered clarifying question, so a resume UI must handle "the debate you were in the middle of is gone": on
+  `GET /debates/{id}`, a terminal `failed` with that code means offer to start a new one, not to resume.
+- Event rows are purged about 10 minutes after a debate ends, so after that the node is the only record. Resume reads
+  `GET /debates/{id}` first and only opens the stream if the status is non-terminal.
 - Do not show model names for judging while the debate runs; the judge sees anonymised positions on purpose. Model names
   are fine in the final card.
 
@@ -455,6 +503,7 @@ Drive the scene from this state, not directly from the stream, so a reconnect re
 | 10 | Verdict card from `GET /debates/node/{id}`: winner, confidence, scores, citations, counterpoints, flips | Structured data is richer than the chat text |
 | 11 | The `prose_matches_winner` warning banner and the `Contested` framing (section 8) | An honest near-tie must not read as a broken verdict |
 | 12 | Node type `"debate"` on the map: icon, title style, `title` prefixes (`FOR wins:`, `AGAINST wins:`, `Contested:`, `FOR (your pick):`, `Stopped early:`) | It is a new node kind |
+| 12b | **"Read the debate" disclosure**, gated on `transcript_turns`, fetching the transcript on open (section 8b) | Without it a week-old debate node is a verdict with nothing behind it |
 | 13 | **Branch checkboxes + `PATCH .../branches`** (section 9.2) | Ticking must survive a refresh |
 | 14 | **The create action + `POST .../branches`**, idempotent, with a per-row "→ open node" state | This is what makes a debate a starting point instead of a dead end |
 | 15 | **Render the new nodes as siblings under `parent_node_id`**, not under the debate node (section 9.4) | Get this wrong and the tree is wrong; it is also what keeps the branches isolated |
@@ -480,7 +529,18 @@ python3 scripts/debate_client.py --resume <debate id>
 
 Backend dev: `uvicorn app.main:app` with `DEBATE_QUEUE_URL` unset runs the worker inline, so no AWS is needed locally.
 
-## 14. Open items (not blockers)
+## 14. What this document does not cover
+
+- **Gent**, the agentic assistant, is not built. When it is, it will be able to *start* a debate like any user and then
+  the debate behaves exactly as described here, waiting on the user's clarifying answers. Nothing in this document
+  changes for that.
+- **Art direction**: the courtroom scene, animation timings, and the visual design of the verdict card are the
+  frontend's call. Section 11 is a suggestion, not a spec.
+- **The rest of the app's APIs** — auth, projects, trees, nodes, chat, sharing. This covers `/debates` only.
+
+---
+
+## 15. Open items (not blockers)
 
 - The courtroom art direction and animation timings are the frontend's call.
 - Whether to show cost/time on the card (the data exists: `cost_usd`, `wall_ms`).

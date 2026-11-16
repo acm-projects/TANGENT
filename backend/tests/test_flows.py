@@ -392,3 +392,33 @@ def test_cached_search_does_not_cache_failures():
         return await c.search("x"), c._inner.n
 
     assert asyncio.run(go()) == ([], 2)
+
+
+def test_the_whole_debate_is_stored_so_it_outlives_the_event_stream():
+    """debate_events is purged minutes after a debate ends, so the arguments have to live on the result row."""
+    deps = make_deps(ScriptedBrain())
+    values, _, _ = run(drive(deps, rounds=2))
+    payload = deps.writer.results["d1"]
+
+    transcript = payload["transcript"]
+    assert len(transcript) == len(values["turns"])
+    assert [(t["side"], t["phase"], t["round"]) for t in transcript] == \
+           [(t["side"], t["phase"], t["round"]) for t in values["turns"]]
+    # every speech is there in full, not a summary of it
+    for stored, live in zip(transcript, values["turns"]):
+        assert stored["argument"] == live["argument"] and stored["argument"]
+        assert stored["thinking"] == (live.get("thinking") or [])
+    # both sides argued, through every phase
+    assert {t["side"] for t in transcript} == {"for", "against"}
+    assert {"research", "opening", "rebuttal", "closing"} <= {t["phase"] for t in transcript}
+
+
+def test_the_stored_debate_keeps_the_claims_that_branches_point_at():
+    """Branches carry from_claims; those ids reference nothing unless the claims are stored with the turns."""
+    deps = make_deps(ScriptedBrain())
+    run(drive(deps, rounds=1))
+    transcript = deps.writer.results["d1"]["transcript"]
+    assert any(t["claims"] for t in transcript), "no claims were kept"
+    for t in transcript:
+        for claim in t["claims"]:
+            assert "id" in claim

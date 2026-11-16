@@ -620,6 +620,22 @@ async def finalize(state: DebateState, config: RunnableConfig) -> dict[str, Any]
         "timing_summary": summarize_timings(state.get("metrics", [])),
         "usage": state.get("usage", []),
         "usage_summary": summarize_usage(state.get("usage", [])),
+        # The debate itself, kept for good. Events are purged minutes after a debate ends (they include one row per
+        # streamed token), so without this the arguments exist only while the stream is warm and a node opened a day
+        # later shows a verdict with nothing behind it. Claims travel too: branches reference claim ids in from_claims,
+        # and those point at nothing unless the claims are stored.
+        "transcript": [
+            {
+                "side": turn["side"],
+                "phase": turn["phase"],
+                "round": turn.get("round", 0),
+                "thinking": turn.get("thinking") or [],
+                "argument": turn.get("argument") or "",
+                "claims": turn.get("claims") or [],
+                "truncated": bool(turn.get("truncated")),
+            }
+            for turn in state.get("turns", [])
+        ],
     }
     # The questions worth exploring next, as nodes. A separate small call rather than more work for the judge: the judge
     # is already the longest call in the run and has produced self-contradictory output when overloaded. Best-effort --
