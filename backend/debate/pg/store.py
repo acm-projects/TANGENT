@@ -251,6 +251,20 @@ async def mark_failed(factory: Factory, debate_id: str, code: str) -> None:
             )
 
 
+async def get_transcript_by_node(s: AsyncSession, node_id: str) -> Optional[dict[str, Any]]:
+    """The debate itself: every turn, in order. Served on its own because it is large and the card does not need it."""
+    r = (
+        await s.execute(
+            text(
+                "SELECT debate_id::text AS debate_id, proposition, for_model, against_model, rounds, transcript "
+                "FROM debate_results WHERE node_id = CAST(:n AS uuid)"
+            ),
+            {"n": node_id},
+        )
+    ).mappings().first()
+    return dict(r) if r else None
+
+
 async def purge_events(factory: Factory, debate_id: str) -> int:
     async with tx(factory, system_job=True) as s:
         r = await s.execute(text("DELETE FROM debate_events WHERE debate_id = CAST(:d AS uuid)"), {"d": debate_id})
@@ -323,7 +337,7 @@ async def get_result_by_node(s: AsyncSession, node_id: str) -> Optional[dict[str
             text(
                 "SELECT node_id, debate_id, proposition, winner::text AS winner, judge_would_have_chosen::text AS judge_would_have_chosen, "
                 "confidence, summary, end_reason::text AS end_reason, for_model, against_model, judge_model, rounds, "
-                "final_output, verdict_rationale AS rationale, strongest_counterpoints, verdict_flips_if, citations, scores, cost_usd, wall_ms, active_ms, waited_ms, usage_summary, timing_summary, branches FROM debate_results WHERE node_id = CAST(:n AS uuid)"
+                "final_output, verdict_rationale AS rationale, strongest_counterpoints, verdict_flips_if, citations, scores, cost_usd, wall_ms, active_ms, waited_ms, usage_summary, timing_summary, branches, jsonb_array_length(transcript) AS transcript_turns FROM debate_results WHERE node_id = CAST(:n AS uuid)"
             ),
             {"n": node_id},
         )

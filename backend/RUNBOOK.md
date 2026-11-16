@@ -54,19 +54,45 @@ including the branch endpoints, node creation under the origin node, and sibling
 Two new columns and one policy. **Safe to run more than once**, and I verified it on a database built from the previous
 schema.
 
+**If you have `psql`:**
+
 ```
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f deploy/migration_branches.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f deploy/migration_transcript.sql
 ```
 
-If your `.env` holds a `jdbc:` URL, strip that prefix first. Check it landed:
+**If you do not** (`zsh: command not found: psql`) use the Python runner, which needs nothing you do not already have —
+it reads `DATABASE_URL` from the environment or from `.env`, strips a `jdbc:` prefix itself, and verifies the result:
 
 ```
-psql "$DATABASE_URL" -c "\d debate_results" | grep branches
-psql "$DATABASE_URL" -c "SELECT policyname, cmd FROM pg_policies WHERE tablename='debate_results' ORDER BY cmd;"
+python3 scripts/migrate.py deploy/migration_branches.sql
+python3 scripts/migrate.py deploy/migration_transcript.sql
 ```
 
-You should see `branches | jsonb | not null default '[]'::jsonb` and three policies: INSERT, SELECT, **UPDATE**.
-Without that UPDATE policy every branch write fails closed under RLS, which is why it is in the migration.
+Expect five `PASS` lines and `all good`. To look without changing anything, `python3 scripts/migrate.py --check`.
+
+The file is sent as a single query so its own `BEGIN`/`COMMIT` applies: if any statement fails, nothing is left
+half-applied. Running it twice is fine — I tested that.
+
+It connects the way the app does, via `debate.pg.db.normalize_url`: a `jdbc:` prefix is stripped, `DB_USER` and
+`DB_PASSWORD` fill in a URL that carries no credentials, a remote host gets `sslmode=require`, and anything the shell
+has not exported is read from `.env` first. So if `uvicorn app.main:app` can reach the database, this can too.
+
+If it says `DATABASE_URL carries no username, and DB_USER is not set`, the shell you are in has not loaded `.env` and
+the file has no `DB_USER` line. Either add `DB_USER` / `DB_PASSWORD` to `.env`, or pass them for the one command:
+`DB_USER=... DB_PASSWORD=... python3 scripts/migrate.py deploy/migration_branches.sql`.
+
+The four checks it runs, and what they mean if one fails:
+
+| Check | If missing |
+|---|---|
+| `debate_results.branches` jsonb | Nothing can store proposed branches |
+| `nodes.branch_of_debate_id` | Branch nodes cannot be traced back to their debate |
+| `nodes_branch_of_debate_id_idx` | Only slower, not broken |
+| `debate_results.transcript` jsonb | The debate itself is lost 10 minutes after it ends, leaving a verdict with nothing behind it |
+| `debate_results` has an **UPDATE** policy | **Every branch write fails closed under RLS.** This is the one that would have 500'd in production |
+
+If you would rather have `psql` anyway: `brew install libpq && brew link --force libpq`.
 
 `docs/tangent-debate-mode-ddl.sql` now also contains these, so a fresh install needs no migration.
 
@@ -114,22 +140,43 @@ curl -X POST $API/debates/node/<RESULT_NODE_ID>/branches \
   -d '{"ids":["b1","b3"]}'
 ```
 
-The POST returns `201` with `parent_node_id` and the new node ids. Check the tree:
+The POST returns `201` with `parent_node_id` and the new node ids. Check the tree with the migration script, which
+needs no `psql`:
 
 ```
-psql "$DATABASE_URL" -c "
-SELECT n.id, n.node_type, n.title, n.parent_id, n.branch_of_debate_id IS NOT NULL AS from_debate
-FROM nodes n WHERE n.parent_id = '<ORIGIN_NODE_ID>' ORDER BY n.fork_index;"
+python3 scripts/migrate.py --tree <ORIGIN_NODE_ID>
 ```
 
-You should see the debate node and the new branch nodes as **siblings**, all with the same `parent_id`. Confirm the
-isolation by reading one branch's seeded chat and checking the other branches' questions are absent:
+`<ORIGIN_NODE_ID>` is the `--node` you passed to `debate_client.py`, and it is also `parent_node_id` in the POST
+response. You should see the debate node and the new branch nodes as **siblings**, all children of the same node:
+
+```
+  node                                    type        msgs  from debate  title
+  11111111-...                            standard       0  False        (origin) picking an architecture
+  aaaaaaaa-...                            debate         0  False        Contested: microservices from day one
+  bbbbbbbb-...                            standard       2  True         Cost at 10x traffic
+  bbbbbbbb-...                            standard       2  True         Team-size threshold
+
+isolation check across 2 branch node(s):
+  PASS  Cost at 10x traffic                              95 chars
+  PASS  Team-size threshold                             102 chars
+
+no branch can see a sibling's subject
+```
+
+What to read in that output:
+- the branch nodes are `standard`, not `debate` — they are ordinary chat nodes the user can just type in
+- `from debate` is `True` on them, so the map can trace them back
+- `msgs` is 2: the branch's question and the seeded briefing, so the node opens mid-conversation rather than empty
+- the isolation check reads each branch's seeded text and looks for its siblings' titles in it. I verified this check
+  fails when it should: planting a sibling's title in a seed turns the line into
+  `FAIL ... <- mentions ['Team-size threshold']`
+
+If you have `psql` and want to read a whole seed yourself:
 
 ```
 psql "$DATABASE_URL" -tAc "SELECT chats FROM nodes WHERE id='<BRANCH_NODE_ID>';" | python3 -m json.tool | head -40
 ```
-
----
 
 ## 5. Build and deploy to AWS (SSO, about 5 minutes)
 
