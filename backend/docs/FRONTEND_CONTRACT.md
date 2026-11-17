@@ -50,6 +50,10 @@ A finished debate proposes 3-5 questions worth exploring, on `GET /debates/node/
   ticked. Returns `201` with `{parent_node_id, created: [{branch_id, node_id, created}], branches}`. Idempotent: a branch
   that already has a node comes back with `created: false` and the original id, never a duplicate.
 - Older nodes have `branches: []`.
+- `created_node_id` is re-checked against the `nodes` table on every read. Nodes are hard-deleted, so if the user
+  deletes a branch node its branch comes back with `created_node_id: null` and can be created again; `selected`
+  stays as the user set it. **Drive the row off `created_node_id`, never off a local "already made" flag,** and
+  re-fetch the card after a delete.
 
 **Where the new nodes go, and why it matters.** Each one's parent is **the node the debate started from**, not the
 debate node. So the branches are siblings of the debate node and of each other. Since context is the lineage walked
