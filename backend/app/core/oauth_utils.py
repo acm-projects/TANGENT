@@ -93,6 +93,7 @@ async def verify_google_id_token(id_token: str) -> Dict[str, Any]:
             algorithms=["RS256"],
             audience=GOOGLE_CLIENT_ID,
             issuer="https://accounts.google.com",
+            leeway=10,  # tolerate clock skew vs Google's iat/exp
         )
         return decoded_token
 
