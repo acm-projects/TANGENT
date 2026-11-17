@@ -484,6 +484,29 @@ export interface DebateResult {
   citations: DebateCitation[] | null;
   scores: { for?: number; against?: number; rubric?: DebateRubric } | null;
   branches: DebateBranch[] | null;
+  /** Turns kept for the replay; 0 on nodes from before 12 Nov (nothing to fetch). */
+  transcript_turns?: number;
+}
+
+/** One speech in GET /debates/node/:nodeId/transcript. */
+export interface DebateTranscriptTurn {
+  side: DebateSide;
+  phase: string;
+  round: number;
+  thinking: string[];
+  argument: string;
+  claims: unknown[];
+  truncated: boolean;
+}
+
+/** GET /debates/node/:nodeId/transcript -- the whole debate, kept for good (its events are purged). */
+export interface DebateTranscript {
+  debate_id: string;
+  proposition: string;
+  for_model: string;
+  against_model: string;
+  rounds: number;
+  transcript: DebateTranscriptTurn[];
 }
 
 /** POST /debates/node/:nodeId/branches (201). The new nodes hang under `parent_node_id`, not the debate node. */

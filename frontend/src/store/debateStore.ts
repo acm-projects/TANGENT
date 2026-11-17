@@ -227,11 +227,16 @@ interface DebateStore {
   setMinimised(minimised: boolean): void;
   dispatch(a: DebateAction): void;
   close(): void;
+  /** Bumped when a branch card is deleted, so an open verdict card re-reads its branches (the server frees the direction). */
+  branchesRev: number;
+  refreshBranches(): void;
 }
 
 export const useDebateStore = create<DebateStore>()((set) => ({
   view: null,
   minimised: false,
+  branchesRev: 0,
+  refreshBranches: () => set((s) => ({ branchesRev: s.branchesRev + 1 })),
   open: (id, minimised = false) => set({ view: emptyDebate(id), minimised }),
   setMinimised: (minimised) => set({ minimised }),
   dispatch: (a) => set((s) => (s.view ? { view: reduceDebate(s.view, a) } : s)),
