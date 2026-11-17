@@ -36,6 +36,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCourt?: boolean }) {
   const [result, setResult] = useState<DebateResult | null | undefined>(undefined);
+  const [reads, setReads] = useState(0);
   const [open, setOpen] = useState(false);
   const [entering, setEntering] = useState(false);
   const [enterError, setEnterError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
   useEffect(() => {
     let cancelled = false;
     api.debates.result(nodeId).then(
-      (r) => !cancelled && setResult(r),
+      (r) => !cancelled && (setResult(r), setReads((n) => n + 1)),
       // 404: stopped before anyone argued, so there was nothing to judge. Any other failure just leaves the
       // card out: the chat below holds the readable verdict anyway.
       () => !cancelled && setResult((prev) => (rev ? prev : null)),
@@ -74,9 +75,10 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
       ? `The judge would have picked ${SIDE[judge] ?? "neither side"}.`
       : `Confidence ${pct(result.confidence)}`;
 
-  // keyed on what's made, so a fresh read (a branch card deleted) re-seeds the rows from the server
+  // keyed on the read, not its content: Branches keeps its own rows after a create, so only a new read
+  // (a branch card deleted) re-seeds them from the server, even when it came back identical to the last one
   const branches = result.branches?.length ? (
-    <Branches key={result.branches.map((b) => b.created_node_id ?? "-").join()} nodeId={nodeId} initial={result.branches} inCourt={inCourt} />
+    <Branches key={reads} nodeId={nodeId} initial={result.branches} inCourt={inCourt} />
   ) : null;
 
   return (

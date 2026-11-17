@@ -101,8 +101,8 @@ describe("deleteNode (optimistic)", () => {
     expect(s.activeNodeId).toBe("g");
   });
 
-  it("tells the verdict card to re-read its branches once a debate branch card is deleted, not before", async () => {
-    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), { ...node("b", "r", 1), branch_of_debate_id: "d" }, node("x", "r", 2)]);
+  it("tells an open verdict card to re-read its branches once the server has deleted a card, not before or if it refuses", async () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("b", "r", 1), node("x", "r", 2)]);
     const before = useDebateStore.getState().branchesRev;
     let finish!: () => void;
     remove.mockReturnValueOnce(new Promise<void>((res) => (finish = res)));
@@ -111,8 +111,8 @@ describe("deleteNode (optimistic)", () => {
     finish();
     await done;
     expect(useDebateStore.getState().branchesRev).toBe(before + 1);
-    remove.mockResolvedValueOnce(undefined);
-    await deleteNode("x");
+    remove.mockRejectedValueOnce(new Error("nope"));
+    await expect(deleteNode("x")).rejects.toThrow("nope");
     expect(useDebateStore.getState().branchesRev).toBe(before + 1);
   });
 

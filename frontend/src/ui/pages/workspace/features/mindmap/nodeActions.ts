@@ -401,8 +401,9 @@ export async function deleteNode(nodeId: string) {
   }
   try {
     await api.nodes.delete(nodeId);
-    // a debate branch card is gone: its direction is free again on the verdict card, once the server has deleted it
-    if (nodes.some((n) => n.branch_of_debate_id)) useDebateStore.getState().refreshBranches();
+    // A deleted card may have been a debate branch (the API doesn't say so on a node, and a delete can take a
+    // whole subtree), whose direction is free again on the verdict card. Any open card re-reads once the server has deleted it.
+    useDebateStore.getState().refreshBranches();
   } catch (e) {
     const now = () => useTreeStore.getState(); // each add changes the state, so read it fresh
     const remaining = new Map(nodes.map((node) => [node.id, node]));
