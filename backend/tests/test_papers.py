@@ -6,7 +6,7 @@ _added = [k for k in _dummies if k not in os.environ]
 os.environ.update({k: _dummies[k] for k in _added})
 
 from app.papers import s2
-from app.papers.service import citations_in, fill_budget, full_text_state, parse_leaked_tool_calls, prefer_accessible, quote_matches
+from app.papers.service import citations_in, fill_budget, full_text_state, parse_leaked_tool_calls, prefer_accessible, quote_matches, web_citations_in
 
 for _k in _added:
     del os.environ[_k]
@@ -34,6 +34,11 @@ def test_quote_matches_ignores_case_and_whitespace():
 
 def test_citations_in_dedupes_in_order():
     assert citations_in("A [p1:c2]. B [p3:c0] and again [p1:c2]; not p4:c1.") == ["p1:c2", "p3:c0"]
+
+
+def test_citations_in_accepts_line_annotated_markdown_citations():
+    assert citations_in("A 【p1:c2†L1-L2】 and [p3:c0].") == ["p1:c2", "p3:c0"]
+    assert web_citations_in("A 【web:1†L1-L2】【web:2†L3-L4】 and [web:1].") == ["web:1", "web:2"]
 
 
 def test_full_text_state():

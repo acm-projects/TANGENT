@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { Button, Frame, Input, Link, Loading, Panel, Text } from "@/ui/library";
 import { FieldGuide } from "@/ui/features/settings/FieldGuide";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
+import { ShowNudges } from "@/ui/features/settings/ShowNudges";
 import { useSignOut } from "@/ui/features/settings/useSignOut";
 import { Contents } from "./components/Contents";
 import { IdBadge } from "./components/IdBadge";
@@ -88,6 +89,7 @@ export function Account() {
                 <Text as="h3" id="account-lighting" size="xs" className="settings-heading" content="Lighting" />
                 <LightingPicker labelledBy="account-lighting" />
               </Frame>
+              <ShowNudges />
             </Section>
 
             <Section id="guide" number={4} title="Field guide" note="The moves the board doesn't spell out.">

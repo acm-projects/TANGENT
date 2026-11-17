@@ -8,11 +8,19 @@ const get = vi.fn();
 const split = vi.fn();
 const join = vi.fn();
 const merge = vi.fn();
+const reset = vi.fn();
+const answer = vi.fn();
+const forProject = vi.fn();
+const tag = vi.fn();
+const untag = vi.fn();
 vi.mock("@/api", () => ({
-  api: { nodes: { fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids) } },
+  api: {
+    nodes: { tag: (...a: unknown[]) => tag(...a), untag: (id: string) => untag(id), fork: (id: string) => fork(id), delete: (id: string) => remove(id), get: (id: string) => get(id), split: (...a: unknown[]) => split(...a), join: (id: string) => join(id), merge: (ids: string[]) => merge(ids), reset: (id: string) => reset(id), answer: (...a: unknown[]) => answer(...a) },
+    trees: { forProject: (id: string) => forProject(id) },
+  },
   forkedProjectIdOf: () => null,
 }));
-const { deleteNode, forkNode, isPending, loadChats, mergeNodes, splitNode } = await import("./nodeActions");
+const { answerQuestion, deleteNode, forkNode, isPending, loadChats, mergeNodes, refreshTree, resetProject, splitNode, tagNode } = await import("./nodeActions");
 
 const node = (id: string, parent: string | null, idx: number): NodeMeta => ({
   id, tree_id: "t", project_id: "p", parent_id: parent, fork_index: idx, node_type: null,
@@ -51,6 +59,28 @@ describe("forkNode (optimistic)", () => {
   });
 });
 
+describe("tagNode (optimistic)", () => {
+  const pin = { shape: "pin", color: "slate" } as const;
+  beforeEach(() => useTreeStore.getState().hydrateTree("r", [node("r", null, 0), { ...node("a", "r", 1), tag: { shape: "flag", color: "sage" } }]));
+
+  it("tags at once and keeps the server's card", async () => {
+    tag.mockResolvedValueOnce({ node: { ...node("a", "r", 1), tag: pin }, fork: null });
+    const done = tagNode("a", pin);
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual(pin);
+    await done;
+    expect(tag).toHaveBeenCalledWith("a", pin);
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual(pin);
+  });
+
+  it("untags with null, and puts the old tag back if the server refuses", async () => {
+    untag.mockRejectedValueOnce(new Error("nope"));
+    const done = tagNode("a", null);
+    expect(useTreeStore.getState().nodesById["a"].tag).toBeNull();
+    await expect(done).rejects.toThrow("nope");
+    expect(useTreeStore.getState().nodesById["a"].tag).toEqual({ shape: "flag", color: "sage" });
+  });
+});
+
 describe("deleteNode (optimistic)", () => {
   it("removes the branch at once and puts it all back if the server refuses", async () => {
     useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("g", "a", 1)]);
@@ -68,6 +98,26 @@ describe("deleteNode (optimistic)", () => {
     expect(s.childrenByParent["a"]).toEqual(["g"]);
     expect(s.chatsByNode["g"]).toEqual([]);
     expect(s.activeNodeId).toBe("g");
+  });
+
+  it("removes dependent merges and restores them after both parents if the server refuses", async () => {
+    useTreeStore.getState().hydrateTree("r", [
+      node("r", null, 0),
+      node("a", "r", 1),
+      node("b", "r", 2),
+      { ...node("m", "a", 1), merge_source_ids: ["a", "b"] },
+      node("tail", "m", 1),
+    ]);
+    let refuse!: (e: Error) => void;
+    remove.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)));
+    const done = deleteNode("a");
+    expect(Object.keys(useTreeStore.getState().nodesById).sort()).toEqual(["b", "r"]);
+    refuse(new Error("nope"));
+    await expect(done).rejects.toThrow("nope");
+    const s = useTreeStore.getState();
+    expect(s.nodesById["m"]!.merge_source_ids).toEqual(["a", "b"]);
+    expect(s.nodesById["tail"]!.parent_id).toBe("m");
+    expect(s.childrenByParent["a"]).toEqual(["m"]);
   });
 });
 
@@ -128,7 +178,7 @@ describe("loadChats", () => {
 });
 
 describe("splitNode (optimistic)", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     const s = useTreeStore.getState();
     s.hydrateTree("r", [node("r", null, 0), node("a", "r", 1), node("k", "a", 1)]);
@@ -172,7 +222,7 @@ describe("splitNode (optimistic)", () => {
 });
 
 describe("mergeNodes", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     // r -> a -> t -> k   (a, t: a split; k: a branch of t)
     const s = useTreeStore.getState();
@@ -210,7 +260,23 @@ describe("mergeNodes", () => {
     expect(join).not.toHaveBeenCalled();
   });
 
-  it("merges two leaves of separate branches into a placeholder under where they part, then the server's node", async () => {
+  it("refuses to fold a merge into its source or change the history of a merge source", async () => {
+    useTreeStore.getState().hydrateTree("r", [
+      node("r", null, 0),
+      node("a", "r", 1),
+      node("b", "r", 2),
+      { ...node("m", "a", 1), merge_source_ids: ["a", "b"] },
+    ]);
+    useTreeStore.getState().setChats("a", []);
+    useTreeStore.getState().setChats("m", []);
+    await expect(mergeNodes("a", "m")).rejects.toThrow(/merge can't be folded/i);
+    useTreeStore.getState().addNode(node("child", "a", 2));
+    useTreeStore.getState().setChats("child", []);
+    await expect(mergeNodes("a", "child")).rejects.toThrow(/feeds a merge/i);
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it("merges two leaves into an empty placeholder under the first source", async () => {
     // r -> (a -> t -> k, b)
     useTreeStore.getState().addNode(node("b", "r", 2));
     let answer!: (r: unknown) => void;
@@ -219,20 +285,21 @@ describe("mergeNodes", () => {
     let s = useTreeStore.getState();
     const temp = s.activeNodeId!;
     expect(isPending(temp)).toBe(true);
-    expect(s.nodesById[temp]!.parent_id).toBe("r");
+    expect(s.nodesById[temp]!.parent_id).toBe("k");
     expect(s.nodesById[temp]!.merge_source_ids).toEqual(["k", "b"]);
-    answer({ ...node("m", "r", 3), fork: null });
+    expect(s.chatsByNode[temp]).toEqual([]);
+    answer({ ...node("m", "k", 1), merge_source_ids: ["k", "b"], fork: null });
     await done;
     s = useTreeStore.getState();
     expect(merge).toHaveBeenCalledWith(["k", "b"]);
     expect(s.activeNodeId).toBe("m");
     expect(s.nodesById["m"]!.merge_source_ids).toEqual(["k", "b"]);
-    expect(s.chatsByNode["m"]).toBeUndefined(); // read fresh from the server
+    expect(s.chatsByNode["m"]).toEqual([]);
   });
 });
 
 describe("placeholders made from a merged card", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   beforeEach(() => {
     // m merges a and b, and has used tokens; it is what gets split or forked
     const s = useTreeStore.getState();
@@ -260,7 +327,7 @@ describe("placeholders made from a merged card", () => {
 });
 
 describe("ready to type after a branch or merge", () => {
-  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, branch_source: null, created_at: "" });
+  const msg = (role: "user" | "assistant", content: string, seq: number) => ({ role, content, seq, created_at: "" });
   const asks = async (act: () => Promise<unknown>) => {
     const before = useTreeStore.getState().composeAt;
     await act().catch(() => {});
@@ -287,8 +354,76 @@ describe("ready to type after a branch or merge", () => {
   });
 
   it("merging two leaves asks too, and a refused merge doesn't", async () => {
-    merge.mockResolvedValueOnce({ ...node("m", "r", 3), fork: null });
+    merge.mockResolvedValueOnce({ ...node("m", "t", 1), merge_source_ids: ["t", "b"], fork: null });
     expect(await asks(() => mergeNodes("t", "b"))).toBe(true);
     expect(await asks(() => mergeNodes("a", "b"))).toBe(false); // a has a branch: not a leaf
+  });
+});
+
+describe("resetProject (optimistic)", () => {
+  const chat = { role: "user" as const, content: "hi", seq: 0, created_at: "" };
+  beforeEach(() => {
+    const s = useTreeStore.getState();
+    s.hydrateTree("r", [{ ...node("r", null, 0), title: "Start", tokens: 9 }, node("a", "r", 1), node("b", "a", 1)]);
+    s.setChats("r", [chat]);
+    s.setActive("b");
+  });
+
+  it("leaves one blank root at once, selected, and keeps it when the server agrees", async () => {
+    let answer!: (n: NodeMeta & { fork: null }) => void;
+    reset.mockReturnValueOnce(new Promise((res) => (answer = res)));
+    const done = resetProject("r");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById)).toEqual(["r"]);
+    expect(s.nodesById["r"]).toMatchObject({ title: null, tokens: 0 });
+    expect(s.chatsByNode["r"]).toEqual([]);
+    expect(s.activeNodeId).toBe("r");
+    answer({ ...node("r", null, 0), fork: null });
+    await done;
+    expect(reset).toHaveBeenCalledWith("r");
+    expect(Object.keys(useTreeStore.getState().nodesById)).toEqual(["r"]);
+  });
+
+  it("puts the whole map back, chats and selection included, if the server refuses", async () => {
+    reset.mockRejectedValueOnce(new Error("no"));
+    await expect(resetProject("r")).rejects.toThrow("no");
+    const s = useTreeStore.getState();
+    expect(Object.keys(s.nodesById).sort()).toEqual(["a", "b", "r"]);
+    expect(s.chatsByNode["r"]).toEqual([chat]);
+    expect(s.activeNodeId).toBe("b");
+  });
+
+  it("goes to the sharee's copy when the reset forked the project", async () => {
+    const fork = { project_id: "p2", workspace_slug: "me", node_map: { r: "r2" }, tree_map: {} };
+    reset.mockResolvedValueOnce({ ...node("r2", null, 0), fork });
+    await resetProject("r");
+    expect(useTreeStore.getState().pendingSwitch).toEqual({ slug: "me", projectId: "p2", nodeId: "r2" });
+  });
+});
+
+describe("question cards reach the map without a reload", () => {
+  const card = { ...node("q", "r", 0), node_type: "question" as const };
+  beforeEach(() => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0)]);
+    useTreeStore.getState().setProject({ id: "p" } as never);
+  });
+
+  it("refreshTree puts a card the server made on the map and keeps a reply streaming", async () => {
+    useTreeStore.getState().beginStream("r", { role: "user", content: "who won?", seq: 0, created_at: "" });
+    forProject.mockResolvedValueOnce({ tree: { root_node_id: "r" }, nodes: [node("r", null, 0), card] });
+    await refreshTree("p");
+    expect(useTreeStore.getState().nodesById.q?.node_type).toBe("question");
+    expect("r" in useTreeStore.getState().streaming).toBe(true);
+  });
+
+  it("answering adds the branch it opened (the next question) and selects it", async () => {
+    const next = { ...node("q2", "q", 0), node_type: "question" as const };
+    answer.mockResolvedValueOnce({ node: next, existing: false, final: false, continue_prompt: null, fork: null });
+    forProject.mockResolvedValueOnce({ tree: { root_node_id: "r" }, nodes: [node("r", null, 0), card, next] });
+    useTreeStore.getState().addNode(card);
+    const done = await answerQuestion("q", "Today");
+    expect(done).toEqual({ nodeId: "q2", continuePrompt: null });
+    expect(useTreeStore.getState().nodesById.q2).toBeDefined();
+    expect(useTreeStore.getState().activeNodeId).toBe("q2");
   });
 });

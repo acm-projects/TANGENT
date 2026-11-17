@@ -64,8 +64,9 @@ _ADDED_COLUMNS = [
     """CREATE TABLE IF NOT EXISTS papers (
         id bigserial PRIMARY KEY,
         source text NOT NULL,                  -- 's2' | 'upload'
-        source_id text NOT NULL,               -- S2 paperId, or '{project_id}:{sha256}' for uploads
+        source_id text NOT NULL,               -- S2 paperId, or '{project_id}:{node_id}:{sha256}' for uploads
         project_id uuid REFERENCES projects(id) ON DELETE CASCADE,  -- uploads only; S2 papers are global
+        node_id uuid REFERENCES nodes(id) ON DELETE CASCADE,  -- upload scope: this node and its descendants
         title text NOT NULL,
         authors jsonb NOT NULL DEFAULT '[]'::jsonb,
         year int,
@@ -84,6 +85,7 @@ _ADDED_COLUMNS = [
         updated_at timestamptz NOT NULL DEFAULT now(),
         UNIQUE (source, source_id)
     )""",
+    "ALTER TABLE papers ADD COLUMN IF NOT EXISTS node_id uuid REFERENCES nodes(id) ON DELETE CASCADE",
     "CREATE INDEX IF NOT EXISTS papers_search_tsv_idx ON papers USING gin (search_tsv)",
     """CREATE TABLE IF NOT EXISTS paper_files (
         sha256 text PRIMARY KEY,
@@ -115,7 +117,35 @@ _ADDED_COLUMNS = [
         UNIQUE (paper_id, pipeline_version)
     )""",
     "CREATE INDEX IF NOT EXISTS ingestion_jobs_pending_idx ON ingestion_jobs (run_after) WHERE status = 'pending'",
-    # Legacy: no longer written. The Sources panel lists uploads and the Semantic Scholar papers a reply cites (papers.service.project_sources).
+    # Question cards (app/questions.py): their node type, and the question each holds
+    "ALTER TYPE node_type ADD VALUE IF NOT EXISTS 'question'",
+    "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS question jsonb",
+    # Compact and resolve (app/resolving.py): the Compacted card's type, and a resolved card's stamp
+    "ALTER TYPE node_type ADD VALUE IF NOT EXISTS 'compact'",
+    "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS resolved jsonb",
+    "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tag jsonb",
+    # Gent's conversations (app/agent/thread.py): one thread per user per project, its Field Notes, and the
+    # events of every run in order (notes, tools, answers, replies), replayed by the client to rebuild the chat.
+    """CREATE TABLE IF NOT EXISTS gent_threads (
+        project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        notes jsonb NOT NULL DEFAULT '[]'::jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (project_id, user_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS gent_events (
+        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        project_id uuid NOT NULL,
+        user_id uuid NOT NULL,
+        run_id uuid NOT NULL,
+        event text NOT NULL,
+        payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        FOREIGN KEY (project_id, user_id) REFERENCES gent_threads (project_id, user_id) ON DELETE CASCADE
+    )""",
+    "CREATE INDEX IF NOT EXISTS gent_events_thread_idx ON gent_events (project_id, user_id, id)",
+    # Papers a card or Gent kept for the project (papers.service.add_source); the Sources panel lists these, uploads
+    # and the papers a reply cites (papers.service.project_sources).
     """CREATE TABLE IF NOT EXISTS project_papers (
         project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         paper_id bigint NOT NULL REFERENCES papers(id) ON DELETE CASCADE,

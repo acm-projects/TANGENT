@@ -1,0 +1,113 @@
+/* ToolRow: one collapsed row per tool call or thought. Unlayered. Colours: --tool-fg, --tool-alert, --tool-rule,
+ * --tool-wash (Gent's dock sets them to his pale ink). */
+
+.tool-row {
+  font-size: var(--font-size-xs);
+  color: var(--tool-fg, var(--color-text-muted));
+}
+
+.tool-row summary,
+.tool-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+}
+
+.tool-row summary {
+  cursor: pointer;
+}
+
+.tool-row summary::-webkit-details-marker {
+  display: none;
+}
+
+/* tight to the row: the rows sit close, and a wider ring would cover the next one */
+.tool-row summary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+.tool-row-chevron {
+  flex: none;
+  opacity: 0;
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    rotate var(--motion-spring) var(--ease-spring);
+}
+
+.tool-row summary:is(:hover, :focus-visible) > .tool-row-chevron,
+.tool-row[open] > summary > .tool-row-chevron {
+  opacity: 0.7;
+}
+
+.tool-row[open] > summary > .tool-row-chevron {
+  rotate: 180deg;
+}
+
+.tool-row :is(summary, .tool-row-head) > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tool-row[open] summary > span {
+  white-space: normal;
+}
+
+.tool-row:is([data-kind="note"], [data-kind="think"]) :is(summary, .tool-row-head) {
+  font-style: italic;
+}
+
+.tool-row[data-kind="nudge"] summary {
+  opacity: 0.75;
+}
+
+.tool-row[data-pending] [data-ui="icon"]:not(.tool-row-chevron) {
+  animation: tool-row-busy 1.2s var(--ease-out) infinite;
+}
+
+@keyframes tool-row-busy {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tool-row[data-failed] :is(summary, .tool-row-head) {
+  color: var(--tool-alert, var(--color-danger));
+}
+
+.tool-row-substeps {
+  margin: var(--space-1) 0;
+  padding-inline-start: var(--space-3);
+  list-style: none;
+  border-inline-start: 1px dashed var(--tool-rule, var(--color-border));
+}
+
+.tool-row-substeps [data-failed] {
+  color: var(--tool-alert, var(--color-danger));
+}
+
+.tool-row-body {
+  display: block;
+  margin: var(--space-1) 0;
+  white-space: pre-wrap;
+}
+
+.tool-row pre {
+  max-height: 12rem;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--tool-wash, var(--color-surface-raised));
+  font-size: var(--font-size-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-row[data-pending] [data-ui="icon"]:not(.tool-row-chevron) {
+    animation: none;
+  }
+}

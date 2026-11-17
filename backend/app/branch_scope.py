@@ -1,5 +1,5 @@
-"""Branch-only shares: a sharee whose every share names a node sees only the path from the root down to
-that node (the node included). Sibling branches and anything below the node stay hidden.
+"""Branch-only shares: a sharee sees the shared node and every ancestor through either merge parent.
+Sibling branches and anything below the shared node stay hidden.
 
 RLS (has_project_access) only knows project-level access, so the scoping is enforced here, by the
 endpoints that read or copy nodes for a sharee."""
@@ -14,10 +14,16 @@ from sqlalchemy.future import select
 from app.models import Project, Share
 
 _PATH_IDS_SQL = text("""
-    WITH RECURSIVE path AS (
-      SELECT id, parent_id FROM nodes WHERE id = :node
-      UNION ALL
-      SELECT n.id, n.parent_id FROM nodes n JOIN path p ON n.id = p.parent_id
+    WITH RECURSIVE path(id) AS (
+      SELECT CAST(:node AS uuid)
+      UNION
+      SELECT e.parent
+      FROM path p
+      JOIN (
+        SELECT id AS child, parent_id AS parent FROM nodes WHERE parent_id IS NOT NULL
+        UNION ALL
+        SELECT node_id, source_leaf_id FROM node_merge_sources
+      ) e ON e.child = p.id
     )
     SELECT id FROM path
 """)
@@ -44,7 +50,7 @@ async def branch_root(db: AsyncSession, project_id: UUID, user_id: UUID) -> UUID
 
 
 async def visible_ids(db: AsyncSession, node: UUID) -> set[UUID]:
-    """The shared node and all its ancestors."""
+    """The shared node and its ancestors through both kinds of parent link."""
     return {r.id for r in (await db.execute(_PATH_IDS_SQL, {"node": node})).all()}
 
 

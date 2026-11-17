@@ -25,6 +25,10 @@ CHECKS = [
         SELECT data_type || ' not null=' || (is_nullable = 'NO')::text || ' default=' || coalesce(column_default, '-')
         FROM information_schema.columns
         WHERE table_name = 'debate_results' AND column_name = 'branches'"""),
+    ("debate_results.transcript column", """
+        SELECT data_type || ' not null=' || (is_nullable = 'NO')::text
+        FROM information_schema.columns
+        WHERE table_name = 'debate_results' AND column_name = 'transcript'"""),
     ("nodes.branch_of_debate_id column", """
         SELECT data_type FROM information_schema.columns
         WHERE table_name = 'nodes' AND column_name = 'branch_of_debate_id'"""),

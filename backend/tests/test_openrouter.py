@@ -253,3 +253,12 @@ def test_frame_returns_the_three_checks_and_the_schema_requires_them():
     assert r.checks == {"criterion_stated": False, "setting_stated": True, "context_resolves": False}
     schema = s.bodies()[0]["response_format"]["json_schema"]["schema"]
     assert {"criterion_stated", "setting_stated", "context_resolves"} <= set(schema["required"])
+
+
+def test_model_ids_map_across_free_and_paid_variants():
+    from app.core import openrouter
+    for m in openrouter.AVAILABLE_MODELS:
+        base = m.id.removesuffix(":free")
+        assert openrouter.model_id(base) == m.id and openrouter.model_id(base + ":free") == m.id
+        assert openrouter.get_model_or_400(base + ":free") is m
+    assert openrouter.model_id("someone/else") == "someone/else" and openrouter.model_id(None) is None

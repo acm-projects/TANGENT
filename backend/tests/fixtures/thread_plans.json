@@ -1,0 +1,44 @@
+[
+  {
+    "name": "chain",
+    "tip": "b",
+    "parents": {"r": [], "a": ["r"], "b": ["a"]},
+    "order": ["r", "a", "b"],
+    "plan": ["r", "a", "b"]
+  },
+  {
+    "name": "simple merge",
+    "tip": "m",
+    "parents": {"r": [], "a": ["r"], "b": ["r"], "m": ["a", "b"]},
+    "order": ["r", "a", "b", "m"],
+    "plan": ["r", {"merge": [{"from": "a", "plan": ["a"]}, {"from": "b", "plan": ["b"]}]}, "m"]
+  },
+  {
+    "name": "child of a merge",
+    "tip": "c",
+    "parents": {"r": [], "a": ["r"], "b": ["r"], "m": ["a", "b"], "c": ["m"]},
+    "order": ["r", "a", "b", "m", "c"],
+    "plan": ["r", {"merge": [{"from": "a", "plan": ["a"]}, {"from": "b", "plan": ["b"]}]}, "m", "c"]
+  },
+  {
+    "name": "merge of a merge",
+    "tip": "J2",
+    "parents": {"root": [], "attn": ["root"], "pos": ["root"], "scale": ["attn"], "mha": ["attn"], "rope": ["pos"], "J1": ["mha", "rope"], "J2": ["J1", "scale"]},
+    "order": ["root", "attn", "pos", "scale", "mha", "rope", "J1", "J2"],
+    "plan": ["root", "attn", {"merge": [{"from": "J1", "plan": [{"merge": [{"from": "mha", "plan": ["mha"]}, {"from": "rope", "plan": ["pos", "rope"]}]}, "J1"]}, {"from": "scale", "plan": ["scale"]}]}, "J2"]
+  },
+  {
+    "name": "linear algebra",
+    "tip": "m2",
+    "parents": {"r": [], "a": ["r"], "b": ["r"], "m": ["a", "b"], "cc": ["b"], "m2": ["cc", "m"]},
+    "order": ["r", "a", "b", "m", "cc", "m2"],
+    "plan": ["r", "b", {"merge": [{"from": "cc", "plan": ["cc"]}, {"from": "m", "plan": [{"merge": [{"from": "a", "plan": ["a"]}]}, "m"]}]}, "m2"]
+  },
+  {
+    "name": "criss-cross",
+    "tip": "Z",
+    "parents": {"r": [], "x": ["r"], "y": ["r"], "x1": ["x"], "y1": ["y"], "x2": ["x"], "y2": ["y"], "M1": ["x1", "y1"], "M2": ["x2", "y2"], "Z": ["M1", "M2"]},
+    "order": ["r", "x", "y", "x1", "y1", "x2", "y2", "M1", "M2", "Z"],
+    "plan": ["r", {"merge": [{"from": "x", "plan": ["x"]}, {"from": "y", "plan": ["y"]}]}, {"merge": [{"from": "M1", "plan": [{"merge": [{"from": "x1", "plan": ["x1"]}, {"from": "y1", "plan": ["y1"]}]}, "M1"]}, {"from": "M2", "plan": [{"merge": [{"from": "x2", "plan": ["x2"]}, {"from": "y2", "plan": ["y2"]}]}, "M2"]}]}, "Z"]
+  }
+]

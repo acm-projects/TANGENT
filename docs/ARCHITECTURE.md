@@ -122,36 +122,34 @@ The only shared file a feature normally edits is one line in `main.py`:
 > The real database is the source of truth. Verify column names against it.
 > `app/models.py` is **[planned]** and currently an empty placeholder.
 
-- `nodes.parent_id` is the **only** structural link. One parent per node — a
-  tree, never a DAG. NULL only for the root.
+- `nodes.parent_id` is the first structural parent. A merge has additional
+  parents in `node_merge_sources`; the conversation graph is a DAG. NULL only
+  for the root.
 - `fork_index` is the sibling ordinal under a parent, assigned server-side as
   `max(sibling fork_index) + 1`. It is **not** a position inside the parent's
   conversation. It never changes after assignment.
-- `nodes.chats` is a JSON array of `{ role, content, seq, branch_source,
-  created_at }`. **Array order is message order**; `seq` is never read.
-  `branch_source` is `null`, `"a"`, or `"b"`, and is only set on messages copied
-  into a merge node.
+- `nodes.chats` is a JSON array of `{ role, content, seq, created_at }`.
+  **Array order is message order**; `seq` is redundant and mirrors that order.
 - `node_type` (`chat | question | poll | document`, open-ended) is set by the
   user's first action in the node, so it is nullable. Display metadata only —
   never branch logic on it.
 - `summary` is display-only (mind-map hover). **Never used for context.**
-- Deleting a node cascades to its subtree.
+- Deleting a node cascades to every dependent node through either parent link.
 - The DB also has workspaces, projects, shares, and invitations.
 
 ### Merge nodes
 
-A merge node is an **ordinary node** whose `parent_id` is the lowest common
-ancestor of the two source leaves. Each branch's LCA-to-leaf messages are
-**copied** into the merge node's `chats`, tagged `a` / `b`.
+A merge is a node with two parents, like a git merge commit. Its `parent_id` is
+the first selected source; `node_merge_sources` contains both parents, with
+that first parent first in API responses. The merge card stores only its own
+messages. A card that feeds a merge is no longer a leaf and cannot be prompted
+or merged again; fork from it to continue independently.
 
-A merge is therefore a **snapshot**, not a structural exception — which is why
-§8's "one parent per node" invariant survives it. `node_merge_sources` exists
-only so the mind map can draw merge edges; no read path depends on it.
-
-Why copy rather than reference: a referencing merge would make `parent_id` no
-longer sufficient to rebuild history, and every consumer — `flatten`, the mind
-map, Battle mode — would need to special-case it. Copying costs storage and
-keeps one code path.
+`build_plan(tip, graph)` walks all parent links and renders shared ancestors
+once, branch-only history in merge blocks, and nested merges inline. Deleting
+either source deletes the merge and everything depending on it. The
+`source_leaf_id` foreign key is `NO ACTION`, so a partial merge cannot be left
+behind by a code path that fails to delete its dependants.
 
 ---
 
@@ -159,12 +157,11 @@ keeps one code path.
 
 The client sends only `{content}`. The server builds everything else.
 
-1. Fetch the root-to-leaf path with **one** recursive CTE. The query lives in the
-   `flatten.py` module docstring, next to the code that depends on its shape.
-2. `flatten(path)` returns one `Segment` per node. Node boundaries are the
-   natural **prompt-cache breakpoints**.
-3. A merge node collapses both snapshots into **one user turn** with
-   `<branch_a>` / `<branch_b>` blocks, so roles stay strictly alternating.
+1. Fetch every ancestor through both parent links with **one** recursive CTE.
+2. `build_plan(tip, graph)` produces the deterministic reading order.
+3. `flatten(plan, nodes)` returns one `Segment` per card and one user-turn
+   `Segment` per top-level merge block. Nested merges render inline, so roles
+   stay strictly alternating.
 4. `to_provider_messages(segments, new_user_message)` builds the payload and
    coalesces adjacent same-role messages.
 
@@ -222,7 +219,7 @@ POST /shares/:token/accept                                 -> { project_id, work
 GET  /trees/:id                           -> { tree, nodes: NodeMeta[] }   # flat, no chats
 GET  /nodes/:id                           -> Node                          # includes chats
 POST /nodes/:id/fork                      -> NodeMeta
-POST /nodes/merge  { source_leaf_ids }    -> NodeMeta                      # server derives the LCA
+POST /nodes/merge  { source_leaf_ids }    -> NodeMeta                      # parent_id is source_leaf_ids[0]
 POST /nodes/:id/messages { content }      -> SSE stream
 GET  /projects/:id/sources                -> Source[]                      # uploads + S2 papers an agent read here; any member
 GET  /projects/:id/sources/:sourceId/file -> application/pdf (inline)      # uploads only; any member
@@ -352,7 +349,7 @@ produce an error — it produces plausible, wrong output.
 | Invariant | Why | Guarded by |
 |---|---|---|
 | Only leaf nodes are promptable, **enforced on the server** | A UI-only check is bypassable; a non-leaf write corrupts ancestor context | **[planned]** endpoint check + test |
-| One `parent_id` per node (tree, never a DAG) | Merge is a content copy, not a structural exception | design (§3) |
+| A merge's `parent_id` is its first source; `node_merge_sources` lists all parents | Every history consumer uses the same graph plan; deleting either source removes dependants | `build_plan` fixtures + tree-flow integration tests |
 | `fork_index` is assigned server-side and never changes | Sibling order is stable across clients | **[planned]** |
 | `flatten` stays pure and type-agnostic | Every feature converges on it | `tests/test_flatten.py` |
 | `chats` array order is message order | `seq` is redundant and unread | `flatten.py` |
@@ -405,7 +402,7 @@ to run it.
 |---|---|---|
 | Adjacency list in Postgres | A graph database | At this scale Postgres is simpler, faster to build, and entirely sufficient. Neo4j only becomes arguable at scales this project will not reach. |
 | One recursive CTE | N queries walking up | One round trip; the tree depth is unbounded. |
-| Copy messages into merge nodes | Reference both parents | Keeps `parent_id` sufficient to rebuild history, so no consumer special-cases merges. |
+| Reference both parents; keep merge chats local | Copy branch messages into merge nodes | One graph is the source of truth; `build_plan` reconstructs shared and branch history. See [MERGE_REWRITE.md](../MERGE_REWRITE.md) for the migration rationale. |
 | Server builds context | Client builds context | Trust, staleness, cache stability (§4). |
 | One provider SDK called directly | A router (LiteLLM, OpenRouter) | A moving part with no v1 benefit. Keep base URL + model name as one config value so swapping is free. **Update:** the shipped client does call OpenRouter (`app/core/openrouter.py`, the one file that knows the provider); the swap-cost argument still holds. |
 | SSE over `fetch` | XHR, or `fetch-event-source` | XHR streams badly; the library auto-retries a POST. |

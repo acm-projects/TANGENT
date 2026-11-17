@@ -1,6 +1,6 @@
 "use client";
 
-import { Background, BackgroundVariant, ReactFlow } from "@xyflow/react";
+import { Background, BackgroundVariant, ReactFlow, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
@@ -21,6 +21,19 @@ import "./MindMap.css";
  *
  * Layout is derived (layout.ts), so nodes can't be dragged -- a dragged
  * position would have to be stored, and stored positions drift (§7.3). */
+
+// The chat panel covers the right half, so cards are centred in the left half.
+const VIEW_PADDING = { top: "20%", bottom: "20%", left: "8%", right: "52%" } as const;
+
+/** Flies the map to the card a search picked (treeStore.requestFlyTo). Inside <ReactFlow>, for its camera. */
+function FlyTo() {
+  const flyTo = useTreeStore((s) => s.flyTo);
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    if (flyTo) void fitView({ nodes: [{ id: flyTo.id }], padding: VIEW_PADDING, minZoom: 0.6, maxZoom: 1, duration: 600 });
+  }, [flyTo, fitView]);
+  return null;
+}
 
 // Module-level: React Flow re-mounts every node if this object changes identity.
 const nodeTypes = { tangent: MindMapNode };
@@ -152,13 +165,14 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
           onNodeMouseLeave={(e) => traceThread(e.currentTarget, null)}
           fitView
           // The chat panel covers the right half, so centre the tree in the left half.
-          fitViewOptions={{ padding: { top: "20%", bottom: "20%", left: "8%", right: "52%" }, minZoom: 0.45, maxZoom: 1 }}
+          fitViewOptions={{ padding: VIEW_PADDING, minZoom: 0.45, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={2}
           // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
+          <FlyTo />
         </ReactFlow>
         </Merge>
         </MapProject>

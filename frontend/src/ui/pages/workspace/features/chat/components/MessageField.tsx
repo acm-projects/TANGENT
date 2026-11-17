@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTreeStore } from "@/store/treeStore";
-import { Button, Frame, Icon, Input, Panel, Select, Text, TextArea } from "@/ui/library";
+import { Button, Frame, Icon, Input, Panel, Text, TextArea } from "@/ui/library";
 import type { AvailableModel } from "@/api/types";
+import { ModelSelect } from "./ModelSelect";
 import type { SendBlocker } from "../useChat";
 
 /* The message box (Figma "MessageField", 10:39, + "Send Button", 10:54), drawn
@@ -13,6 +14,7 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   ready: "Message…",
   "no-selection": "Select a node on the map to write here.",
   "not-leaf": "This node has branches. Use Branch on a reply to continue from it.",
+  question: "Answer the question on its card to go on.",
   streaming: "Waiting for the reply…",
   pending: "Message…",
 };
@@ -108,24 +110,14 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
         {/* the card's head: what it's written with, above the red rule */}
         <Frame direction="row" justify="between" align="center" className="message-field-head">
           <Frame direction="row" gap="1" align="center">
-            <Select
+            <ModelSelect
               aria-label="Chat model"
               className="message-field-model"
+              models={models}
               value={selectedModel}
-              onChange={(e) => onModelChange(e.target.value)}
-              disabled={modelsLoading || modelLocked || blocker === "streaming" || models.length === 0}
-              options={
-                modelsLoading
-                  ? [{ value: "", label: "Loading models…" }]
-                  : models.length === 0 && !selectedModel
-                    ? [{ value: "", label: "No models available" }]
-                    : [
-                        ...(!models.some((m) => m.id === selectedModel)
-                          ? [{ value: selectedModel, label: selectedModel }]
-                          : []),
-                        ...models.map((m) => ({ value: m.id, label: m.name })),
-                      ]
-              }
+              onChange={onModelChange}
+              loading={modelsLoading}
+              disabled={modelLocked || blocker === "streaming"}
             />
             {modelLocked && <Text as="span" size="xxs" hierarchy="tertiary" content="Locked for this node" />}
             <Button

@@ -135,11 +135,11 @@ class PgWriter:
                     "judge_would_have_chosen, confidence, summary, final_output, verdict_rationale, scores, "
                     "strongest_counterpoints, verdict_flips_if, citations, clarifications, for_model, against_model, "
                     "judge_model, rounds, end_reason, cost_usd, usage, usage_summary, timings, timing_summary, "
-                    "wall_ms, active_ms, waited_ms, branches) VALUES (:n, CAST(:d AS uuid), :pr, :prop, "
+                    "wall_ms, active_ms, waited_ms, branches, transcript) VALUES (:n, CAST(:d AS uuid), :pr, :prop, "
                     "CAST(:w AS debate_winner), CAST(:wh AS debate_winner), :conf, :sum, :fo, :rat, CAST(:sc AS jsonb), "
                     "CAST(:cp AS jsonb), CAST(:fl AS jsonb), CAST(:ci AS jsonb), CAST(:cl AS jsonb), :fm, :am, :jm, :r, "
                     "CAST(:er AS debate_end_reason), :cost, CAST(:us AS jsonb), CAST(:uss AS jsonb), CAST(:tm AS jsonb), "
-                    "CAST(:tms AS jsonb), :wall, :active, :waited, CAST(:br AS jsonb))"
+                    "CAST(:tms AS jsonb), :wall, :active, :waited, CAST(:br AS jsonb), CAST(:tr AS jsonb))"
                 ),
                 {
                     "n": node_id, "d": debate_id, "pr": parent["project_id"], "prop": payload["proposition"],
@@ -152,6 +152,7 @@ class PgWriter:
                     "jm": d["judge_model"], "r": d["rounds"], "er": payload["end_reason"], "cost": cost,
                     "us": js(payload.get("usage") or []), "uss": js(summary), "tm": js(payload.get("timings") or []),
                     "tms": js(payload.get("timing_summary") or {}), "wall": wall, "active": active, "waited": waited,
+                    "tr": js(payload.get("transcript") or []),
                 },
             )
             await s.execute(

@@ -47,9 +47,9 @@ def run(**args):
     return asyncio.run(web_search.web_search(**args))
 
 
-def test_both_nodes_and_the_agent_have_it():
+def test_nodes_have_it_and_gent_asks_them():
     assert "web_search" in [t["function"]["name"] for t in paper_service.TOOLS]
-    assert "web_search" in [t["function"]["name"] for t in tools.AGENT_TOOLS]
+    assert "web_search" not in [t["function"]["name"] for t in tools.GENT_TOOLS]  # Gent researches through nodes
     assert nodes_router.paper_service.TOOLS is paper_service.TOOLS
 
 

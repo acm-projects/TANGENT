@@ -1,0 +1,44 @@
+/* Gent's questions, popped up out of his dock (GentAsk.tsx). The choices share the question cards' look
+ * (.question-choice, .question-other in ../mindmap/MindMap.css). Unlayered. */
+
+.gent-ask-pop {
+  position: absolute;
+  bottom: calc(100% + var(--space-3));
+  left: 50%;
+  translate: -50% 0;
+  /* inside the dock's column: never over the toolbar or the Field Notes beside it */
+  width: min(26rem, 100%);
+  transform-origin: 50% calc(100% + var(--space-3)); /* the tail's tip, on the pill */
+  pointer-events: auto;
+}
+
+/* Gent's question: a speech bubble in his blue, its tail on the pill it came out of */
+.gent-ask {
+  max-height: min(32rem, 100cqh - 6rem);
+  overflow-y: auto;
+  padding: var(--space-4);
+  border-color: var(--color-gent);
+}
+
+.gent-ask-pop::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0.9rem;
+  height: 0.9rem;
+  translate: -50% -50%;
+  rotate: 45deg;
+  border: solid var(--color-gent);
+  border-width: 0 1px 1px 0;
+  background: var(--texture-grain), var(--color-surface); /* the panel's own paper, so the join doesn't show */
+}
+
+.gent-ask-foot > [data-component="button"][data-hierarchy="primary"] {
+  margin-inline-start: auto;
+}
+
+.gent-ask-count {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

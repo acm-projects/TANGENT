@@ -22,6 +22,7 @@ Three materials, and nothing else:
 | Paper | every surface: board, cards, sheet | ~75% |
 | Graphite | ink: text, icons, rules, unselected string | ~20% |
 | Flag red | a connection: string, pins, the active path | ~5% |
+| Gent blue | what Gent did: his questions, the node he is on, his Field Notes | accent only |
 
 ### Principles
 
@@ -70,6 +71,7 @@ Cream on the same board, in light and dark.
 | ink-muted | `#66625D` | `#A19C95` | secondary text, metadata |
 | ink-faint | `#8F8A84` | `#6E6A65` | placeholders, unselected string, dot grid |
 | red | `#E5484A` | `#E5484A` | string, pins, selected path (one value for both themes) |
+| gent | `#0083B2` | `#0083B2` | Gent's actions: his questions' margin line, his current node (one value for both themes) |
 
 The board is one step *darker* than the paper in both themes, so cards lift off it
 without needing a heavy shadow.
@@ -82,6 +84,8 @@ without needing a heavy shadow.
 | ink-muted on paper | 5.0 : 1 | 5.4 : 1 |
 | red on paper | 3.5 : 1 | 3.8 : 1 |
 | red on board | 3.1 : 1 | 4.3 : 1 |
+| gent on paper | 3.8 : 1 | 3.4 : 1 |
+| gent on board | 3.4 : 1 | 3.9 : 1 |
 | ink-faint on paper | 3.1 : 1 | — |
 
 - `ink-faint` is under 4.5 : 1. It is for placeholders and non-text marks only, never
@@ -89,6 +93,9 @@ without needing a heavy shadow.
 - **One red, both themes: `#E5484A`** (decision). It is 3.5 : 1 on light paper and 3.8 : 1 on
   dark, which clears the 3 : 1 bar for strings, pins and icons. That makes red a graphic colour
   only: never use it for text. The original `#C42021` was 5.3 : 1 on light paper but only 2.5 : 1 on dark.
+- **Blue is Gent, as red is the user: `#0083B2`** (decision). Red marks what the user did; blue marks
+  what Gent did. It is `#00A7E1`'s hue deepened until one value clears 3 : 1 in both themes (`#00A7E1`
+  itself is 2.5 : 1 on light paper). Graphic only, like the red.
 
 ### Danger is not red
 

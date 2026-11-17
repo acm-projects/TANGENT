@@ -2,9 +2,11 @@
 
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
+import { SEARCH, useGentStation } from "@/store/gentStations";
 import { Button, Frame } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
+import { SearchPanel } from "./components/SearchPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SharePanel } from "./components/SharePanel";
 import { SourcesPanel } from "./components/SourcesPanel";
@@ -16,19 +18,17 @@ import "./Toolbar.css";
  *   top:     Home · Search · Sources
  *   bottom:  Share · Settings
  *
- * Sources, Share and Settings open a panel beside the rail; Escape or the panel's own
+ * Search, Sources, Share and Settings open a panel beside the rail; Escape or the panel's own
  * chevron closes it. Panels swing out from the rail and tuck back into it. */
 
-type Panel = "sources" | "share" | "settings" | null;
+type Panel = "search" | "sources" | "share" | "settings" | null;
 type ToolbarProps = { slug: string; projectId: string; className?: string };
-
-/* TODO(design): Search has nothing behind it yet (it isn't in Figma at all).
- * It renders disabled, so it doesn't look like a broken button. */
-const notDesignedYet = { disabled: true, onClick: () => {} };
 
 export function Toolbar({ slug, projectId, className }: ToolbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState<Panel>(null);
+  // Gent visits the search tile while he searches the tree
+  const searchStation = useGentStation<HTMLButtonElement>(SEARCH);
 
   const toggle = (panel: Exclude<Panel, null>) => setOpen((cur) => (cur === panel ? null : panel));
 
@@ -47,7 +47,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
       <Frame as="nav" justify="between" align="center" aria-label="Workspace tools" className="toolbar-rail">
         <Frame gap="2">
           <Tile icon="home" label="Dashboard" onClick={() => router.push(`/${slug}/dashboard`)} />
-          <Tile icon="search" label="Search (not available yet)" {...notDesignedYet} />
+          <Tile icon="search" label="Search" pressed={open === "search"} onClick={() => toggle("search")} station={searchStation} />
           <Tile icon="folder" label="Sources" pressed={open === "sources"} onClick={() => toggle("sources")} />
         </Frame>
 
@@ -67,6 +67,7 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
             animate={{ opacity: 1, x: 0, scale: 1, rotate: 0, transition: spring.pin }}
             exit={{ opacity: 0, x: -32, scale: 0.9, rotate: -2, transition: spring.lift }}
           >
+            {open === "search" && <SearchPanel projectId={projectId} onClose={() => setOpen(null)} />}
             {open === "sources" && <SourcesPanel projectId={projectId} onClose={() => setOpen(null)} />}
             {open === "share" && <SharePanel slug={slug} projectId={projectId} onClose={() => setOpen(null)} />}
             {open === "settings" && <SettingsPanel slug={slug} onClose={() => setOpen(null)} />}
@@ -78,10 +79,15 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
   );
 }
 
-/* Figma "ToolBar Tile": a round icon-only button (Default / Hover / Open). */
-function Tile({ icon, label, pressed, disabled, onClick }: { icon: string; label: string; pressed?: boolean; disabled?: boolean; onClick(): void }) {
+/* Figma "ToolBar Tile": a round icon-only button (Default / Hover / Open). Also the folded Field Notes. */
+export function Tile({ icon, label, pressed, disabled, onClick, station, tip = "right" }: {
+  icon: string; label: string; pressed?: boolean; disabled?: boolean; onClick(): void; station?: Ref<HTMLButtonElement>;
+  /** which side its name tag slides out: left for tiles at the board's right edge, so the chat doesn't cover it */
+  tip?: "left" | "right";
+}) {
   return (
     <Button
+      ref={station}
       disabled={disabled}
       elevation="floating"
       size="l"
@@ -93,6 +99,7 @@ function Tile({ icon, label, pressed, disabled, onClick }: { icon: string; label
       pressed={pressed}
       onClick={onClick}
       className="toolbar-tile"
+      data-tip={tip}
     />
   );
 }

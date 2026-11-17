@@ -243,6 +243,21 @@ def build_router(
         r = {k: (str(v) if k in ("node_id", "debate_id") else float(v) if k in ("confidence", "cost_usd") else v) for k, v in r.items()}
         return r
 
+    @router.get("/node/{node_id}/transcript")
+    async def transcript(node_id: str, user: str = Depends(current_user)) -> dict[str, Any]:
+        """The full debate behind a node: every turn, both sides, for good.
+
+        Separate from the card because it is large (tens of KB) and only wanted when someone opens the replay, while
+        the card is fetched every time the node is opened.
+        """
+        if not _is_uuid(node_id):
+            raise HTTPException(404, "no debate result for this node")
+        async with tx(factory, user_id=user) as s:
+            r = await store.get_transcript_by_node(s, node_id)
+        if r is None:
+            raise HTTPException(404, "no debate result for this node")
+        return r
+
     @router.patch("/node/{node_id}/branches", status_code=200)
     async def select_branches(node_id: str, body: BranchSelectBody, user: str = Depends(current_user)) -> dict[str, Any]:
         """Tick or untick the branches on a debate node. The full selection is sent each time, not a delta."""

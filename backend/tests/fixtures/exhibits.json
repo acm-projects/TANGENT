@@ -1,0 +1,25 @@
+[
+  {
+    "name": "outline numbers by sibling order",
+    "nodes": [
+      {"id": "r", "parent": null, "fork": 0, "created_at": "2026-01-01T00:00:00Z"},
+      {"id": "b", "parent": "r", "fork": 2, "created_at": "2026-01-01T00:00:02Z"},
+      {"id": "a", "parent": "r", "fork": 1, "created_at": "2026-01-01T00:00:01Z"},
+      {"id": "c", "parent": "b", "fork": 1, "created_at": "2026-01-01T00:00:03Z"}
+    ],
+    "addresses": {"r": "1", "a": "1.1", "b": "1.2", "c": "1.2.1"}
+  },
+  {
+    "name": "merges are joint exhibits and don't shift tree labels",
+    "nodes": [
+      {"id": "r", "parent": null, "fork": 0, "created_at": "2026-01-01T00:00:00Z"},
+      {"id": "a", "parent": "r", "fork": 1, "created_at": "2026-01-01T00:00:01Z"},
+      {"id": "b", "parent": "r", "fork": 2, "created_at": "2026-01-01T00:00:02Z"},
+      {"id": "m", "parent": "a", "fork": 1, "created_at": "2026-01-01T00:00:03Z", "merge_source_ids": ["a", "b"]},
+      {"id": "x", "parent": "a", "fork": 2, "created_at": "2026-01-01T00:00:04Z"},
+      {"id": "k", "parent": "m", "fork": 1, "created_at": "2026-01-01T00:00:05Z"},
+      {"id": "m2", "parent": "x", "fork": 1, "created_at": "2026-01-01T00:00:06Z", "merge_source_ids": ["x", "k"]}
+    ],
+    "addresses": {"r": "1", "a": "1.1", "b": "1.2", "x": "1.1.1", "m": "J1", "k": "J1.1", "m2": "J2"}
+  }
+]

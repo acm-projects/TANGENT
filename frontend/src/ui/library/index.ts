@@ -22,7 +22,11 @@ export { Divider } from "./primitives/Divider/Divider";
 export { Button } from "./components/Button/Button";
 export { InkText } from "./components/InkText/InkText";
 export { Popup } from "./components/Popup/Popup";
+export { Picker } from "./components/Picker/Picker";
+export type { PickerOption } from "./components/Picker/Picker";
 export { DangerButton } from "./components/DangerButton/DangerButton";
 export { Loading } from "./components/Loading/Loading";
+export { InkPanel } from "./components/Ink/InkPanel";
+export { jolt } from "./tokens/jolt";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";

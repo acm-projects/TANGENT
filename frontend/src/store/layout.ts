@@ -8,7 +8,9 @@
  *
  * The algorithm is a simple tidy tree: leaves take consecutive columns left to
  * right in fork_index order, and each parent sits centred over its first and
- * last child. Depth decides the row. Pure: no React, no store, no DOM.
+ * last child. Depth decides the row, unless `rows` pushes a node further down
+ * (a merged card sits below the deepest card it joins: toFlow.ts); its subtree
+ * moves down with it. Pure: no React, no store, no DOM.
  */
 
 export interface Point {
@@ -24,9 +26,14 @@ export const ROW_HEIGHT = 220;
 /**
  * @param rootId           the tree's root, or null for an empty tree
  * @param childrenByParent child ids per parent, already ordered by fork_index
+ * @param rows             the row to draw a node on in place of its depth, for the nodes that need one
  * @returns the top-centre point of every node reachable from the root
  */
-export function layoutTree(rootId: string | null, childrenByParent: Record<string, string[]>): Record<string, Point> {
+export function layoutTree(
+  rootId: string | null,
+  childrenByParent: Record<string, string[]>,
+  rows: Record<string, number> = {},
+): Record<string, Point> {
   const out: Record<string, Point> = {};
   if (!rootId) return out;
 
@@ -35,20 +42,21 @@ export function layoutTree(rootId: string | null, childrenByParent: Record<strin
 
   // Returns the node's x. Recursion depth = tree depth, which is fine for
   // conversation trees; the `seen` guard stops corrupt (cyclic) data looping.
-  const place = (id: string, depth: number): number => {
+  const place = (id: string, parentRow: number): number => {
     seen.add(id);
+    const depth = rows[id] ?? parentRow + 1;
     const children = (childrenByParent[id] ?? []).filter((c) => !seen.has(c));
     let x: number;
     if (children.length === 0) {
       x = nextColumn++ * COLUMN_WIDTH;
     } else {
-      const xs = children.map((c) => place(c, depth + 1));
+      const xs = children.map((c) => place(c, depth));
       x = (xs[0]! + xs[xs.length - 1]!) / 2;
     }
     out[id] = { x, y: depth * ROW_HEIGHT };
     return x;
   };
 
-  place(rootId, 0);
+  place(rootId, -1);
   return out;
 }

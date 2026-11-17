@@ -42,13 +42,13 @@ let following: AbortController | null = null;
 /** Bumped on leaving, so a resume still waiting on the server doesn't start following afterwards. */
 let generation = 0;
 
-/** Show `debateId` and follow its events until it ends. */
-function follow(debateId: string) {
+/** Show `debateId` and follow its events until it ends (`quiet`: as the button on the board). */
+function follow(debateId: string, quiet = false) {
   following?.abort();
   const controller = new AbortController();
   following = controller;
   const store = useDebateStore.getState();
-  store.open(debateId);
+  store.open(debateId, quiet);
   void streamDebate({
     baseURL: "/api",
     debateId,
@@ -104,9 +104,13 @@ export async function startDebate(projectId: string, nodeId: string, topic: stri
   follow(res.id);
 }
 
+/** Whether `debateId` is the one this project picks up on load (the last one started here). */
+export const isProjectDebate = (projectId: string, debateId: string) => remembered(projectId) === debateId;
+
 /** On opening a project: pick up the debate last started in it. A finished one is read from its state alone
- * (its events are purged minutes after it ends); a running one is followed again from the start. */
-export async function resumeDebate(projectId: string) {
+ * (its events are purged minutes after it ends); a running one is followed again from the start. `quiet`
+ * picks it up as the button on the board rather than opening the courtroom. */
+export async function resumeDebate(projectId: string, quiet = false) {
   const id = remembered(projectId);
   if (!id) return leaveDebate();
   const asked = generation;
@@ -118,11 +122,29 @@ export async function resumeDebate(projectId: string) {
     return;
   }
   if (asked !== generation) return;
-  if (!isTerminal(info.status)) return follow(id);
+  if (!isTerminal(info.status)) return follow(id, quiet);
   following?.abort();
   const store = useDebateStore.getState();
-  store.open(id);
+  store.open(id, quiet);
   store.dispatch({ type: "event", event: { name: "done", data: info } });
+}
+
+/** The courtroom behind a debate card. Its hearing replays if the server still has the events (they're
+ * purged minutes after it ends); after that the court shows the judgment alone. `quiet` (picking the card
+ * on the map) only puts it on the board's court button, and leaves a live debate's button alone; otherwise
+ * it walks straight in. Opening a past debate stops following a live one; stepping back out picks the
+ * live one up again (Debate.tsx). Throws 404 for a card with no debate result behind it (one made before
+ * results were kept). */
+export async function openDebateNode(nodeId: string, quiet = false) {
+  const { debate_id } = await api.debates.result(nodeId);
+  const store = useDebateStore.getState();
+  if (store.view?.id === debate_id) {
+    if (!quiet) store.setMinimised(false);
+    return;
+  }
+  if (quiet && store.view && !store.view.ended) return;
+  generation++; // a resume still on its way must not take the floor from this one
+  follow(debate_id, quiet);
 }
 
 /** Dismiss a finished debate: it isn't offered again on reload. */

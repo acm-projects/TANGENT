@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { ProjectDetail, ProjectSummary } from "../types";
+import type { ProjectDetail, ProjectSearchResult, ProjectSummary } from "../types";
 
 /** /projects/ -- every project the user owns or has been shared. */
 export function createProjectsApi({ http }: ApiClient) {
@@ -16,6 +16,11 @@ export function createProjectsApi({ http }: ApiClient) {
       http.patch<ProjectSummary>(`/projects/${projectId}`, { project_name: projectName }).then((r) => r.data),
     /** Owner only. */
     delete: (projectId: string) => http.delete(`/projects/${projectId}`).then(() => undefined),
+    /** Cards whose title, summary or messages contain `q` (up to 20), each with a snippet round the match. */
+    search: (projectId: string, q: string) =>
+      http
+        .get<{ results?: ProjectSearchResult[] }>(`/projects/${projectId}/search`, { params: { q } })
+        .then((r) => r.data.results ?? []),
   };
 }
 

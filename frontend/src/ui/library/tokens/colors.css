@@ -58,6 +58,14 @@
   --red-oxblood-light: #9b1c1e;
   --red-oxblood-dark: #f08a88;
 
+  /* Gent's blue, one for both themes like the red: 3.8:1 on light paper, 3.4:1
+   * on dark (the #00a7e1 hue, deepened: #00a7e1 itself was 2.5:1 on light).
+   * Graphics only (lines, outlines, pins), never text. */
+  --blue-gent: #0083b2;
+  /* Gent's ink: a panel's solid fill (deeper, so text on it reads: 5.3:1) and the pale paper in its pores and text */
+  --gent-ink: #006c93;
+  --on-gent-ink: #f3f2ef;
+
   /* ── tier 2: semantic ────────────────────────────────────────── */
 
   /* the paper everything is written on, and the board it is pinned to */
@@ -99,6 +107,9 @@
    * danger colour: a red delete button would read as a link. */
   --color-string: var(--red-flag);
   --color-danger: light-dark(var(--red-oxblood-light), var(--red-oxblood-dark));
+  /* Blue means "Gent did this", as red means the user did: the questions he
+   * asked, the node he is on, the steps in his Field Notes. */
+  --color-gent: var(--blue-gent);
 
   /* what string and pins cast on the board, and the light caught on a pin head */
   --color-string-shadow: light-dark(rgb(40 30 20 / 0.28), rgb(0 0 0 / 0.6));

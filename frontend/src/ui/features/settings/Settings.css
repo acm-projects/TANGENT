@@ -28,3 +28,10 @@
   --pop-from: -0.75rem 0;
   --pop-scale: 1;
 }
+
+/* a plain on/off preference (Show Gent's nudges): Gent's blue, since the nudges are his */
+.settings-check {
+  flex: none;
+  width: auto;
+  accent-color: var(--color-gent);
+}

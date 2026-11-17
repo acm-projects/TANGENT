@@ -1,5 +1,3 @@
-import copy
-import json
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
@@ -7,26 +5,25 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app import questions
 from app.branch_scope import visible_to
 from app.models import Node, NodeMergeSource, Project, Share, Tree, Workspace
 
-
-def remap_branch_sources(chats, node_map):
-    if isinstance(chats, str):
-        chats = json.loads(chats)
-    remapped = copy.deepcopy(chats or [])
-    for message in remapped:
-        source = message.get("branch_source")
-        if source:
-            try:
-                message["branch_source"] = str(node_map.get(UUID(source), source))
-            except ValueError:
-                pass
-    return remapped
+# A fork's copy carries the forking user's conversation with Gent (app/agent/thread.py); their run continues there.
+# shortcut: node ids inside the copied events still name the original's cards, so old cwd refs don't light up the
+# copy's cards; remap them through node_map if the history ever needs to point into the copy.
+GENT_COPY_SQL = (
+    "INSERT INTO gent_threads (project_id, user_id, notes) SELECT :new, user_id, notes FROM gent_threads "
+    "WHERE project_id = :old AND user_id = :u ON CONFLICT DO NOTHING",
+    "INSERT INTO gent_events (project_id, user_id, run_id, event, payload, created_at) "
+    "SELECT :new, user_id, run_id, event, payload, created_at FROM gent_events WHERE project_id = :old AND user_id = :u "
+    "ORDER BY id",
+)
 
 
 @dataclass
@@ -160,7 +157,10 @@ async def _copy_project(
                 summary=n.summary,
                 model=n.model,
                 tokens=n.tokens,
-                chats=remap_branch_sources(n.chats, node_map),
+                chats=n.chats,
+                question=questions.remap(n.question, node_map),
+                resolved=n.resolved,
+                tag=n.tag,
                 created_by_id=new_owner_id,
                 created_at=n.created_at,
             )
@@ -189,6 +189,14 @@ async def _copy_project(
         nt.forked_from_tree_id = tree_map.get(t.forked_from_tree_id)
         nt.forked_from_node_id = node_map.get(t.forked_from_node_id)
     await db.flush()
+
+    # the papers kept as the project's sources come along (papers.service.add_source)
+    await db.execute(text("INSERT INTO project_papers (project_id, paper_id) SELECT :new, paper_id FROM project_papers "
+                          "WHERE project_id = :old ON CONFLICT DO NOTHING"), {"new": new_project.id, "old": original.id})
+
+    # their conversation with Gent comes along (app/agent/thread.py)
+    for statement in GENT_COPY_SQL:
+        await db.execute(text(statement), {"new": new_project.id, "old": original.id, "u": new_owner_id})
 
     return ForkResult(project=new_project, tree_map=tree_map, node_map=node_map)
 
