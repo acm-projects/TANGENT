@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, apiErrorMessage } from "@/api";
-import type { DebateBranch, DebateResult } from "@/api/types";
+import type { DebateBranch, DebateResult, DebateTranscriptTurn } from "@/api/types";
 import { useDebateStore } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Input, Link, Loading, Panel, Text } from "@/ui/library";
 import { createBranches, openDebateNode } from "../debateActions";
+import { phaseLabel, REPORTED } from "../debateLabels";
 import "../Debate.css";
 
 /* The structured verdict behind a debate card (GET /debates/node/:id), pinned above its chat
@@ -35,22 +36,25 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCourt?: boolean }) {
   const [result, setResult] = useState<DebateResult | null | undefined>(undefined);
+  const [reads, setReads] = useState(0);
   const [open, setOpen] = useState(false);
   const [entering, setEntering] = useState(false);
   const [enterError, setEnterError] = useState<string | null>(null);
+  const rev = useDebateStore((s) => s.branchesRev);
 
+  // Re-read on a deleted branch card too (rev): the server frees its direction, so the row must come from it
   useEffect(() => {
     let cancelled = false;
     api.debates.result(nodeId).then(
-      (r) => !cancelled && setResult(r),
+      (r) => !cancelled && (setResult(r), setReads((n) => n + 1)),
       // 404: stopped before anyone argued, so there was nothing to judge. Any other failure just leaves the
       // card out: the chat below holds the readable verdict anyway.
-      () => !cancelled && setResult(null),
+      () => !cancelled && setResult((prev) => (rev ? prev : null)),
     );
     return () => {
       cancelled = true;
     };
-  }, [nodeId]);
+  }, [nodeId, rev]);
 
   if (result === undefined) return <Loading label="Reading the verdict…" />;
   if (result === null) return null;
@@ -71,7 +75,11 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
       ? `The judge would have picked ${SIDE[judge] ?? "neither side"}.`
       : `Confidence ${pct(result.confidence)}`;
 
-  const branches = result.branches?.length ? <Branches nodeId={nodeId} initial={result.branches} inCourt={inCourt} /> : null;
+  // keyed on the read, not its content: Branches keeps its own rows after a create, so only a new read
+  // (a branch card deleted) re-seeds them from the server, even when it came back identical to the last one
+  const branches = result.branches?.length ? (
+    <Branches key={reads} nodeId={nodeId} initial={result.branches} inCourt={inCourt} />
+  ) : null;
 
   return (
     <Panel as="section" className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
@@ -140,8 +148,67 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
 
         <Button size="s" hierarchy="tertiary" icon={open ? "expand_less" : "expand_more"} showIcon label={open ? "Hide the reasoning" : "Show the reasoning"} aria-expanded={open} onClick={() => setOpen(!open)} className="verdict-more" />
         {open && <Reasoning result={result} />}
+        {!!result.transcript_turns && <Transcript nodeId={nodeId} turns={result.transcript_turns} />}
       </Frame>
     </Panel>
+  );
+}
+
+/** "Read the debate": the stored transcript, fetched only when opened (it runs to tens of KB). Unlike the
+ * courtroom's replay of events, it outlives their purge. */
+function Transcript({ nodeId, turns }: { nodeId: string; turns: number }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<DebateTranscriptTurn[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || data) return;
+    let cancelled = false;
+    api.debates.transcript(nodeId).then(
+      (r) => !cancelled && (setData(r.transcript), setError(null)),
+      (e: unknown) => !cancelled && setError(apiErrorMessage(e, "Could not load the debate.")),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [open, data, nodeId]);
+
+  return (
+    <Frame gap="2" className="verdict-transcript">
+      <Button size="s" hierarchy="tertiary" icon={open ? "expand_less" : "expand_more"} showIcon label={open ? "Hide the debate" : `Read the debate (${turns} turns)`} aria-expanded={open} onClick={() => setOpen(!open)} className="verdict-more" />
+      {open && !data && !error && <Loading label="Fetching the record…" />}
+      {open && error && <Text role="alert" size="s" className="debate-error" content={error} />}
+      {open && data && (
+        <Frame as="ol" gap="4" className="debate-transcript" aria-label="Transcript">
+          {data.map((t, i) => (
+            <Fragment key={i}>
+              {(i === 0 || data[i - 1]!.phase !== t.phase || data[i - 1]!.round !== t.round) && (
+                <Frame as="li" direction="row" align="center" gap="3" className="debate-phase">
+                  <Text as="span" size="xs" className="debate-kicker" content={phaseLabel(t.phase, t.round)} />
+                </Frame>
+              )}
+              <Frame as="li" gap="1" className="debate-turn" data-side={t.side}>
+                <Frame direction="row" gap="2" align="center" className="debate-speaker">
+                  <Text as="span" size="xxs" className="debate-kicker" content={REPORTED[t.side] ?? t.side} />
+                  {t.truncated && <Text as="span" size="xxs" hierarchy="tertiary" content="(cut short)" />}
+                </Frame>
+                {t.argument && <Text className="debate-speech" content={t.argument} />}
+                {t.thinking.length > 0 && (
+                  <details>
+                    <summary>
+                      <Text as="span" size="xs" hierarchy="tertiary" content="Notes" />
+                    </summary>
+                    {t.thinking.map((note, j) => (
+                      <Text key={j} size="xs" hierarchy="tertiary" content={note} />
+                    ))}
+                  </details>
+                )}
+              </Frame>
+            </Fragment>
+          ))}
+        </Frame>
+      )}
+    </Frame>
   );
 }
 

@@ -433,6 +433,30 @@ In the verdict card, below the scores:
 - On a `no_clear_winner` card, put this section **above** the scores. The branches are the answer there; the scores are
   the evidence that it is genuinely close.
 
+
+---
+
+### 9.7 Re-offering a direction after its node is deleted
+
+A branch's `created_node_id` is only meaningful while that node exists, and nodes are hard-deleted. So the backend
+re-checks on every read of the branches -- on the card, on `PATCH` and on `POST`: if the node behind a branch is
+gone, `created_node_id` comes back `null` and the branch is an ordinary unmade branch again. `selected` is left as
+the user set it, because they chose that direction once and recreating it should be one click.
+
+Before this, deleting a branch node left the card showing "open node" on a dead link, and `POST` refused to remake
+it -- that direction was lost for good short of running the whole debate again.
+
+The rule for your UI is therefore: **drive the row off `created_node_id` from the response, never off a local
+"already made" flag.**
+
+- `created_node_id` set -> show "-> open node", linking to it
+- `created_node_id` null -> show the checkbox, ticked if `selected` is true
+
+After the user deletes a branch node, re-fetch `GET /debates/node/{node_id}` for that debate -- on navigating back
+to it is enough -- and the row will have reverted on its own. `POST` then creates a fresh node with a new id.
+Nothing needs clearing from your side. If you cache "I already made b1" in client state, this fix does nothing for
+you and the bug stays.
+
 ---
 
 ## 10. Failure and edge cases
@@ -505,6 +529,7 @@ Drive the scene from this state, not directly from the stream, so a reconnect re
 | 12 | Node type `"debate"` on the map: icon, title style, `title` prefixes (`FOR wins:`, `AGAINST wins:`, `Contested:`, `FOR (your pick):`, `Stopped early:`) | It is a new node kind |
 | 12b | **"Read the debate" disclosure**, gated on `transcript_turns`, fetching the transcript on open (section 8b) | Without it a week-old debate node is a verdict with nothing behind it |
 | 13 | **Branch checkboxes + `PATCH .../branches`** (section 9.2) | Ticking must survive a refresh |
+| 13b | **Branch row state from `created_node_id`, not a local flag; re-fetch the card after a delete** (section 9.7) | A deleted branch node frees its direction again; a cached flag would keep it locked forever |
 | 14 | **The create action + `POST .../branches`**, idempotent, with a per-row "→ open node" state | This is what makes a debate a starting point instead of a dead end |
 | 15 | **Render the new nodes as siblings under `parent_node_id`**, not under the debate node (section 9.4) | Get this wrong and the tree is wrong; it is also what keeps the branches isolated |
 | 16 | Error, 409, 422, 429 and 503 states | Debates are long-running and the caps are real (5 active per user) |

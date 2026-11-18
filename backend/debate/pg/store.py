@@ -342,7 +342,12 @@ async def get_result_by_node(s: AsyncSession, node_id: str) -> Optional[dict[str
             {"n": node_id},
         )
     ).mappings().first()
-    return dict(row) if row else None
+    if row is None:
+        return None
+    out = dict(row)
+    # A branch whose node was deleted must read as unmade, or the card shows a dead link and its checkbox stays stuck.
+    out["branches"] = await prune_dead_branch_nodes(s, node_id, list(out.get("branches") or []))
+    return out
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -353,6 +358,37 @@ async def get_result_by_node(s: AsyncSession, node_id: str) -> Optional[dict[str
 # debate node is a sibling too, which is why each branch carries its own seeded context (debate/branching.py) instead of
 # inheriting the verdict through the tree.
 # ---------------------------------------------------------------------------------------------------------------
+async def prune_dead_branch_nodes(s: AsyncSession, node_id: str, branches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Forget branch nodes the user has since deleted, so their direction can be chosen again.
+
+    Nodes are hard-deleted (app/routers/nodes_router.py), which leaves `created_node_id` pointing at nothing. Until
+    this ran, such a branch stayed stuck: the card showed it as already made, and create_branch_nodes refused to
+    remake it -- so deleting the node you had just created meant losing that direction for good, short of running
+    the whole debate again.
+
+    A branch whose node is gone goes back to being an ordinary unmade branch, still ticked, because the user picked
+    that direction once and recreating it should be a single click. The write only happens when something actually
+    died, so the ordinary read stays read-only.
+    """
+    pointed_at = [b["created_node_id"] for b in branches if b.get("created_node_id")]
+    if not pointed_at:
+        return branches
+    rows = await s.execute(
+        text("SELECT id::text AS id FROM nodes WHERE id = ANY(CAST(:ids AS uuid[]))"), {"ids": pointed_at}
+    )
+    alive = {r[0] for r in rows}
+    dead = [b for b in branches if b.get("created_node_id") and b["created_node_id"] not in alive]
+    if not dead:
+        return branches
+    for b in dead:
+        b["created_node_id"] = None
+    await s.execute(
+        text("UPDATE debate_results SET branches = CAST(:b AS jsonb) WHERE node_id = CAST(:n AS uuid)"),
+        {"b": js(branches), "n": node_id},
+    )
+    return branches
+
+
 async def set_branch_selection(s: AsyncSession, node_id: str, selected: list[str]) -> dict[str, Any]:
     """Tick or untick branches on a debate result. Unknown ids are an error, so a stale client cannot silently no-op."""
     row = (
@@ -363,7 +399,7 @@ async def set_branch_selection(s: AsyncSession, node_id: str, selected: list[str
     ).mappings().first()
     if row is None:
         raise StateError("no debate result for this node")
-    branches = list(row["branches"] or [])
+    branches = await prune_dead_branch_nodes(s, node_id, list(row["branches"] or []))
     known = {b["id"] for b in branches}
     unknown = [x for x in selected if x not in known]
     if unknown:
@@ -406,7 +442,7 @@ async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids:
     if origin is None:
         raise StateError("the node this debate started from no longer exists")
 
-    branches = list(row["branches"] or [])
+    branches = await prune_dead_branch_nodes(s, node_id, list(row["branches"] or []))
     by_id = {b["id"]: b for b in branches}
     unknown = [x for x in ids if x not in by_id]
     if unknown:

@@ -704,6 +704,75 @@ def test_a_branch_node_cannot_see_its_siblings_through_its_lineage_or_its_seed(p
         assert not (set(made.values()) - {nid}) & got, "a sibling branch is on this node's lineage"
 
 
+def test_deleting_a_branch_node_frees_its_direction_to_be_chosen_again(pg):
+    """Nodes are hard-deleted, so a branch that kept pointing at a dead node was a direction lost for good."""
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            h = H(ids["user"])
+            first = (await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1"]}, headers=h)).json()
+            made = first["created"][0]["node_id"]
+            assert first["created"][0]["created"] is True
+
+            # while it exists, the branch reads as made and is not remade
+            card = (await c.get(f"/debates/node/{node}", headers=h)).json()
+            assert [b for b in card["branches"] if b["id"] == "b1"][0]["created_node_id"] == made
+            again = (await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1"]}, headers=h)).json()
+            assert again["created"][0]["node_id"] == made and again["created"][0]["created"] is False
+
+            # the user deletes it
+            pg.sql("DELETE FROM nodes WHERE id=%s", (made,))
+
+            # now the card offers it again, still ticked, so remaking it is one click
+            card = (await c.get(f"/debates/node/{node}", headers=h)).json()
+            b1 = [b for b in card["branches"] if b["id"] == "b1"][0]
+            assert b1["created_node_id"] is None, "a deleted branch node must not keep its direction locked"
+            assert b1["selected"] is True
+
+            remade = (await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1"]}, headers=h)).json()
+            assert remade["created"][0]["created"] is True
+            assert remade["created"][0]["node_id"] != made, "a new node, not the dead id"
+    run(go())
+
+
+def test_the_selection_endpoint_also_forgets_dead_branch_nodes(pg):
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            h = H(ids["user"])
+            made = (await c.post(f"/debates/node/{node}/branches", json={"ids": ["b2"]}, headers=h)
+                    ).json()["created"][0]["node_id"]
+            pg.sql("DELETE FROM nodes WHERE id=%s", (made,))
+            out = (await c.patch(f"/debates/node/{node}/branches", json={"selected": ["b2"]}, headers=h)).json()
+            assert [b for b in out["branches"] if b["id"] == "b2"][0]["created_node_id"] is None
+    run(go())
+
+
+def test_a_live_branch_node_is_never_forgotten(pg):
+    """The prune must only ever drop branches whose node is really gone."""
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            h = H(ids["user"])
+            out = (await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1", "b2"]}, headers=h)).json()
+            made = {x["branch_id"]: x["node_id"] for x in out["created"]}
+            pg.sql("DELETE FROM nodes WHERE id=%s", (made["b1"],))
+            card = (await c.get(f"/debates/node/{node}", headers=h)).json()
+            by_id = {b["id"]: b for b in card["branches"]}
+            assert by_id["b1"]["created_node_id"] is None
+            assert by_id["b2"]["created_node_id"] == made["b2"], "a living branch node was forgotten"
+    run(go())
+
+
 def test_creating_the_same_branch_twice_returns_the_first_node(pg):
     ids = seed(pg)
     did, node = finished_debate(pg, ids)

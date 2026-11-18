@@ -1,6 +1,7 @@
 import { api, forkedProjectIdOf } from "@/api";
 import type { ForkInfo } from "@/api";
 import type { Ending, NodeMeta, NodeTag } from "@/api/types";
+import { useDebateStore } from "@/store/debateStore";
 import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
 
 /* The map's per-node actions, shared with the chat's "branch" button.
@@ -400,6 +401,9 @@ export async function deleteNode(nodeId: string) {
   }
   try {
     await api.nodes.delete(nodeId);
+    // A deleted card may have been a debate branch (the API doesn't say so on a node, and a delete can take a
+    // whole subtree), whose direction is free again on the verdict card. Any open card re-reads once the server has deleted it.
+    useDebateStore.getState().refreshBranches();
   } catch (e) {
     const now = () => useTreeStore.getState(); // each add changes the state, so read it fresh
     const remaining = new Map(nodes.map((node) => [node.id, node]));

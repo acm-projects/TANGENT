@@ -8,6 +8,7 @@ import { useTreeStore } from "@/store/treeStore";
 import { Button, DangerButton, Frame, Icon, Loading, Popup, Text } from "@/ui/library";
 import { QuestionCard } from "./components/QuestionCard";
 import { VerdictCard } from "./components/VerdictCard";
+import { phaseLabel, REPORTED } from "./debateLabels";
 import { cancelDebate, dismissDebate, isProjectDebate, leaveDebate, openDebateNode, resumeDebate, steerDebate } from "./debateActions";
 import "./Debate.css";
 
@@ -24,17 +25,6 @@ import "./Debate.css";
 type DebateProps = { projectId: string; className?: string };
 
 const SPEAKER: Record<string, string> = { for: "For", against: "Against", judge: "The judge" };
-/** Speaker names as the transcript prints them. */
-const REPORTED: Record<string, string> = { for: "Counsel for", against: "Counsel against", judge: "The Court" };
-const PHASE: Record<string, string> = {
-  intake: "Reading the case",
-  frame: "Framing the question",
-  research: "Research",
-  opening: "Opening statements",
-  closing: "Closing statements",
-  judging: "Judgment",
-};
-const phaseLabel = (phase: string, round: number) => (phase === "rebuttal" ? `Rebuttal ${round}` : (PHASE[phase] ?? phase));
 
 const FAILED: Record<string, string> = {
   expired: "This debate expired before it finished. Start a new one from the card.",

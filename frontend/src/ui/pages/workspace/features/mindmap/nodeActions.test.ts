@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NodeMeta } from "@/api/types";
+import { useDebateStore } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
 
 const fork = vi.fn();
@@ -98,6 +99,21 @@ describe("deleteNode (optimistic)", () => {
     expect(s.childrenByParent["a"]).toEqual(["g"]);
     expect(s.chatsByNode["g"]).toEqual([]);
     expect(s.activeNodeId).toBe("g");
+  });
+
+  it("tells an open verdict card to re-read its branches once the server has deleted a card, not before or if it refuses", async () => {
+    useTreeStore.getState().hydrateTree("r", [node("r", null, 0), node("b", "r", 1), node("x", "r", 2)]);
+    const before = useDebateStore.getState().branchesRev;
+    let finish!: () => void;
+    remove.mockReturnValueOnce(new Promise<void>((res) => (finish = res)));
+    const done = deleteNode("b");
+    expect(useDebateStore.getState().branchesRev).toBe(before);
+    finish();
+    await done;
+    expect(useDebateStore.getState().branchesRev).toBe(before + 1);
+    remove.mockRejectedValueOnce(new Error("nope"));
+    await expect(deleteNode("x")).rejects.toThrow("nope");
+    expect(useDebateStore.getState().branchesRev).toBe(before + 1);
   });
 
   it("removes dependent merges and restores them after both parents if the server refuses", async () => {

@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { DebateBranch, DebateBranchesCreated, DebateInfo, DebateModels, DebateResult, DebateStarted } from "../types";
+import type { DebateBranch, DebateBranchesCreated, DebateInfo, DebateModels, DebateResult, DebateStarted, DebateTranscript } from "../types";
 
 /** /debates/* -- start a debate on a node, steer it, and read the verdict node it lands as.
  * The live view is the SSE stream (streamDebate), not part of this. */
@@ -23,6 +23,8 @@ export function createDebatesApi({ http }: ApiClient) {
     cancel: (id: string) => http.post(`${debate(id)}/cancel`).then(() => undefined),
 
     result: (nodeId: string) => http.get<DebateResult>(node(nodeId)).then((r) => r.data),
+    /** Every turn of the debate, both sides. Tens of KB: fetch only when the user asks to read it. */
+    transcript: (nodeId: string) => http.get<DebateTranscript>(`${node(nodeId)}/transcript`).then((r) => r.data),
     /** The whole selection, not a delta: anything left out is unticked. */
     selectBranches: (nodeId: string, selected: string[]) =>
       http.patch<{ branches: DebateBranch[] }>(`${node(nodeId)}/branches`, { selected }).then((r) => r.data.branches),
