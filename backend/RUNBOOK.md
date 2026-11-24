@@ -144,11 +144,11 @@ The POST returns `201` with `parent_node_id` and the new node ids. Check the tre
 needs no `psql`:
 
 ```
-python3 scripts/migrate.py --tree <ORIGIN_NODE_ID>
+python3 scripts/migrate.py --tree <RESULT_NODE_ID>
 ```
 
-`<ORIGIN_NODE_ID>` is the `--node` you passed to `debate_client.py`, and it is also `parent_node_id` in the POST
-response. You should see the debate node and the new branch nodes as **siblings**, all children of the same node:
+`<RESULT_NODE_ID>` is the debate node -- the `result node:` the client prints, and also `parent_node_id` in
+the POST response. You should see the debate node with the new branch nodes as its **children**:
 
 ```
   node                                    type        msgs  from debate  title

@@ -377,42 +377,50 @@ Response:
 - It is pure database work: fast, no model call, no cost. No SSE involved — this is a plain request/response.
 - 409 if nothing is selected and `ids` is empty, or if an id is unknown.
 
-### 9.4 Where the new nodes go on the map — read this bit carefully
+### 9.4 Where the new nodes go on the map
 
-The new nodes' `parent_id` is **the node the debate started from**, not the debate node. So the debate node and all its
-branch nodes are **siblings** of each other:
+The new nodes' `parent_id` is **the debate node**. They are its children, so the map reads:
 
 ```
-          (origin node — where the user clicked "start debate")
-           ├── debate node            ← the verdict and the card
-           ├── branch node "b1"       ← new
-           └── branch node "b3"       ← new
+  (origin node — where the user clicked "start debate")
+   └── debate node                 ← the verdict and its card
+        ├── branch node "b1"       ← new
+        └── branch node "b3"       ← new
 ```
 
-That is deliberate, and it is why `parent_node_id` is in the response: render the new nodes under *that* id, not under
-the debate node you were just looking at. They are `node_type: "standard"` — ordinary chat nodes, not debate nodes — so
-the user continues them by typing, exactly like any other node. They also carry `branch_of_debate_id` pointing at the
-debate they came from, which you can use to draw a lighter "came out of this debate" link if the design wants one.
+Place them by `parent_node_id` from the POST response, which holds the debate node's own id. Never assume a parent:
+the response is the only thing that should decide where they land.
 
-Each new node opens with two messages already in it: the user's message is the branch's question, and the assistant's
-first message is a short briefing assembled from the debate (what the evidence supports, what is still open, the
-caveats, the sources). So the node reads as a conversation already in progress, not an empty box.
+They are `node_type: "standard"` — ordinary chat nodes, not debate nodes — so the user continues one by typing in it,
+exactly like a node they made by hand. Each also carries `branch_of_debate_id`, the debate it came from, if you want a
+lighter edge style for "came out of a debate".
 
-### 9.5 The isolation rule (what you must not break)
+Each new node opens with two messages already in it: the user's is the branch's question, and the assistant's is a
+short briefing assembled from the debate. So the node reads as a conversation already in progress, not an empty box.
 
-**A branch node must never be able to see its sibling branches' topics.** The backend guarantees this structurally:
-context is the lineage walked up through `parent_id`, and siblings are never on each other's path. The seeded briefing is
-assembled in code from only the shared findings plus that branch's own question — the verdict's "next steps" and
-"strongest points against" sections, which name the other directions, are stripped out.
+> **Changed 24 Nov.** Branch nodes used to be *siblings* of the debate node, parented to the origin. If your code
+> places them by `parent_node_id` as returned — which is what `landNode` does — there is nothing to change.
 
-The frontend gets this for free and does not need to do anything to earn it. What it must **not** do:
-- do not pass the debate's `final_output`, the full `branches` array, or the other branches' titles into a new branch
-  node's messages or into any prompt sent from it;
-- do not reparent a branch node under another branch, or under the debate node;
-- do not "helpfully" prefill a branch node with a summary you composed on the client.
+**One consequence worth knowing:** deleting the debate node now deletes its branch nodes too, because
+`DELETE /nodes/{id}` recurses through `parent_id` and they are its descendants. That is intended — they came out of
+that debate — but it is a stronger delete than before, so a confirmation that counts descendants will now include them.
 
-If a design calls for showing the user all three of their branches side by side, that is a *view*, not context — read it
-from the debate node's card, never by writing it into the branch nodes.
+### 9.5 What a branch node can and cannot see
+
+Context is the lineage walked up through `parent_id`. Under this shape that means:
+
+- **A sibling branch is still never on another branch's path.** b1 and b3 are both children of the debate node, so
+  neither is an ancestor of the other. Their seeds name only their own question.
+- **The debate node is on every branch's path, deliberately.** Each branch inherits the verdict, the evidence and
+  the caveats — the context its question came out of. That is the point of the move.
+- **Because the debate node's text also lists every direction**, a branch can read its siblings' subjects through
+  its parent. This was accepted as a trade-off for the clearer tree. If that ever needs to change, the fix is in
+  `debate/render.py` (leave the "Where to go next" block out of the node's chats), not in the frontend.
+
+What the frontend must **not** do:
+- do not reparent a branch node under another branch;
+- do not prefill a branch node with a summary you composed on the client;
+- do not write one branch's question into another branch's messages.
 
 ### 9.6 Suggested UI
 

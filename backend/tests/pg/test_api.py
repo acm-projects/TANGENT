@@ -648,7 +648,7 @@ def test_ticking_branches_persists_and_rejects_unknown_ids(pg):
     run(go())
 
 
-def test_creating_branches_makes_nodes_under_the_node_the_debate_started_from(pg):
+def test_creating_branches_makes_nodes_under_the_debate_node(pg):
     ids = seed(pg)
     did, node = finished_debate(pg, ids)
     origin = pg.sql("SELECT parent_node_id::text FROM debates WHERE id=%s", (did,))[0][0]
@@ -659,7 +659,7 @@ def test_creating_branches_makes_nodes_under_the_node_the_debate_started_from(pg
             r = await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1", "b3"]}, headers=H(ids["user"]))
             assert r.status_code == 201, r.text
             out = r.json()
-            assert out["parent_node_id"] == origin
+            assert out["parent_node_id"] == node, "the debate node is the parent now, not the one it started from"
             return [x["node_id"] for x in out["created"]]
 
     made = run(go())
@@ -667,14 +667,53 @@ def test_creating_branches_makes_nodes_under_the_node_the_debate_started_from(pg
     for nid in made:
         parent, ntype, dbid = pg.sql(
             "SELECT parent_id::text, node_type::text, branch_of_debate_id::text FROM nodes WHERE id=%s", (nid,))[0]
-        assert parent == origin, "a branch hangs off the origin node, not the debate node"
+        assert parent == node, "a branch hangs off the debate node"
         assert ntype == "standard", "a branch is an ordinary node, not another debate"
         assert dbid == did, "the node records which debate it came from"
-    # the debate node is a sibling of the branches, not their parent
+    # the chain is origin -> debate -> branches
     assert pg.sql("SELECT parent_id::text FROM nodes WHERE id=%s", (node,))[0][0] == origin
 
 
-def test_a_branch_node_cannot_see_its_siblings_through_its_lineage_or_its_seed(pg):
+def test_branches_can_be_made_when_the_node_the_debate_started_from_is_gone(pg):
+    """debates.parent_node_id is ON DELETE SET NULL, so the origin can vanish. The debate node cannot: its result
+    row is ON DELETE CASCADE. Parenting to the debate node is what makes this work at all."""
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    pg.sql("UPDATE debates SET parent_node_id = NULL WHERE id=%s", (did,))
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            r = await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1"]}, headers=H(ids["user"]))
+            assert r.status_code == 201, r.text
+            assert r.json()["parent_node_id"] == node
+    run(go())
+
+
+def test_deleting_the_debate_node_takes_its_branches_with_it(pg):
+    """They are its children now, so the recursive delete reaches them. It did not before, so this is worth pinning."""
+    ids = seed(pg)
+    did, node = finished_debate(pg, ids)
+    q = Queue()
+
+    async def go():
+        async with client(app_for(pg, q)) as c:
+            r = await c.post(f"/debates/node/{node}/branches", json={"ids": ["b1", "b2"]}, headers=H(ids["user"]))
+            return [x["node_id"] for x in r.json()["created"]]
+
+    made = run(go())
+    pg.sql("""WITH RECURSIVE doomed(id) AS (SELECT CAST(%s AS uuid)
+                 UNION SELECT n.id FROM nodes n JOIN doomed d ON n.parent_id = d.id)
+              DELETE FROM nodes WHERE id IN (SELECT id FROM doomed)""", (node,))
+    for nid in made:
+        assert not pg.sql("SELECT 1 FROM nodes WHERE id=%s", (nid,)), "a branch outlived the debate it came from"
+
+
+def test_a_branch_is_seeded_with_only_its_own_question_and_no_sibling_is_on_its_path(pg):
+    """What survives the move under the debate node: a branch's own seed names no sibling, and no sibling node sits
+    on its parent_id path. What does NOT survive: the debate node is now on that path, and its text lists every
+    direction, so a branch can read its siblings' subjects through its parent. That was accepted deliberately --
+    the debate is the context these questions came out of."""
     ids = seed(pg)
     did, node = finished_debate(pg, ids)
     q = Queue()
@@ -702,6 +741,7 @@ def test_a_branch_node_cannot_see_its_siblings_through_its_lineage_or_its_seed(p
             "UNION ALL SELECT n.id, n.parent_id FROM nodes n JOIN up ON n.id = up.parent_id) SELECT id::text FROM up", (nid,))
         got = {r[0] for r in lineage}
         assert not (set(made.values()) - {nid}) & got, "a sibling branch is on this node's lineage"
+        assert node in got, "the debate node should be on the path: that is the point of the move"
 
 
 def test_deleting_a_branch_node_frees_its_direction_to_be_chosen_again(pg):
