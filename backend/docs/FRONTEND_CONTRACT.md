@@ -55,16 +55,17 @@ A finished debate proposes 3-5 questions worth exploring, on `GET /debates/node/
   stays as the user set it. **Drive the row off `created_node_id`, never off a local "already made" flag,** and
   re-fetch the card after a delete.
 
-**Where the new nodes go, and why it matters.** Each one's parent is **the node the debate started from**, not the
-debate node. So the branches are siblings of the debate node and of each other. Since context is the lineage walked
-through `parent_id`, a branch can never see another branch - the isolation is a property of the tree, not of a prompt.
-What a branch does need from the debate travels in its own seeded `chats`: the proposition, the verdict summary, the
-shared findings, the sources, and **only its own question**. The sections that list the other directions are stripped
-out in code before seeding.
+**Where the new nodes go.** Each one's parent is **the debate node itself**, so the chain is origin -> debate node
+-> branches, and `parent_node_id` in the POST response is the debate node's id. *(Before 24 Nov they were siblings of
+the debate node, parented to the origin.)* Place them by that field; never assume.
 
-**A branch node is an ordinary node** (`node_type: "standard"`), with `branch_of_debate_id` set so the map can trace it
-back. It shows no verdict card and no branch list of its own - it has already been branched. Render it like any other
-node. If a user wants a debate on one of those questions, that starts a fresh debate which produces its own debate node.
+Context is the lineage walked through `parent_id`. A sibling branch is never on another branch's path, and each
+branch's seed names only its own question. The debate node IS on every branch's path, on purpose -- a branch inherits
+the verdict its question came out of. Since that text also lists the other directions, a branch can read its siblings'
+subjects through its parent; that was accepted deliberately.
+
+Deleting the debate node deletes its branch nodes too, since they are its children and `DELETE /nodes/{id}` recurses
+through `parent_id`.
 
 **On the card.** Show the branches as checkboxes under a heading like "Where to go next", each with its `question` and
 `why`, and a "Create selected branches" action calling the POST. After it returns, the map should show the new sibling

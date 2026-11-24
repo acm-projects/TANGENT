@@ -173,8 +173,9 @@ export async function cancelDebate(debateId: string) {
   });
 }
 
-/** Turn chosen branches into nodes. They hang under the node the debate STARTED FROM (`parent_node_id`), as
- * siblings of the debate node: that lineage is what keeps each branch from seeing the others. */
+/** Turn chosen branches into nodes. They hang under the DEBATE node (`parent_node_id`), so the map reads
+ * origin -> debate -> branches and each question sits beneath the debate it came out of. landNode places each one
+ * by the parent_id the server gives it, so there is nothing to assume here. */
 export async function createBranches(debateNodeId: string, ids: string[]) {
   const res = await api.debates.createBranches(debateNodeId, ids);
   await Promise.all(res.created.filter((c) => c.created).map((c) => landNode(c.node_id)));

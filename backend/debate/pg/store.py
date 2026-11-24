@@ -416,7 +416,10 @@ async def set_branch_selection(s: AsyncSession, node_id: str, selected: list[str
 
 async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids: list[str],
                               chats_for: Any) -> dict[str, Any]:
-    """Create one node per requested branch, under the node the debate started from.
+    """Create one node per requested branch, as a child of the debate node itself.
+
+    The debate's directions came out of the debate, so they hang beneath it: origin -> debate node -> branches. A
+    branch therefore inherits the debate on its lineage, which is wanted -- it is the context the question came from.
 
     `chats_for(branch_row) -> list[chat]` builds the seeded exchange; it is passed in so this layer never has to know
     how a seed is assembled. Idempotent: a branch that already has a node is returned as it stands, never duplicated.
@@ -424,23 +427,26 @@ async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids:
     row = (
         await s.execute(
             text("SELECT r.debate_id::text AS debate_id, r.branches, r.proposition, r.winner::text AS winner, r.summary, "
-                 "r.final_output, r.citations, d.parent_node_id::text AS origin_id "
-                 "FROM debate_results r JOIN debates d ON d.id = r.debate_id "
-                 "WHERE r.node_id = CAST(:n AS uuid) FOR UPDATE OF r"),
+                 "r.final_output, r.citations "
+                 "FROM debate_results r WHERE r.node_id = CAST(:n AS uuid) FOR UPDATE OF r"),
             {"n": node_id},
         )
     ).mappings().first()
     if row is None:
         raise StateError("no debate result for this node")
-    origin = (
+    # The debate node is the parent, and it is always there: debate_results.node_id is ON DELETE CASCADE, so a result
+    # row cannot outlive its node. (The node the debate *started from* is not used any more. debates.parent_node_id is
+    # ON DELETE SET NULL, so it could vanish while the debate node was still on the map, and branch creation then
+    # failed outright.)
+    parent = (
         await s.execute(
             text("SELECT id::text AS id, tree_id::text AS tree_id, project_id::text AS project_id FROM nodes "
                  "WHERE id = CAST(:n AS uuid)"),
-            {"n": row["origin_id"]},
+            {"n": node_id},
         )
     ).mappings().first()
-    if origin is None:
-        raise StateError("the node this debate started from no longer exists")
+    if parent is None:
+        raise StateError("the debate node no longer exists")
 
     branches = await prune_dead_branch_nodes(s, node_id, list(row["branches"] or []))
     by_id = {b["id"]: b for b in branches}
@@ -460,7 +466,7 @@ async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids:
         for _ in range(5):  # same fork-index race the debate node handles
             fork = (
                 await s.execute(text("SELECT COALESCE(MAX(fork_index), 0) + 1 FROM nodes WHERE parent_id = :p"),
-                                {"p": origin["id"]})
+                                {"p": parent["id"]})
             ).scalar_one()
             try:
                 async with s.begin_nested():
@@ -469,7 +475,7 @@ async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids:
                             text("INSERT INTO nodes (tree_id, project_id, parent_id, created_by_id, node_type, title, "
                                  "summary, chats, fork_index, branch_of_debate_id) VALUES (:t, :pr, :pa, CAST(:u AS uuid), "
                                  "'standard', :ti, :su, CAST(:c AS jsonb), :f, CAST(:dbid AS uuid)) RETURNING id"),
-                            {"t": origin["tree_id"], "pr": origin["project_id"], "pa": origin["id"], "u": owner_id,
+                            {"t": parent["tree_id"], "pr": parent["project_id"], "pa": parent["id"], "u": owner_id,
                              "ti": b["title"][:60], "su": b["question"][:280], "c": js(chats_for(payload, b)),
                              "f": fork, "dbid": row["debate_id"]},
                         )
@@ -487,4 +493,4 @@ async def create_branch_nodes(s: AsyncSession, node_id: str, owner_id: str, ids:
         text("UPDATE debate_results SET branches = CAST(:b AS jsonb) WHERE node_id = CAST(:n AS uuid)"),
         {"b": js(branches), "n": node_id},
     )
-    return {"parent_node_id": origin["id"], "created": created, "branches": branches}
+    return {"parent_node_id": parent["id"], "created": created, "branches": branches}

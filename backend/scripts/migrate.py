@@ -93,8 +93,9 @@ ORDER BY n.fork_index"""
 
 
 async def show_tree(conn, origin: str) -> int:
-    """What step 4 of the runbook checks: the branch nodes are siblings of the debate node, and no branch's
-    seeded context mentions another branch's subject."""
+    """Pass a DEBATE node id: prints it with its branch children, and checks that no branch's own seed names
+    another branch's subject. (The debate node's own text does list every direction; its children inherit that by
+    design, which is why the check is on the seeds.)"""
     rows = await conn.fetch(TREE_SQL, origin)
     if not rows:
         print(f"no node {origin}, and nothing parented to it")
@@ -103,7 +104,7 @@ async def show_tree(conn, origin: str) -> int:
     print(f"children of {origin}:\n")
     print(f"  {'node':38}  {'type':10}  {'msgs':>4}  {'from debate':11}  title")
     for r in rows:
-        tag = "(origin) " if r["id"] == origin else ""
+        tag = "(parent) " if r["id"] == origin else ""
         print(f"  {r['id']:38}  {r['node_type']:10}  {r['messages']:>4}  "
               f"{str(bool(r['from_debate'])):11}  {tag}{(r['title'] or '')[:46]}")
 

@@ -509,7 +509,8 @@ export interface DebateTranscript {
   transcript: DebateTranscriptTurn[];
 }
 
-/** POST /debates/node/:nodeId/branches (201). The new nodes hang under `parent_node_id`, not the debate node. */
+/** POST /debates/node/:nodeId/branches (201). The new nodes hang under `parent_node_id`, which is the debate
+ * node itself: the chain is origin -> debate -> branches. Always place them by this field, never by assuming. */
 export interface DebateBranchesCreated {
   parent_node_id: string;
   created: { branch_id: string; node_id: string; created: boolean }[];
