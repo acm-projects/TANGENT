@@ -346,7 +346,7 @@
   position: absolute;
   inset: 1.4rem 0 0;
   border-radius: 0 var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   box-shadow: var(--shadow-floating);
 }
 
@@ -361,7 +361,7 @@
   height: 1.5rem;
   padding: 0 var(--space-3);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   color: var(--color-text-secondary);
 }
 
@@ -426,7 +426,7 @@
   background:
     radial-gradient(ellipse 1.4rem 0.6rem at 50% 0, rgb(0 0 0 / 0.08), transparent 70%),
     var(--texture-grain),
-    color-mix(in oklab, var(--color-folder) 45%, var(--color-surface));
+    color-mix(in oklab, var(--color-card-alt) 45%, var(--color-surface));
   box-shadow:
     0 -1px 0 var(--color-border),
     0 -0.25rem 0.6rem rgb(0 0 0 / 0.08);

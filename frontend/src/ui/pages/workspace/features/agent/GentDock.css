@@ -39,7 +39,7 @@
   --dock-wash: rgb(243 242 239 / 0.14);
   --dock-field: rgb(0 0 0 / 0.14);
   /* the danger colour (oxblood), lifted to read on his ink */
-  --dock-alert: color-mix(in srgb, var(--red-oxblood-dark) 55%, white);
+  --dock-alert: color-mix(in srgb, var(--color-danger) 55%, white);
 }
 
 .gent-dock[data-inked="false"] {

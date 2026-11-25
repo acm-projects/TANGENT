@@ -1,8 +1,9 @@
 /* text.css — typography. See DESIGN.md Rule 1a.
  *
- * Font files are loaded by next/font in app/layout.tsx, which sets
- * --font-heading, --font-content and --font-symbols on <html>. Components name the roles below,
- * never the font itself.
+ * Font files are loaded by next/font in app/layout.tsx, which sets --font-heading (Aleo),
+ * --font-content (Outfit), --font-mono (IBM Plex Mono), --font-stamp (Special Elite) and
+ * --font-symbols on <html>. Components name those roles (and --font-icon below), never the
+ * font itself.
  *
  * The size scale matches the TextSize type in types/Types.ts one-to-one.
  * A step in the type with no token here is a bug. */

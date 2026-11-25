@@ -11,7 +11,7 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   /* minmax(0, …): the dock's buttons must not widen the room past the screen (they scroll instead) */
   grid-template-columns: minmax(0, 1fr);
-  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
+  background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
   color: var(--color-text);
   animation: court-in var(--motion-slow) var(--ease-out) backwards;
 }
@@ -130,7 +130,7 @@
   padding: var(--space-2) var(--space-8) var(--space-3);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   /* the dais: a step beneath the bench, then its shadow on the floor */
   box-shadow: 0 6px 0 -1px var(--color-board), 0 6px 0 0 var(--color-border-strong), var(--shadow-floating);
   text-align: center;

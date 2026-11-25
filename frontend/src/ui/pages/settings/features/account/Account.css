@@ -139,7 +139,7 @@
 .id-badge-initial {
   display: grid;
   place-items: center;
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   font-family: var(--font-heading);
   color: var(--color-text);
 }
@@ -310,7 +310,7 @@
   border: 1px solid var(--color-border);
   border-bottom: 0;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-text);
@@ -387,7 +387,7 @@
   margin-top: 0.35rem;
   border: 1px solid var(--color-border-strong);
   border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   font-family: var(--font-heading);
   color: var(--color-text);
   transform-origin: left bottom;
@@ -404,7 +404,7 @@
   border: 1px solid var(--color-border-strong);
   border-bottom: 0;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--color-folder);
+  background: var(--color-card-alt);
 }
 
 .workspace-row:hover .workspace-row-tab {

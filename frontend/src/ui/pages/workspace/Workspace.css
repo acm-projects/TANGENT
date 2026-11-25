@@ -11,7 +11,7 @@
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   height: 100dvh;
   overflow: hidden;
-  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
+  background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }
 
 .workspace > * {

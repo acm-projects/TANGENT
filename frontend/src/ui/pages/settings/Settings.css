@@ -3,7 +3,7 @@
 .settings-page {
   min-height: 100dvh;
   /* the board the file lies on, as on the dashboard */
-  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
+  background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }
 
 /* the index scrolls to a section instead of jumping */

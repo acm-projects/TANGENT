@@ -4,7 +4,21 @@ Source: the **Tangent** design-system artifact (https://claude.ai/artifact/WmPTf
 derived from the **Tanget Design System** canvas (https://claude.ai/artifact/Pf2jhiWECCLzcMrtH7LyMq).
 Day = vanilla leather on pale kraft cork; Night = charcoal leather on dark wood. Paper stays light in both.
 
-Status: **PLAN FINAL, waiting for the go-ahead.** Work runs top to bottom.
+Status: **docs and foundations done; batch 1a (primitives) running.** Work runs bottom up.
+
+## How we build
+
+1. **Surface plan** (this file): what changes, in which order.
+2. **Build briefs**: before each batch, Claude (Opus) writes a deep how-to-build brief per task, committed under `docs/retheme-briefs/<batch>/`: exact files, tokens, selectors, DS values, what not to touch.
+3. **Sonnet agents build in parallel**, each in its own git worktree, running typecheck + lint only (no dev servers: battery). Claude reviews each diff and merges.
+4. **Check and review**: Claude runs the one mock server, checks Day and Night, and reads the gallery (`/dev/library`) to suggest changes. Then the user looks at the UI, we list changes, and the loop repeats.
+
+**Bottom up, overlap on purpose.** Each batch builds on the one below and may redo what lower batches touched, so a change low down cascades up.
+
+- **1a primitives** (parallel): Panel + materials; Text + Icon; Input/TextArea/Select; Divider/Frame/Image/Link; the gallery page.
+- **1b material adoption** (parallel per surface, after Panel merges): every paper, leather or cork surface moves to `material=`, Panels and styled divs alike (a div may become `<Panel as=…>` in the same spot: no new wrappers, no moved logic), and is fully restyled to the DS while it's there.
+- **Then** components, board surfaces, brand, REPO-ONLY screens, layer by layer.
+- **Torn edge:** a baked strip mask (resizes cleanly). A `live` edge parameter only if something animated needs it.
 
 Branch: `claude/tangent-retheme`, off `origin/dev` (abb757f). Paths below are under `frontend/src/ui/` unless they start with `docs/`.
 
@@ -28,7 +42,16 @@ Update the docs to describe the new look before any code changes, so each later 
 
 ## 1. Foundations (`library/tokens/`)
 
-- [ ] **Colours** `colors.css`: 50 DS tokens in 3 layers.
+Done (by Claude, since everything else depends on it). Notes for the agents:
+- Tier-1 names keep the repo's `-light`/`-dark` pairs (`--paper-light`, `--ink-2-dark`, ...). Components use tier 2 only: the DS's material names became `--color-leather`, `--color-text-on-leather(-muted)`, `--color-stitch`, `--color-card`, `--color-card-alt`, `--color-slip`, `--color-composer`, `--color-hole`, `--color-track`, `--color-ruling`, `--color-pin`, `--color-highlight`, `--color-scrap(-line)`, `--color-stain`.
+- `--board-lamp` and `--board-vignette` are gradient layers: `background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board)`.
+- New textures in `shape.css`: `--texture-cork`, `--texture-leather` (multiply it over `--color-leather`). `--texture-grain` (paper) and `--texture-pin` stay: the DS keeps them, so they were never "dropped".
+- **Torn paper edge is not a token yet.** It's an SVG displacement filter in the DS; it lands with Panel's `edge="torn"` (step 2).
+- **Known issue:** text placed straight on the board (dashboard heading, workspace labels) is now dark on Night's dark wood. Text on the board should use `--color-text-on-leather` (the DS puts `leather-ink` on the board). Fix it per surface in steps 4 to 6.
+- `--font-weight-semibold` is used with a fallback in `GentDock.css` but never defined (pre-existing). Fix in the GentDock step.
+- Search dim is one value (0.34); the DS's Night 0.28 needs a non-colour theme switch we don't have.
+
+- [x] **Colours** `colors.css`: 50 DS tokens in 3 layers.
   - materials: board, board-lamp, board-vignette, scrap, scrap-line, leather, leather-ink, leather-ink-2, stitch, leather-wear, paper, card, card-alt, slip, composer, hole, stain
   - ink/marks: ink, ink-2, ink-3, rule, track, ruling, string-red, graphite, pin-grey, gent-ink, blue-gent, on-gent-ink, highlight
   - semantic (same names as today): color-board, color-surface(-raised), color-text(-secondary/-muted/-faint/-on-brand), color-border(-strong/-emphasis), color-brand(-hover), color-string, color-danger, color-gent, color-focus-ring, color-selection, color-string-shadow, color-pin-shine
@@ -38,10 +61,10 @@ Update the docs to describe the new look before any code changes, so each later 
     - `light-lamp` / `light-vignette` (Dashboard, Settings, Workspace, Debate, Login) → `board-lamp` / `board-vignette`.
     - `texture-pin` (16 uses) → pin colour + `shadow-pin` + `color-pin-shine`.
     - `filter-floating` (Chat.css:100) → `shadow-floating`.
-- [ ] **Type** `text.css` + font loading in `app/layout.tsx`: heading Aleo, content Outfit, **NEW** mono IBM Plex Mono, **NEW** stamp Special Elite, symbols Material Symbols Rounded (filled). App scale xxs 10 to display 48; marketing display-xl 88 / l 64 / m 44, lede 20, eyebrow 13.
-- [ ] **Shape** `shape.css`: spacing, radius, **NEW** shadows (badge, rail, pin, press, wear), opacity (search-dim, board-scrap, board-grain), layout (sheet-width 520, content-max, measure).
-- [ ] **Motion** `motion.css`: DS says unchanged. Verify only.
-- [ ] **Textures**: cork grain, torn paper edge, leather pebble grain + dashed stitch (from the DS `bundle.css`), as tokens the materials read.
+- [x] **Type** `text.css` + font loading in `app/layout.tsx`: heading Aleo, content Outfit, **NEW** mono IBM Plex Mono, **NEW** stamp Special Elite, symbols Material Symbols Rounded (filled). App scale xxs 10 to display 48; marketing display-xl 88 / l 64 / m 44, lede 20, eyebrow 13.
+- [x] **Shape** `shape.css`: spacing, radius, **NEW** shadows (badge, rail, pin, press, wear), opacity (search-dim, board-scrap, board-grain), layout (sheet-width 520, content-max, measure).
+- [x] **Motion** `motion.css`: verified, unchanged (matches the DS bundle).
+- [x] **Textures**: cork and leather as tiles. Torn edge and stitch land with Panel (step 2).
 
 ## 2. Primitives (`library/primitives/`)
 

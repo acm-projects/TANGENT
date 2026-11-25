@@ -3,5 +3,5 @@
 .dashboard {
   min-height: 100dvh;
   /* the board the paper lies on, as in the workspace */
-  background: var(--light-vignette), var(--light-lamp), var(--texture-grain), var(--color-board);
+  background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }

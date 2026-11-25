@@ -1,4 +1,4 @@
-/* shape.css — spacing, radii, texture. See DESIGN.md Rule 1 and
+/* shape.css — spacing, radii, sizes, opacities, textures. See DESIGN.md Rule 1 and
  * docs/VISUAL_LANGUAGE.md §3.
  *
  * Spacing and radii are scales, used by components directly
@@ -13,6 +13,19 @@
   --space-4: 1rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+  /* the leather rail's width */
+  --space-rail: 72px;
+
+  /* layout widths: the notes sheet, a landing page's column, a line of body text */
+  --sheet-width: 520px;
+  --content-max: 1200px;
+  --measure: 40rem;
+
+  /* cards that don't match a search fade to this */
+  --opacity-search-dim: 0.34;
 
   /* radii */
   --radius-sm: 2px;
@@ -30,4 +43,13 @@
 
   /* how much of a surface's colour shows through a hover wash */
   --glass-mix: 50%;
+
+  /* Cork: fine grain over a slow mottle, baked at board-grain strength. Layer
+   * it over --color-board (see --board-lamp in colors.css). */
+  --texture-cork: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27400%27%3E%3Cfilter id=%27g%27 x=%270%27 y=%270%27 width=%271%27 height=%271%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.65%27 numOctaves=%274%27 seed=%2721%27 stitchTiles=%27stitch%27 result=%27g%27/%3E%3CfeColorMatrix in=%27g%27 values=%270 0 0 0 .3 0 0 0 0 .22 0 0 0 0 .14 0 0 0 .21 -.02%27 result=%27gr%27/%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.018%27 numOctaves=%273%27 seed=%2713%27 stitchTiles=%27stitch%27 result=%27m%27/%3E%3CfeColorMatrix in=%27m%27 values=%270 0 0 0 .32 0 0 0 0 .22 0 0 0 0 .12 0 0 0 .15 0%27 result=%27mo%27/%3E%3CfeMerge%3E%3CfeMergeNode in=%27mo%27/%3E%3CfeMergeNode in=%27gr%27/%3E%3C/feMerge%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23g%29%27/%3E%3C/svg%3E");
+
+  /* Leather: a lit pebble grain with a warm mottle. Opaque and near white, so
+   * it is multiplied over the leather colour:
+   * `background: var(--texture-leather), var(--color-leather); background-blend-mode: multiply`. */
+  --texture-leather: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27320%27 height=%27320%27%3E%3Cfilter id=%27l%27 x=%270%27 y=%270%27 width=%271%27 height=%271%27 color-interpolation-filters=%27sRGB%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.012%27 numOctaves=%273%27 seed=%2712%27 stitchTiles=%27stitch%27 result=%27mot%27/%3E%3CfeColorMatrix in=%27mot%27 values=%270 0 0 0 .62 0 0 0 0 .38 0 0 0 0 .2 0 0 0 .4 -.16%27 result=%27mot2%27/%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.6%27 numOctaves=%273%27 seed=%2744%27 stitchTiles=%27stitch%27 result=%27pebble%27/%3E%3CfeDiffuseLighting in=%27pebble%27 surfaceScale=%27.6%27 diffuseConstant=%271.12%27 lighting-color=%27%23fff%27 result=%27lit%27%3E%3CfeDistantLight azimuth=%27235%27 elevation=%2760%27/%3E%3C/feDiffuseLighting%3E%3CfeComposite in=%27mot2%27 in2=%27lit%27 operator=%27over%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23l%29%27/%3E%3C/svg%3E");
 }

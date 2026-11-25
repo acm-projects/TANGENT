@@ -514,7 +514,7 @@
 
 /* A compact card: a thread pressed into one summary, filed on manila stock with a seal like the verdict's. */
 .mindmap-node[data-compact] {
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   border-style: dashed;
 }
 

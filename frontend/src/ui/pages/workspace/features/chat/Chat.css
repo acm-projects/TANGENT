@@ -97,7 +97,8 @@
 .chat:not([data-layout="collapsed"]) {
   border: 0;
   background: none;
-  filter: var(--filter-floating);
+  /* shortcut: a box shadow ignores the cut corner; the NotesSheet retheme replaces this sheet's shape */
+  box-shadow: var(--shadow-floating);
 }
 
 /* The full-screen button sits under the folded corner, hidden. Hovering or
@@ -1228,5 +1229,5 @@
   padding: var(--space-3) var(--space-4);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-md);
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
 }

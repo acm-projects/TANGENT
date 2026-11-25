@@ -223,7 +223,7 @@
   margin-inline: calc(-1 * var(--space-6));
   padding: var(--space-6) var(--space-6) var(--space-4);
   border-bottom: 1px solid var(--color-border);
-  background: var(--texture-grain), var(--color-folder);
+  background: var(--texture-grain), var(--color-card-alt);
   color: var(--color-text);
 }
 

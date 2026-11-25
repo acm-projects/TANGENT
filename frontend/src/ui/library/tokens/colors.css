@@ -1,17 +1,17 @@
 /* colors.css — palette and colour meanings. See DESIGN.md Rule 1 and
- * docs/VISUAL_LANGUAGE.md §2.
+ * docs/VISUAL_LANGUAGE.md §2. Values: the Tangent design system.
  *
  * Two tiers, top to bottom:
  *   1. Palette: raw values. Never referenced by a component. A name here says
- *      what the value IS, not what it's FOR.
+ *      what the value IS (a material or an ink), not what it's FOR. Pairs are
+ *      `-light` (Day) and `-dark` (Night).
  *   2. Semantic: meaning. The ONLY tier a component may reference. Test: can
  *      you name it without saying a colour? `--color-danger` passes.
- *      `--color-paper` is tier 1 in disguise.
  *
- * Three materials: paper (surfaces), graphite (ink), flag red (a connection).
- * Light and dark are both defined here and the OS picks between them (unless
- * the reader picks in Settings: lighting.ts), so each semantic token is
- * written once as light-dark(light, dark). */
+ * Day is vanilla leather on pale kraft cork; Night is charcoal leather on dark
+ * wood under a lamp. Paper stays light in both, so ink is dark in both. The OS
+ * picks the theme unless the reader picks in Settings (lighting.ts), so each
+ * semantic token is written once as light-dark(day, night). */
 
 :root {
   color-scheme: light dark;
@@ -29,87 +29,138 @@
 :root {
   /* ── tier 1: palette ─────────────────────────────────────────── */
 
-  --paper-light: #f3f2ef;
-  --paper-dark: #2a2826;
-  --board-light: #e7e5e0;
-  --board-dark: #1f1e1c;
-  --paper-raised-light: #e7e5e0;
-  --paper-raised-dark: #35322f;
+  /* materials */
+  --board-light: #d6c9ae;
+  --board-dark: #2a2018;
+  --lamp-light: rgb(255 252 240 / 0.78);
+  --lamp-dark: rgb(255 186 104 / 0.2);
+  --vignette-light: rgb(80 54 26 / 0.32);
+  --vignette-dark: rgb(0 0 0 / 0.66);
+  /* scraps are baked at board-scrap strength (0.4 Day, 0.3 Night) */
+  --scrap-light: rgb(236 229 212 / 0.4);
+  --scrap-dark: rgb(110 95 74 / 0.3);
+  --scrap-line-light: rgb(60 46 30 / 0.18);
+  --scrap-line-dark: rgb(24 16 8 / 0.3);
 
-  --ink-light: #2a2826;
-  --ink-dark: #ece9e4;
-  --ink-soft-light: #3f3c39;
-  --ink-soft-dark: #d5d1cb;
-  --ink-muted-light: #66625d;
-  --ink-muted-dark: #a19c95;
-  --ink-faint-light: #8f8a84;
-  --ink-faint-dark: #6e6a65;
+  --leather-light: #f1e8d4;
+  --leather-dark: #332c26;
+  --leather-ink-light: #3a3128;
+  --leather-ink-dark: #e6dbc8;
+  --leather-ink-2-light: #5c5042;
+  --leather-ink-2-dark: #c4b59d;
+  --stitch-light: rgb(150 112 70 / 0.45);
+  --stitch-dark: rgb(206 164 112 / 0.34);
 
-  /* folder card stock: the one warm-leaning neutral, still short of cream */
-  --manila-light: #d3cbbd;
-  --manila-dark: #47413a;
+  --paper-light: #f7f3ea;
+  --paper-dark: #e3d7c0;
+  --card-light: #f4efe4;
+  --card-dark: #e1d4ba;
+  --card-alt-light: #ece5d6;
+  --card-alt-dark: #d3c5a9;
+  --slip-light: #fbf8f1;
+  --slip-dark: #ede3d0;
+  --composer-light: rgb(255 255 255 / 0.4);
+  --composer-dark: rgb(255 248 230 / 0.3);
+  --hole-light: #d3c8b4;
+  --hole-dark: #b8aa90;
 
-  --rule-light: #cfcbc4;
-  --rule-dark: #46423e;
+  /* inks and marks */
+  --ink-light: #26211c;
+  --ink-dark: #1f1913;
+  --ink-2-light: #4a4239;
+  --ink-2-dark: #42382d;
+  --ink-3-light: #625a4f;
+  --ink-3-dark: #54493b;
+  --rule-light: rgb(38 33 28 / 0.22);
+  --rule-dark: rgb(31 25 19 / 0.26);
+  --track-light: rgb(38 33 28 / 0.14);
+  --track-dark: rgb(31 25 19 / 0.16);
+  --ruling-light: rgb(30 91 128 / 0.14);
+  --ruling-dark: rgb(28 84 118 / 0.18);
+  --string-red-light: #c2302c;
+  --string-red-dark: #da453d;
+  --graphite-light: #7c7367;
+  --graphite-dark: #a3967f;
+  --pin-grey-light: #6a625a;
+  --pin-grey-dark: #8a7f6e;
+  --highlight-light: rgb(222 164 38 / 0.46);
+  --highlight-dark: rgb(222 160 30 / 0.55);
+  --stain-light: rgb(120 78 38 / 0.12);
+  --stain-dark: rgb(30 18 8 / 0.22);
+  --oxblood: #9b1c1e;
 
-  /* One red for both themes: 3.5:1 on light paper, so it only ever colours
-   * graphics (string, pins), never text. */
-  --red-flag: #e5484a;
-  --red-oxblood-light: #9b1c1e;
-  --red-oxblood-dark: #f08a88;
-
-  /* Gent's blue, one for both themes like the red: 3.8:1 on light paper, 3.4:1
-   * on dark (the #00a7e1 hue, deepened: #00a7e1 itself was 2.5:1 on light).
-   * Graphics only (lines, outlines, pins), never text. */
+  /* Gent's blue, one value for both themes: blue means Gent did this.
+   * blue-gent draws his outlines (graphics only, never text); gent-ink is his
+   * panels' solid fill, and on-gent-ink the text and pale pores inside it. */
   --blue-gent: #0083b2;
-  /* Gent's ink: a panel's solid fill (deeper, so text on it reads: 5.3:1) and the pale paper in its pores and text */
   --gent-ink: #006c93;
   --on-gent-ink: #f3f2ef;
 
   /* ── tier 2: semantic ────────────────────────────────────────── */
 
-  /* the paper everything is written on, and the board it is pinned to */
-  --color-surface: light-dark(var(--paper-light), var(--paper-dark));
-  --color-surface-raised: light-dark(var(--paper-raised-light), var(--paper-raised-dark));
+  /* the board everything is pinned to, and the lamp over it. The lamp and
+   * vignette are layers: `background: var(--board-vignette), var(--board-lamp),
+   * var(--texture-cork), var(--color-board)`. */
   --color-board: light-dark(var(--board-light), var(--board-dark));
-  /* The desk lamp over the board: a warm pool of light, and the dimmer edges
-   * it doesn't reach. Layer over --color-board with --texture-grain. */
-  --light-lamp: radial-gradient(ellipse 60% 70% at 32% 42%,
-      light-dark(rgb(255 252 246 / 0.55), rgb(255 236 210 / 0.1)), transparent 70%);
-  --light-vignette: radial-gradient(ellipse 120% 100% at 40% 45%,
-      transparent 55%, light-dark(rgb(60 45 30 / 0.1), rgb(0 0 0 / 0.45)));
+  --board-lamp: radial-gradient(ellipse 60% 70% at 40% 40%,
+      light-dark(var(--lamp-light), var(--lamp-dark)), transparent 72%);
+  --board-vignette: radial-gradient(ellipse 120% 100% at 45% 45%,
+      transparent 45%, light-dark(var(--vignette-light), var(--vignette-dark)));
+  --color-scrap: light-dark(var(--scrap-light), var(--scrap-dark));
+  --color-scrap-line: light-dark(var(--scrap-line-light), var(--scrap-line-dark));
+  /* the coffee ring: at most one per board, never over text */
+  --color-stain: light-dark(var(--stain-light), var(--stain-dark));
 
-  /* manila: case folders, and the band that heads a panel holding a case's files */
-  --color-folder: light-dark(var(--manila-light), var(--manila-dark));
+  /* leather: navigation and identity only (rail, case badge, app mark) */
+  --color-leather: light-dark(var(--leather-light), var(--leather-dark));
+  --color-text-on-leather: light-dark(var(--leather-ink-light), var(--leather-ink-dark));
+  --color-text-on-leather-muted: light-dark(var(--leather-ink-2-light), var(--leather-ink-2-dark));
+  --color-stitch: light-dark(var(--stitch-light), var(--stitch-dark));
 
-  /* Four text emphases, strongest first:
-   *   text            selected node, chat messages
-   *   text-secondary  headings, nodes on the selected path
-   *   text-muted      section labels, chat metadata ("Thought for 32s"),
-   *                   unselected nodes, placeholders
-   *   text-faint      graphics only: idle string, pins, the dot grid (under
-   *                   4.5:1, so never text) */
+  /* paper stocks: the sheet (Panel's default), cards, your slips, the composer */
+  --color-surface: light-dark(var(--paper-light), var(--paper-dark));
+  --color-surface-raised: light-dark(var(--card-alt-light), var(--card-alt-dark));
+  --color-card: light-dark(var(--card-light), var(--card-dark));
+  --color-card-alt: light-dark(var(--card-alt-light), var(--card-alt-dark));
+  --color-slip: light-dark(var(--slip-light), var(--slip-dark));
+  --color-composer: light-dark(var(--composer-light), var(--composer-dark));
+  --color-hole: light-dark(var(--hole-light), var(--hole-dark));
+
+  /* Four text emphases on paper, strongest first:
+   *   text            the picked card, chat messages
+   *   text-secondary  headings, cards on the path, breadcrumbs
+   *   text-muted      labels, metadata, placeholders, exhibit numbers
+   *                   (the lightest text: 4.5:1 on card and paper)
+   *   text-faint      graphics only: idle string (under 4.5:1, never text) */
   --color-text: light-dark(var(--ink-light), var(--ink-dark));
-  --color-text-secondary: light-dark(var(--ink-soft-light), var(--ink-soft-dark));
-  --color-text-muted: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
-  --color-text-faint: light-dark(var(--ink-faint-light), var(--ink-faint-dark));
+  --color-text-secondary: light-dark(var(--ink-2-light), var(--ink-2-dark));
+  --color-text-muted: light-dark(var(--ink-3-light), var(--ink-3-dark));
+  --color-text-faint: light-dark(var(--graphite-light), var(--graphite-dark));
   --color-text-on-brand: light-dark(var(--paper-light), var(--paper-dark));
 
   /* Three border emphases: resting, on the selected path, active/hovered. */
   --color-border: light-dark(var(--rule-light), var(--rule-dark));
-  --color-border-strong: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
+  --color-border-strong: light-dark(var(--ink-3-light), var(--ink-3-dark));
   --color-border-emphasis: light-dark(var(--ink-light), var(--ink-dark));
+  /* the empty part of a meter; hovered and selected rows */
+  --color-track: light-dark(var(--track-light), var(--track-dark));
+  /* faint blue index-card ruling under the composer */
+  --color-ruling: light-dark(var(--ruling-light), var(--ruling-dark));
 
+  /* primary is solid ink */
   --color-brand: light-dark(var(--ink-light), var(--ink-dark));
-  --color-brand-hover: light-dark(var(--ink-soft-light), var(--ink-soft-dark));
+  --color-brand-hover: light-dark(var(--ink-2-light), var(--ink-2-dark));
 
-  /* Red means "connected" (string, pins, the selected path), so it is not the
-   * danger colour: a red delete button would read as a link. */
-  --color-string: var(--red-flag);
-  --color-danger: light-dark(var(--red-oxblood-light), var(--red-oxblood-dark));
-  /* Blue means "Gent did this", as red means the user did: the questions he
-   * asked, the node he is on, the steps in his Field Notes. */
+  /* Red means "connected" (string, pins, the path, your slips' margin and
+   * tack), so it is not the danger colour: a red delete would read as a link.
+   * Danger is oxblood, in both themes. */
+  --color-string: light-dark(var(--string-red-light), var(--string-red-dark));
+  --color-pin: light-dark(var(--pin-grey-light), var(--pin-grey-dark));
+  --color-danger: var(--oxblood);
+  /* Blue means "Gent did this", as red means the user did. */
   --color-gent: var(--blue-gent);
+  /* the ochre highlighter: search hits and marked phrases, ink on top */
+  --color-highlight: light-dark(var(--highlight-light), var(--highlight-dark));
 
   /* what string and pins cast on the board, and the light caught on a pin head */
   --color-string-shadow: light-dark(rgb(40 30 20 / 0.28), rgb(0 0 0 / 0.6));
@@ -117,19 +168,25 @@
   /* that light as a layer for a domed pin head: `background: var(--texture-pin), var(--color-string)` */
   --texture-pin: radial-gradient(circle at 35% 30%, var(--color-pin-shine), transparent 30%);
 
-  --color-selection: light-dark(rgb(42 40 38 / 0.16), rgb(236 233 228 / 0.2));
+  --color-selection: light-dark(rgb(42 40 38 / 0.16), rgb(31 25 19 / 0.18));
 
-  --color-focus-ring: light-dark(var(--ink-muted-light), var(--ink-muted-dark));
+  --color-focus-ring: light-dark(var(--ink-3-light), var(--ink-3-dark));
 
-  /* Paper lying on the board: a short contact shadow, and a taller one while
-   * the card is lifted. Shadows get darker and tighter on the dark board. */
+  /* Shadows. Paper lying on the board, and lifted off it; leather's heavier
+   * cast; a pin head; the current rail item pressed into the leather; worn
+   * leather edges. Darker and tighter on the dark board. */
   --shadow-floating: 0 1px 1px light-dark(rgb(40 30 20 / 0.1), rgb(0 0 0 / 0.35)),
     0 3px 8px -2px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45));
   --shadow-lift: 0 2px 2px light-dark(rgb(40 30 20 / 0.08), rgb(0 0 0 / 0.3)),
     0 14px 24px -8px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.6));
-
-  /* --shadow-floating as a `filter`, for a sheet whose outline isn't a box
-   * (the chat's cut corner): drop-shadow follows the painted shape. */
-  --filter-floating: drop-shadow(0 1px 1px light-dark(rgb(40 30 20 / 0.12), rgb(0 0 0 / 0.35)))
-    drop-shadow(0 8px 12px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45)));
+  --shadow-badge: 0 2px 3px rgb(10 6 2 / 0.35), 0 12px 22px -6px rgb(10 6 2 / 0.55);
+  --shadow-rail: 3px 0 4px rgb(10 6 2 / 0.3), 10px 0 24px rgb(10 6 2 / 0.35);
+  --shadow-pin: 1px 4px 4px rgb(20 12 6 / 0.45);
+  /* shortcut: light-dark() can only swap colours, so Night uses Day's blur radii (4px, 12px; the DS has 5px, 14px) */
+  --shadow-press: inset 0 2px 4px light-dark(rgb(90 64 36 / 0.28), rgb(0 0 0 / 0.6)),
+    0 1px 0 light-dark(rgb(255 255 255 / 0.75), rgb(255 228 190 / 0.16));
+  --shadow-wear: inset 0 0 0 1px light-dark(rgb(255 255 255 / 0.55), rgb(214 164 112 / 0.12)),
+    inset 0 0 2px 1px light-dark(rgb(196 158 108 / 0.34), rgb(164 106 60 / 0.34)),
+    inset 0 0 12px 2px light-dark(rgb(190 150 100 / 0.16), rgb(122 74 38 / 0.26)),
+    inset 0 1px 1px light-dark(rgb(255 255 255 / 0.6), rgb(255 226 186 / 0.06));
 }
