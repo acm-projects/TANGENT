@@ -83,6 +83,24 @@
     border-color: var(--color-border-emphasis);
   }
 
+  /* leather: flush with the leather around it at rest (no wear shadow, no border), debossed on hover and
+   * press. Outranks the shared hover and pressed rules above (0,6,0 vs their 0,5,0). */
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"]:not([aria-pressed="true"]) {
+    box-shadow: none;
+  }
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"]:hover:not(:disabled) {
+    background: var(--texture-leather), var(--color-leather);
+    background-blend-mode: multiply;
+    border-color: transparent;
+    box-shadow: var(--shadow-press-soft);
+  }
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"][aria-pressed="true"],
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"][aria-pressed="true"]:hover:not(:disabled),
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"][data-pressed="true"]:hover:not(:disabled) {
+    border-color: transparent;
+    box-shadow: var(--shadow-press);
+  }
+
   /* states */
   [data-ui="panel"][data-component="button"]:focus-visible {
     outline: 2px solid var(--color-focus-ring);
