@@ -1,2 +1,34 @@
-/* Decal — see DESIGN.md §4 "Panel materials".
- * shortcut: empty until batch 1a-2 (docs/retheme-briefs/1a-2/cork-decal.md). */
+/* Decal — see DESIGN.md §4 "Panel materials". Decoration on a board: empty, aria-hidden, positioned
+ * (position/top/left/rotate) by its consumer; this file sets only the look and default size.
+ * Fingerprints and other stains will be added later as new kinds. */
+
+@layer ui {
+  [data-ui="decal"] {
+    display: block;
+    pointer-events: none;
+  }
+
+  /* torn newspaper scrap: headline bar, then text lines, on the scrap's paper */
+  [data-ui="decal"][data-kind="scrap"] {
+    width: 170px;
+    height: 150px;
+    clip-path: polygon(0 4%, 9% 0, 22% 3%, 40% 0, 58% 4%, 76% 0, 100% 3%, 98% 24%, 100% 46%, 97% 70%, 100% 100%, 78% 96%, 60% 100%, 38% 97%, 20% 100%, 0 97%, 3% 72%, 0 48%, 2% 25%);
+    background:
+      linear-gradient(var(--color-scrap-line) 0 0) 16px 16px / 58% 9px no-repeat,
+      repeating-linear-gradient(to bottom, transparent 0 8px, var(--color-scrap-line) 8px 9px) 16px 40px / calc(100% - 32px) calc(100% - 58px) no-repeat,
+      var(--color-scrap);
+  }
+
+  /* a mug set down once: uneven ring, open on one side, darker at the rim. One per board, never over text. */
+  [data-ui="decal"][data-kind="coffee-ring"] {
+    width: 120px;
+    height: 120px;
+    border-radius: 46% 54% 50% 50% / 52% 48% 54% 46%;
+    background:
+      radial-gradient(closest-side, transparent 78%, var(--color-stain) 80% 92%, transparent 94%),
+      radial-gradient(closest-side, transparent 80%, var(--color-stain) 88%, transparent 91%),
+      radial-gradient(closest-side, var(--color-stain), transparent 78%);
+    /* the gap: transparent wedge cut from the ring */
+    mask: conic-gradient(from 20deg, transparent 0 34deg, currentcolor 40deg 100%);
+  }
+}
