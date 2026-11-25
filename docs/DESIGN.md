@@ -654,7 +654,7 @@ every recipe (fill, grain, edge, stitch, shadow) lives once, in `Panel.css`.
 | `material` | Job | Parameters (each one `data-*` attribute) |
 |---|---|---|
 | `paper` (default) | anything you read | `stock`: `paper` \| `card` \| `card-alt` \| `slip` \| `composer` · `edge`: `clean` \| `torn` · `ruled`: `none` \| `lines` \| `margin` · `holes`: boolean |
-| `leather` | navigation and identity | `stitch`: `"all"` \| `"none"` \| a list of sides (`["right"]`) · `round`: `"all"` \| `"none"` \| a list of corners (`["top-right", "bottom-right"]`) · `pressed`: boolean (the panel stays flat; the icons on it are debossed into the leather) |
+| `leather` | navigation and identity | `stitch`: `"all"` \| `"none"` \| a list of sides (`["right"]`) · `round`: `"all"` \| `"none"` \| a list of corners (`["top-right", "bottom-right"]`) · `pressed`: boolean (debossed into the leather and darker; its icons are stamped in) |
 | `ink` | Gent | `seed`: number (keeps this panel's edge stable) · `calm`: boolean (calmer ink for a large reading surface). The living, bleeding ink from `primitives/Ink/` (the same engine `InkPanel` uses), drawn on a canvas under the content. |
 | `cork` | the board | none yet: real cork. Lamp and vignette are the page's lighting, not the material; scraps, stains and coffee rings are `Decal`s. |
 

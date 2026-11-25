@@ -198,6 +198,8 @@
   /* something stamped into leather: shadow inside its top edge, light caught on its lower lip */
   --color-deboss-shadow: light-dark(rgb(60 40 20 / 0.45), rgb(0 0 0 / 0.7));
   --color-deboss-light: light-dark(rgb(255 255 255 / 0.7), rgb(255 228 190 / 0.18));
+  /* pressed leather sits in shadow: multiplied over it as a background layer */
+  --color-deboss-shade: light-dark(rgb(150 112 74 / 0.4), rgb(0 0 0 / 0.38));
   /* shortcut: light-dark() can only swap colours, so Night uses Day's blur radii (4px, 12px; the DS has 5px, 14px) */
   --shadow-press: inset 0 2px 4px light-dark(rgb(90 64 36 / 0.28), rgb(0 0 0 / 0.6)),
     0 1px 0 light-dark(rgb(255 255 255 / 0.75), rgb(255 228 190 / 0.16));

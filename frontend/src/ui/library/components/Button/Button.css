@@ -83,15 +83,21 @@
     border-color: var(--color-border-emphasis);
   }
 
-  /* leather: flush with the leather around it, never a box shadow or border of its own. Pressed and hover
-   * show on the icon, debossed into the leather (Icon.css); hover keeps the leather instead of the shared
-   * paper wash. Outranks the shared hover and pressed rules above (0,6,0 vs their 0,5,0). */
+  /* leather: flush with the leather around it at rest, no border of its own. Pressed and hover
+   * show as a deboss (below; the icon is stamped in too, Icon.css); hover keeps the leather instead of the
+   * shared paper wash. Outranks the shared hover and pressed rules above (0,6,0 vs their 0,5,0). */
   [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"],
   [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"]:hover:not(:disabled) {
     background: var(--texture-leather), var(--color-leather);
     background-blend-mode: multiply;
     border-color: transparent;
     box-shadow: none;
+  }
+  /* pressed: debossed and darker, like a pressed leather Panel (Panel.css), above the rest and hover rule */
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"][data-pressed="true"],
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"][data-pressed="true"]:hover:not(:disabled) {
+    background: linear-gradient(var(--color-deboss-shade) 0 0), var(--texture-leather), var(--color-leather);
+    box-shadow: var(--shadow-press);
   }
   /* hover: the icon sinks a little, a hint of the press */
   [data-ui="panel"][data-component="button"][data-material="leather"][data-pressed="false"]:hover:not(:disabled) [data-ui="icon"] {
