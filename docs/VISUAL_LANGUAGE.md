@@ -20,7 +20,7 @@ Every material has one job, and the texture lives *around* the words, never in t
 
 | Material | Job | Rules |
 |---|---|---|
-| **Cork board** | the background of everything | Grain, a lamp pool left of centre, dark corners. A few newspaper scraps, never under text; at most one coffee ring. No map lines, veins, photos or tape. |
+| **Cork board** | the background of everything | Real cork: granulated, warm, flecked. The page lights it with a lamp pool and dark corners. Decals (newspaper scraps, at most one coffee ring) sit on it, never under text. No map lines, veins, photos or tape. |
 | **Paper** | anything you read | Cards, the notes sheet, drawers, popups. Torn edges on cards, sheets and drawers. No texture inside long text. Stays light in both themes. |
 | **Leather** | navigation and identity only | The rail, the case badge, the app mark. Quiet pebble grain, softly worn edges, a dashed stitch. The stitch is the feature. |
 | **String** | connections | Curved, a slight sag, a soft shadow. Red on your path, graphite off it. |
@@ -112,10 +112,14 @@ in one prop and the recipe lives in one place.
 
 ### Board (cork)
 
-`board` under a cork grain at `board-grain` opacity (0.45 Day, 0.55 Night), a radial
-lamp pool (`board-lamp`) a little left of centre, and dark corners (`board-vignette`).
-Scraps at `board-scrap` (0.4 Day, 0.3 Night), pushed to the edges. Louder for marketing
-(stronger lamp, one more scrap), never louder in the app.
+Real cork: a warm tan ground packed with small granules, some darker, some lighter, irregular and
+dense, under the page's lamp pool (`board-lamp`, left of centre) and dark corners (`board-vignette`).
+The material is just the cork; the lighting belongs to the page.
+
+### Decals
+
+Marks on the board that aren't materials: torn newspaper scraps (pushed to the edges, never under
+text), at most one coffee ring (`stain`), and later fingerprints. Each is a `Decal`, decoration only.
 
 ### Paper
 
@@ -127,8 +131,10 @@ edge. Grain stays faint and never sits inside long text.
 ### Leather
 
 `leather` with a fine pebble grain at low strength, worn edges (`shadow-wear`) and a
-dashed `stitch`. Text and icons on it are `leather-ink` with a 1px emboss. The current
-rail item is pressed into it (`shadow-press`) with a `color-string` edge. Leather is
+dashed `stitch` on the sides that need it, and rounded only on the corners that need it
+(the rail is square against the screen edge). Text and icons on it are `leather-ink` with a 1px emboss.
+A leather button is debossed into the leather while pressed (`shadow-press`) and flush when not: no
+outline, no red. Leather is
 never given to content.
 
 ### Gent's ink
@@ -172,14 +178,14 @@ little crooked on their pin (±0.4–1.6°); the picked card straightens and lif
 |---|---|---|
 | heading | Aleo, one weight, never bold | headings, card titles, slips, the wordmark |
 | content | Outfit | everything else: Gent's answers, inputs, ledes |
-| mono | IBM Plex Mono | node numbers, counts, meters (`CASE NOTES · NODE 1.2.1`) |
 | stamp | Special Elite | typed labels and eyebrows: uppercase, a few words (`CASE FILE 07`) |
 | symbols | Material Symbols Rounded, filled | icons, through `Icon` |
 
 - **App scale** (the `TextSize` type): xxs 10, xs 12, s 14, base 16, m 18, l 20, xl 24, xxl 32, display 48.
 - **Marketing scale** (landing page): display-xl 88, display-l 64, display-m 44, lede 20, eyebrow 13 (stamp).
 - No handwriting face. Nothing in Tangent is handwritten.
-- Uppercase only in the stamp and mono faces.
+- Uppercase only in the stamp face. Numbers that line up (node numbers, counts, meters) use content
+  with tabular figures.
 
 ### Voice
 

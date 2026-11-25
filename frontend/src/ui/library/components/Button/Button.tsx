@@ -25,6 +25,9 @@ type ButtonProps = Omit<ComponentProps<"button">, "children"> & {
   /** Toggle buttons only: true while the thing it opens is open. Renders
    * aria-pressed, which is also what Button.css styles (Figma: tile "Open"). */
   pressed?: boolean;
+  /** what the button is made of: paper (default), or leather for buttons set in leather (the rail),
+   * flush with the leather at rest and debossed into it while pressed */
+  material?: "paper" | "leather";
 };
 
 export function Button({
@@ -37,6 +40,7 @@ export function Button({
   showLabel = true,
   iconAlign = "left",
   pressed,
+  material = "paper",
   type = "button",
   ...rest
 }: ButtonProps) {
@@ -45,6 +49,7 @@ export function Button({
     <Panel
       as="button"
       type={type}
+      {...(material === "leather" ? ({ material: "leather", stitch: "none", pressed: Boolean(pressed) } as const) : ({ material: "paper" } as const))}
       hierarchy={hierarchy}
       elevation={elevation}
       /* An icon-only button still needs an accessible name. */

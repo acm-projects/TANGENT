@@ -12,7 +12,6 @@ const HIERARCHIES: Hierarchy[] = ["primary", "secondary", "tertiary"];
 const FACES = [
   { face: "heading", sample: "Pollen cores, Sea of Galilee" },
   { face: "content", sample: "Drought records line up with the settlement gap." },
-  { face: "mono", sample: "CASE NOTES · NODE 1.2.1" },
   { face: "stamp", sample: "Case file" },
 ] as const;
 const ICONS = ["home", "search", "folder", "call_split", "attach_file"];
@@ -38,7 +37,7 @@ function Specimen({ caption, children }: { caption: string; children: ReactNode 
   return (
     <Frame gap="2">
       {children}
-      <Text content={caption} face="mono" size="xs" hierarchy="tertiary" />
+      <Text content={caption} size="xs" hierarchy="tertiary" />
     </Frame>
   );
 }
@@ -55,7 +54,7 @@ function IconRow({ hierarchy = "secondary" }: { hierarchy?: Hierarchy }) {
 
 export function DevLibrary() {
   return (
-    <Panel as="main" material="cork" scraps="none">
+    <Panel as="main" material="cork">
       <Frame gap="8" className="dev-library-column">
         <Frame as="header" gap="2">
           <Text as="h1" content="Library" size="xxl" />
@@ -76,7 +75,7 @@ export function DevLibrary() {
               <Frame className="dev-library-grid">
                 {FACES.map(({ face, sample }) => (
                   <Frame key={face} gap="2">
-                    <Text content={`face="${face}"`} face="mono" size="xs" hierarchy="tertiary" />
+                    <Text content={`face="${face}"`} size="xs" hierarchy="tertiary" />
                     {SIZES.map((size) => (
                       <Text key={size} content={sample} face={face} size={size} />
                     ))}
@@ -172,7 +171,7 @@ export function DevLibrary() {
         </Section>
 
         <Section title="Leather" description="Stitching, pressed, elevation, and a rail strip.">
-          {(["dashed", "none"] as const).map((stitch) => (
+          {(["all", "none"] as const).map((stitch) => (
             <Specimen key={stitch} caption={`material="leather" stitch="${stitch}"`}>
               <Panel material="leather" stitch={stitch}><Text content="Dashboard" /></Panel>
             </Specimen>
@@ -211,16 +210,14 @@ export function DevLibrary() {
         </Section>
 
         <Section title="Cork" description="The board: lamp on or off, scraps, and text straight on the cork.">
-          {[true, false].map((lamp) => (
-            <Specimen key={String(lamp)} caption={`material="cork" lamp={${lamp}}`}>
-              <Panel material="cork" lamp={lamp} className="dev-library-scrap">
-                <Text content="Board text, straight on the cork" />
-              </Panel>
-            </Specimen>
-          ))}
-          {(["none", "app", "marketing"] as const).map((scraps) => (
-            <Specimen key={scraps} caption={`material="cork" scraps="${scraps}"`}>
-              <Panel material="cork" scraps={scraps} className="dev-library-scrap">
+          <Specimen caption={'material="cork"'}>
+            <Panel material="cork" className="dev-library-scrap">
+              <Text content="Board text, straight on the cork" />
+            </Panel>
+          </Specimen>
+          {(["card"] as const).map((k) => (
+            <Specimen key={k} caption={'a torn card on cork'}>
+              <Panel material="cork" className="dev-library-scrap">
                 <Frame gap="3">
                   <Text content="Drought records" />
                   <Panel material="paper" stock="card" edge="torn" elevation="floating">
@@ -262,7 +259,7 @@ export function DevLibrary() {
             <Specimen key={gap} caption={`Frame gap="${gap}"`}>
               <Frame direction="row" gap={gap}>
                 {["1.1", "1.2", "1.3"].map((n) => (
-                  <Panel key={n}><Text content={n} face="mono" size="xs" /></Panel>
+                  <Panel key={n}><Text content={n} size="xs" /></Panel>
                 ))}
               </Frame>
             </Specimen>

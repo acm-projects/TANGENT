@@ -4,7 +4,7 @@ Source: the **Tangent** design-system artifact (https://claude.ai/artifact/WmPTf
 derived from the **Tanget Design System** canvas (https://claude.ai/artifact/Pf2jhiWECCLzcMrtH7LyMq).
 Day = vanilla leather on pale kraft cork; Night = charcoal leather on dark wood. Paper stays light in both.
 
-Status: **batch 1a (primitives) merged; in review.** Work runs bottom up.
+Status: **batch 1a merged; 1a-2 (review fixes) running.** Work runs bottom up.
 
 ## How we build
 
@@ -19,6 +19,7 @@ Status: **batch 1a (primitives) merged; in review.** Work runs bottom up.
 - **1b material adoption** (parallel per surface, after Panel merges): every paper, leather or cork surface moves to `material=`, Panels and styled divs alike (a div may become `<Panel as=…>` in the same spot: no new wrappers, no moved logic), and is fully restyled to the DS while it's there.
 - **Then** components, board surfaces, brand, REPO-ONLY screens, layer by layer.
 - **Torn edge:** a baked strip mask (resizes cleanly). A `live` edge parameter only if something animated needs it.
+- **1a-2 (review round 1 of primitives):** the ink material is Gent's living ink (engine moved unchanged to `primitives/Ink/`, shared with InkPanel); leather gets per-side `stitch` and per-corner `round`, pressed = deboss only (no red); leather Buttons (`Button material="leather"`), flush at rest, debossed when pressed; fonts are Aleo, Outfit and Special Elite only (IBM Plex Mono dropped); cork is real cork with no parameters; scraps and coffee rings move to a new `Decal` primitive (fingerprints and stains later).
 
 Branch: `claude/tangent-retheme`, off `origin/dev` (abb757f). Paths below are under `frontend/src/ui/` unless they start with `docs/`.
 

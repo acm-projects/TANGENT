@@ -19,13 +19,8 @@
     line-height: var(--line-height-tight);
   }
 
-  [data-ui="text"][data-face="mono"] {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.02em;
-  }
 
-  /* the DS's typed labels (CASE FILE, THE CASE); uppercase comes only from here and mono labels */
+  /* the DS's typed labels (CASE FILE, THE CASE); uppercase comes only from here */
   [data-ui="text"][data-face="stamp"] {
     font-family: var(--font-stamp);
     text-transform: uppercase;

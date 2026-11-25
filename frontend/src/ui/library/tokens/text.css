@@ -1,7 +1,7 @@
 /* text.css — typography. See DESIGN.md Rule 1a.
  *
  * Font files are loaded by next/font in app/layout.tsx, which sets --font-heading (Aleo),
- * --font-content (Outfit), --font-mono (IBM Plex Mono), --font-stamp (Special Elite) and
+ * --font-content (Outfit), --font-stamp (Special Elite) and
  * --font-symbols on <html>. Components name those roles (and --font-icon below), never the
  * font itself.
  *

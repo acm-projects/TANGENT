@@ -8,9 +8,9 @@ import "./Text.css";
 
 type TextTag = "p" | "span" | "label" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
-/** The type role (VISUAL_LANGUAGE.md §4): heading (Aleo), content (Outfit), mono (IBM Plex Mono: numbers,
- * counts, meters), stamp (Special Elite: typed uppercase labels, a few words). */
-type Face = "content" | "heading" | "mono" | "stamp";
+/** The type role (VISUAL_LANGUAGE.md §4): heading (Aleo), content (Outfit), stamp (Special Elite: typed
+ * uppercase labels, a few words). */
+type Face = "content" | "heading" | "stamp";
 
 type TextProps<T extends TextTag> = Omit<ComponentProps<T>, "children"> & {
   as?: T;

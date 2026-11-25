@@ -323,11 +323,10 @@ written once with both values and there is no theme attribute or JS.
 Typography tokens live in their own file, `tokens/text.css`.
 
 - **Fonts are loaded by `next/font`** in `app/layout.tsx`, which puts
-  `--font-heading`, `--font-content`, `--font-mono`, `--font-stamp` and `--font-symbols` on `<html>`.
-  `text.css` maps those to the five roles a component may use:
+  `--font-heading`, `--font-content`, `--font-stamp` and `--font-symbols` on `<html>`.
+  `text.css` maps those to the four roles a component may use:
   - `--font-heading` (Aleo, one weight, never bold): headings, card titles, slips, the wordmark.
   - `--font-content` (Outfit): everything else. `body` uses it, so it is the default.
-  - `--font-mono` (IBM Plex Mono): node numbers, counts, meters.
   - `--font-stamp` (Special Elite): typed labels and eyebrows, uppercase, a few words.
   - `--font-icon` (Material Symbols Rounded, filled): only `Icon` uses it.
     `next/font/google` doesn't carry it, so `layout.tsx` loads the file from the
@@ -655,9 +654,17 @@ every recipe (fill, grain, edge, stitch, shadow) lives once, in `Panel.css`.
 | `material` | Job | Parameters (each one `data-*` attribute) |
 |---|---|---|
 | `paper` (default) | anything you read | `stock`: `paper` \| `card` \| `card-alt` \| `slip` \| `composer` · `edge`: `clean` \| `torn` · `ruled`: `none` \| `lines` \| `margin` · `holes`: boolean |
-| `leather` | navigation and identity | `stitch`: `none` \| `dashed` · `pressed`: boolean |
-| `ink` | Gent, flat | none: `gent-ink` fill, `on-gent-ink` text. The living, bleeding edge is `InkPanel` (`components/Ink/`), a separate component that stays as it is. |
-| `cork` | the board | `lamp`: boolean · `scraps`: `none` \| `app` \| `marketing` |
+| `leather` | navigation and identity | `stitch`: `"all"` \| `"none"` \| a list of sides (`["right"]`) · `round`: `"all"` \| `"none"` \| a list of corners (`["top-right", "bottom-right"]`) · `pressed`: boolean (debossed into the leather) |
+| `ink` | Gent | `seed`: number (keeps this panel's edge stable) · `calm`: boolean (calmer ink for a large reading surface). The living, bleeding ink from `primitives/Ink/` (the same engine `InkPanel` uses), drawn on a canvas under the content. |
+| `cork` | the board | none yet: real cork. Lamp and vignette are the page's lighting, not the material; scraps, stains and coffee rings are `Decal`s. |
+
+**Decal** (`primitives/Decal/`) is the other half of the board: marks that sit *on* a material
+without being one. `<Decal kind="scrap">` (a torn newspaper scrap), `kind="coffee-ring"`, and later
+fingerprints and stains. A Decal is decoration only (`aria-hidden`), never holds content, and is
+positioned by its consumer's CSS (where it sits is layout, Rule 6).
+
+List parameters reach the DOM as space-separated attributes (`data-stitch="top right"`,
+`data-round="top-left bottom-left"`) and are styled with `~=`: `[data-stitch~="right"]`.
 
 The props are a discriminated union on `material`, so a parameter only type-checks
 with its own material (`<Panel material="leather" stitch="dashed">`, never
@@ -671,7 +678,7 @@ material applies only to `secondary`. Its rules are qualified with all three,
 which beats both the base rule and the hierarchy rules. `primary` stays solid ink and
 `tertiary` stays transparent whatever the material; a tertiary Button on the rail
 reads correctly because its text inherits `leather-ink` from the leather around it.
-Parameter rules add one more attribute (`…[data-material="leather"][data-stitch="dashed"]`).
+Parameter rules add one more attribute (`…[data-material="leather"][data-stitch~="right"]`).
 
 **Adding a material** is one CSS block in `Panel.css` (plus its parameter rules), one
 member of the union in `Panel.tsx`, and its tokens in `colors.css`/`shape.css`. No other

@@ -1,5 +1,6 @@
 import type { ComponentProps, ElementType } from "react";
 import type { Elevation, Hierarchy } from "../../types/Types";
+import { InkLayer } from "../Ink/InkLayer";
 import "./Panel.css";
 
 /* A surface: background, border, radius, padding. `as` picks the native tag,
@@ -21,25 +22,36 @@ type PaperParams = {
   /** three punched binder holes down the left edge */
   holes?: boolean;
 };
+type Side = "top" | "right" | "bottom" | "left";
+type Corner = "top-left" | "top-right" | "bottom-right" | "bottom-left";
 type LeatherParams = {
-  stitch?: "none" | "dashed";
-  /** pressed into the leather: the current rail item */
+  /** which sides carry the dashed stitch */
+  stitch?: "all" | "none" | Side[];
+  /** which corners are rounded (the rail is square against the screen edge) */
+  round?: "all" | "none" | Corner[];
+  /** debossed into the leather: a pressed leather button */
   pressed?: boolean;
 };
-type CorkParams = {
-  /** the lamp pool and dark corners */
-  lamp?: boolean;
-  scraps?: "none" | "app" | "marketing";
+type InkParams = {
+  /** picks this panel's own edge; keep it stable so the edge doesn't change on re-render */
+  seed?: number;
+  /** a calmer uneven ink, for a large surface people read on */
+  calm?: boolean;
 };
 
 // every other material's parameters, forbidden
-type Without<P> = { [K in Exclude<keyof (PaperParams & LeatherParams & CorkParams), keyof P>]?: never };
+type Without<P> = { [K in Exclude<keyof (PaperParams & LeatherParams & InkParams), keyof P>]?: never };
 
 type MaterialProps =
   | ({ material?: "paper" } & PaperParams & Without<PaperParams>)
   | ({ material: "leather" } & LeatherParams & Without<LeatherParams>)
-  | ({ material: "ink" } & Without<object>)
-  | ({ material: "cork" } & CorkParams & Without<CorkParams>);
+  | ({ material: "ink" } & InkParams & Without<InkParams>)
+  | ({ material: "cork" } & Without<object>);
+
+const SIDES: Side[] = ["top", "right", "bottom", "left"];
+const CORNERS: Corner[] = ["top-left", "top-right", "bottom-right", "bottom-left"];
+// "all" / "none" / a list, as a space-separated attribute styled with ~= (DESIGN.md §4)
+const list = <T extends string>(v: "all" | "none" | T[], all: T[]) => (v === "all" ? all : v === "none" ? [] : v).join(" ");
 
 export type Material = NonNullable<MaterialProps["material"]>;
 
@@ -59,18 +71,19 @@ export function Panel<T extends PanelTag = "div">(props: PanelProps<T>) {
     edge = "clean",
     ruled = "none",
     holes = false,
-    stitch = "dashed",
+    stitch = "all",
+    round = "all",
     pressed = false,
-    lamp = true,
-    scraps = "app",
+    seed = 7,
+    calm = false,
+    children,
     ...rest
-  } = props as PanelProps<T> & PaperParams & LeatherParams & CorkParams;
+  } = props as PanelProps<T> & PaperParams & LeatherParams & InkParams;
   const Tag = (as ?? "div") as ElementType;
   // only the chosen material's parameters reach the DOM
   const params =
     material === "paper" ? { "data-stock": stock, "data-edge": edge, "data-ruled": ruled, "data-holes": holes }
-    : material === "leather" ? { "data-stitch": stitch, "data-pressed": pressed }
-    : material === "cork" ? { "data-lamp": lamp, "data-scraps": scraps }
+    : material === "leather" ? { "data-stitch": list(stitch, SIDES), "data-round": list(round, CORNERS), "data-pressed": pressed }
     : {};
   // A button gets autoComplete="off": Firefox otherwise restores its disabled state on reload, before
   // hydration, and the HTML no longer matches (see TextArea). React's button types omit it; browsers don't.
@@ -85,6 +98,10 @@ export function Panel<T extends PanelTag = "div">(props: PanelProps<T>) {
       data-elevation={elevation}
       data-material={material}
       {...params}
-    />
+    >
+      {/* Gent's living ink, drawn under the content (primitives/Ink) */}
+      {material === "ink" && <InkLayer seed={seed} calm={calm} />}
+      {children}
+    </Tag>
   );
 }

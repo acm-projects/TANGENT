@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Aleo, IBM_Plex_Mono, Outfit, Special_Elite } from "next/font/google";
+import { Aleo, Outfit, Special_Elite } from "next/font/google";
 import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import { lightingScript } from "@/ui/library/tokens/lighting";
@@ -7,7 +7,6 @@ import "./globals.css";
 
 const heading = Aleo({ weight: "400", subsets: ["latin"], variable: "--font-heading" });
 const content = Outfit({ subsets: ["latin"], variable: "--font-content" });
-const mono = IBM_Plex_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--font-mono" });
 const stamp = Special_Elite({ weight: "400", subsets: ["latin"], variable: "--font-stamp" });
 
 /* next/font/google doesn't carry Material Symbols, so it comes from the
@@ -28,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${heading.variable} ${content.variable} ${mono.variable} ${stamp.variable} ${materialSymbols.variable}`}
+      className={`${heading.variable} ${content.variable} ${stamp.variable} ${materialSymbols.variable}`}
       // lightingScript marks <html>'s lighting before React hydrates
       suppressHydrationWarning
     >
