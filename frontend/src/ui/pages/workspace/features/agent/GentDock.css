@@ -29,17 +29,17 @@
   --tool-fg: var(--dock-fg);
   --tool-alert: var(--dock-alert);
   --tool-rule: var(--dock-rule);
-  --tool-wash: rgb(0 0 0 / 0.2);
+  --tool-wash: color-mix(in srgb, var(--color-text-on-paper) 20%, transparent);
 }
 
 .gent-dock[data-inked="true"] {
-  --dock-fg: var(--on-gent-ink);
-  --dock-soft: rgb(243 242 239 / 0.82);
-  --dock-rule: rgb(243 242 239 / 0.4);
-  --dock-wash: rgb(243 242 239 / 0.14);
-  --dock-field: rgb(0 0 0 / 0.14);
+  --dock-fg: var(--color-text-on-gent);
+  --dock-soft: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+  --dock-rule: color-mix(in srgb, var(--color-text-on-gent) 40%, transparent);
+  --dock-wash: color-mix(in srgb, var(--color-text-on-gent) 14%, transparent);
+  --dock-field: color-mix(in srgb, var(--color-text-on-paper) 14%, transparent);
   /* the danger colour (oxblood), lifted to read on his ink */
-  --dock-alert: color-mix(in srgb, var(--color-danger) 55%, white);
+  --dock-alert: color-mix(in srgb, var(--color-danger) 55%, var(--color-text-on-gent));
 }
 
 .gent-dock[data-inked="false"] {
@@ -84,15 +84,15 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 1.875rem;
+  height: 1.875rem;
   border-radius: var(--radius-full);
 }
 
 .gent-socket::before {
   content: "";
   position: absolute;
-  inset: 0.2rem;
+  inset: 0.15rem;
   border-radius: inherit;
   border: 1.5px dashed var(--dock-rule);
   opacity: 0;
@@ -113,7 +113,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 2px solid var(--on-gent-ink);
+  border: 2px solid var(--color-text-on-gent);
   animation: gent-splash 420ms var(--ease-out) forwards;
 }
 
@@ -147,8 +147,8 @@
 
 /* the avatar's pale ink on the dark panel: drawn as the paper colour */
 .gent-socket .gent-avatar {
-  --avatar-ink: var(--on-gent-ink);
-  --avatar-paper: var(--gent-ink);
+  --avatar-ink: var(--color-text-on-gent);
+  --avatar-paper: var(--color-gent-fill);
 }
 
 /* ── one container, three sizes: the width springs, the chat's top rolls up, nothing remounts ── */
@@ -157,9 +157,9 @@
 .gent-dock {
   display: flex;
   flex-direction: column;
-  width: 3.25rem;
+  width: 2.5rem;
   max-width: 100%;
-  border-radius: 1.625rem;
+  border-radius: 1.25rem;
   transition:
     border-radius var(--motion-spring) var(--ease-spring),
     background-color var(--motion-base) var(--ease-out),
@@ -202,8 +202,8 @@
 
 .gent-dock-top-inner {
   min-height: 0;
-  /* never taller than Gent's layer leaves room for, above the pill row (4.5rem with the layer's padding) */
-  max-height: min(60dvh, 34rem, 100cqh - 4.5rem);
+  /* never taller than Gent's layer leaves room for, above the pill row (3.75rem with the layer's padding) */
+  max-height: min(60dvh, 34rem, 100cqh - 3.75rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -301,8 +301,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 3.25rem;
-  padding: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.3125rem;
 }
 
 .gent-status {
@@ -350,7 +350,7 @@
 }
 
 .gent-dock[data-mode="chat"][data-inked="true"] {
-  --color-surface-raised: rgb(0 0 0 / 0.18);
+  --color-surface-raised: color-mix(in srgb, var(--color-text-on-paper) 18%, transparent);
 }
 
 .gent-chat-history {
@@ -378,12 +378,12 @@
 /* your message to Gent: the app's own paper and ink in either theme, not the dock's (inked, the dock's text tokens are
  * his light-on-blue, so the bubble names the theme pair itself, as tokens/colors.css does) */
 .gent-chat-history .message-user-bubble {
-  color: light-dark(var(--ink-light), var(--ink-dark));
-  --color-text: light-dark(var(--ink-light), var(--ink-dark));
+  color: var(--color-text-on-paper);
+  --color-text: var(--color-text-on-paper);
   background:
     linear-gradient(var(--color-string), var(--color-string)) var(--space-3) 0 / 1px 100% no-repeat,
     var(--texture-grain),
-    light-dark(var(--paper-light), var(--paper-dark));
+    var(--color-slip);
 }
 
 .gent-chat-history .message-meta,
@@ -456,7 +456,7 @@
 /* The pill row is clipped to the dock's own rounded shape (a few px out, for focus rings), so nothing pokes out
  * while the width springs or the dock morphs. The panel itself isn't clipped: its ink edge feathers past it. */
 .gent-dock {
-  --dock-round: 1.625rem;
+  --dock-round: 1.25rem;
 }
 
 .gent-dock[data-mode="chat"] {
@@ -532,8 +532,8 @@
   border: 2px solid currentColor;
   border-radius: var(--radius-sm);
   color: var(--dock-fg);
+  font-family: var(--font-stamp);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -630,22 +630,22 @@
 /* card addresses in his log stand out, so the cards can be picked out of a long run */
 .gent-addr {
   color: var(--dock-fg);
-  font-weight: var(--font-weight-semibold, 600);
+  font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
 /* his reply: his report, typed on the board's paper and pinned into his ink, with his blue margin; the cards it
  * names (bold in the reply) in his blue */
 .gent-chat-history .message-assistant {
-  --color-text: light-dark(var(--ink-light), var(--ink-dark));
-  --color-text-muted: color-mix(in srgb, light-dark(var(--ink-light), var(--ink-dark)) 62%, transparent);
+  --color-text: var(--color-text-on-paper);
+  --color-text-muted: var(--color-text-on-paper-muted);
   margin-inline-end: var(--space-2);
   padding: var(--space-3) var(--space-4) var(--space-2) var(--space-6);
   border-radius: var(--radius-sm);
   background:
     linear-gradient(var(--color-gent), var(--color-gent)) var(--space-4) 0 / 1px 100% no-repeat,
     var(--texture-grain),
-    light-dark(var(--paper-light), var(--paper-dark));
+    var(--color-surface);
   box-shadow: var(--shadow-floating);
   color: var(--color-text);
   rotate: 0.4deg;
@@ -712,19 +712,15 @@
   margin: var(--space-1) 0 var(--space-2) calc(-1 * var(--space-1));
 }
 
-.gent-answer > details {
+.gent-answer {
   max-width: 32rem;
   padding: var(--space-1) var(--space-3) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--texture-grain), light-dark(var(--paper-light), var(--paper-dark));
-  box-shadow: var(--shadow-floating);
-  color: light-dark(var(--ink-light), var(--ink-dark));
   rotate: -0.5deg;
   transform-origin: left center;
   animation: gent-answer-in var(--motion-spring) var(--ease-spring) backwards;
 }
 
-.gent-answer:nth-child(even) > details {
+.gent-answer:nth-child(even) {
   rotate: 0.4deg;
 }
 
@@ -750,7 +746,7 @@
   font-size: var(--font-size-xxs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, light-dark(var(--ink-light), var(--ink-dark)) 70%, transparent);
+  color: var(--color-text-muted);
 }
 
 /* the sender, in his blue: Gent's errand coming back */
@@ -781,7 +777,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gent-answer > details {
+  .gent-answer {
     animation: none;
   }
 }
@@ -818,10 +814,10 @@
   margin-inline: 2px;
   padding: 1px var(--space-2) 1px calc(var(--space-2) + 3px);
   border-radius: var(--radius-sm);
-  background: var(--texture-grain), light-dark(var(--paper-light), var(--paper-dark));
+  background: var(--texture-grain), var(--color-slip);
   box-shadow: inset 3px 0 0 var(--color-string), var(--shadow-floating);
-  color: light-dark(var(--ink-light), var(--ink-dark));
-  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-on-paper);
+  font-weight: var(--font-weight-medium);
 }
 
 /* his pick, for a card's model: in his own ink */
@@ -840,7 +836,7 @@
   border: 0;
   background: none;
   font: inherit;
-  font-weight: var(--font-weight-semibold, 600);
+  font-weight: var(--font-weight-medium);
   color: var(--color-gent);
   text-decoration: underline 1px;
   text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);

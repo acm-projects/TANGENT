@@ -46,7 +46,7 @@
   display: block;
   width: calc(24px * var(--unzoom, 1));
   height: calc(24px * var(--unzoom, 1));
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+  filter: var(--shadow-floating-drop);
 }
 
 /* where he went, when that's off screen: a blue arrowhead on the edge, pointing at him */
