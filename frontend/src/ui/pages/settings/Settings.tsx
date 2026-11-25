@@ -1,4 +1,4 @@
-import { Frame } from "@/ui/library";
+import { Panel } from "@/ui/library";
 import { Account } from "./features/account/Account";
 import "./Settings.css";
 
@@ -9,8 +9,8 @@ import "./Settings.css";
 
 export function Settings() {
   return (
-    <Frame as="main" gap="0" className="settings-page">
+    <Panel as="main" material="cork" className="settings-page">
       <Account />
-    </Frame>
+    </Panel>
   );
 }

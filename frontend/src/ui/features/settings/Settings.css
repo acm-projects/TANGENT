@@ -7,12 +7,17 @@
   color: var(--color-text-secondary);
 }
 
-/* Lighting: three switches on one plate; the lit one is pressed in. */
+/* Lighting: three leather switches on one leather plate; the lit one is pressed in. */
 .settings-lighting {
+  display: flex;
+  gap: var(--space-1);
   padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
+}
+
+/* the guide's tips are ruled apart like index-card lines */
+.settings-guide > li + li {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
 
 .settings-lighting-option {

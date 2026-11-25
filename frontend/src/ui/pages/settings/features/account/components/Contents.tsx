@@ -16,7 +16,7 @@ type ContentsProps = {
 
 export function Contents({ sections, active, onPick }: ContentsProps) {
   return (
-    <Panel as="aside" elevation="floating" className="contents" aria-labelledby="contents-heading">
+    <Panel as="aside" stock="card" edge="torn" elevation="floating" className="contents" aria-labelledby="contents-heading">
       <Text as="h2" id="contents-heading" size="s" className="contents-heading" content="Contents" />
       <Frame as="ol" gap="0">
         {sections.map((section, i) => (
@@ -32,7 +32,7 @@ export function Contents({ sections, active, onPick }: ContentsProps) {
             >
               <Text as="span" size="s" className="contents-label" content={section.label} />
               <Text as="span" size="s" className="contents-leader" content="" aria-hidden="true" />
-              <Text as="span" size="s" className="contents-number" content={`§${i + 1}`} />
+              <Text as="span" size="s" face="heading" className="contents-number" content={`§${i + 1}`} />
             </Link>
           </Frame>
         ))}

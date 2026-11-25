@@ -2,6 +2,9 @@
 
 .settings-page {
   min-height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   /* the board the file lies on, as on the dashboard */
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }
