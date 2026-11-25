@@ -12,7 +12,6 @@
   /* minmax(0, …): the dock's buttons must not widen the room past the screen (they scroll instead) */
   grid-template-columns: minmax(0, 1fr);
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
-  color: var(--color-text);
   animation: court-in var(--motion-slow) var(--ease-out) backwards;
 }
 
@@ -43,13 +42,12 @@
   height: 0.6rem;
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-text-secondary);
-  box-shadow: 0 1px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
   animation: debate-pulse 1.6s var(--ease-in-out) infinite;
 }
 
 .debate-kicker {
   letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
@@ -75,12 +73,10 @@
 }
 
 .debate-inre {
-  font-family: var(--font-heading);
   font-style: italic;
 }
 
 .debate-title {
-  font-family: var(--font-heading);
   text-wrap: balance;
 }
 
@@ -111,8 +107,6 @@
   align-self: start;
   max-height: 100%;
   margin-bottom: var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
 }
 
 .debate-transcript:empty {
@@ -126,13 +120,11 @@
 
 .debate-bench {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 18rem;
   padding: var(--space-2) var(--space-8) var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: var(--texture-grain), var(--color-card-alt);
-  /* the dais: a step beneath the bench, then its shadow on the floor */
-  box-shadow: 0 6px 0 -1px var(--color-board), 0 6px 0 0 var(--color-border-strong), var(--shadow-floating);
   text-align: center;
   transition: box-shadow var(--motion-base) var(--ease-out), translate var(--motion-base) var(--ease-out);
 }
@@ -186,16 +178,10 @@
   overflow-y: auto;
   border-radius: var(--radius-lg);
   scrollbar-width: thin;
-  transition: background var(--motion-slow) var(--ease-out);
 }
 
 .debate-table[data-side="against"] {
   grid-area: against;
-}
-
-/* whoever has the floor stands in the lamp */
-.debate-table[data-floor] {
-  background: radial-gradient(ellipse 90% 60% at 50% 0%, light-dark(rgb(255 252 246 / 0.75), rgb(255 236 210 / 0.08)), transparent 75%);
 }
 
 /* the placard on the table's front edge */
@@ -241,7 +227,7 @@
   opacity: 1;
   background: var(--texture-pin), var(--color-text);
   scale: 1.3;
-  box-shadow: 0 1px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
   animation: debate-pulse 1.6s var(--ease-in-out) infinite;
 }
 
@@ -250,7 +236,7 @@
 }
 
 .debate-bench[data-floor] {
-  box-shadow: 0 6px 0 -1px var(--color-board), 0 6px 0 0 var(--color-border-strong), var(--shadow-lift);
+  box-shadow: var(--shadow-lift);
   translate: 0 -2px;
 }
 
@@ -263,32 +249,21 @@
   animation: debate-gavel 0.9s var(--ease-spring) 0.3s 1 backwards;
 }
 
-/* counsel's legal pad: their working notes on ruled paper, older lines fading up the page */
+/* counsel's working notes, each a scrap of card; older ones fade up the page */
 .debate-pad {
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: 0;
   list-style: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(90deg, transparent calc(var(--space-2) - 1px), var(--color-border) calc(var(--space-2) - 1px) var(--space-2), transparent var(--space-2)),
-    var(--texture-grain), var(--color-surface);
-  box-shadow: var(--shadow-floating);
-  rotate: -0.6deg;
-}
-
-.debate-table[data-side="against"] .debate-pad {
-  rotate: 0.6deg;
 }
 
 .debate-pad-line {
-  padding: var(--space-1) 0 var(--space-1) var(--space-1);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
   opacity: 0.6;
+  rotate: -0.6deg;
 }
 
-.debate-pad-line:last-child {
-  border-bottom: 0;
+.debate-pad-line:nth-child(even) {
+  rotate: 0.6deg;
 }
 
 .debate-pad-line[data-latest] {
@@ -317,13 +292,10 @@
   flex: none;
   min-width: 2.4rem;
   padding: 0.1em 0.4em;
-  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
   text-align: center;
-  color: var(--color-text-secondary);
 }
 
 /* ── the record: the court reporter's transcript, one sheet in the middle ── */
@@ -333,15 +305,6 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-6) var(--space-8) var(--space-8) calc(var(--space-8) + var(--space-2));
-  border: 1px solid var(--color-border);
-  border-bottom: 0;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background:
-    /* pleading paper's double margin rule */
-    linear-gradient(90deg, transparent calc(var(--space-6) - 4px), var(--color-border) calc(var(--space-6) - 4px) calc(var(--space-6) - 3px), transparent calc(var(--space-6) - 3px) calc(var(--space-6) - 1px), var(--color-border) calc(var(--space-6) - 1px) var(--space-6), transparent var(--space-6)),
-    var(--texture-grain), var(--color-surface);
-  background-attachment: local;
-  box-shadow: var(--shadow-lift);
   scrollbar-width: thin;
 }
 
@@ -398,10 +361,6 @@
   text-wrap: pretty;
 }
 
-.debate-turn[data-side="judge"] .debate-speech {
-  font-family: var(--font-heading);
-}
-
 /* the line being spoken: a caret where the reporter is typing */
 .debate-turn[data-speaking] .debate-speech::after {
   content: "";
@@ -421,10 +380,12 @@
 /* ── the dock: the levers the gallery holds ── */
 
 .court-dock {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-6);
-  border-top: 1px solid var(--color-border);
-  background: var(--texture-grain), var(--color-surface);
 }
 
 .court-levers {
@@ -555,28 +516,31 @@
 
 /* ── the court's question to the user ── */
 
-/* the bench turns to the gallery: a slip passed down, pinned to the record in red, since it waits on the user */
+/* the bench turns to the gallery: a card pinned to the record in red, since it waits on the user. The pin hangs
+ * off the body (the torn edge owns the card's own ::before) and reaches up past the card's padding. */
 .debate-question {
   position: relative;
   padding: var(--space-6);
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-lift);
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 0 1rem;
   --pop-rotate: -1deg;
 }
 
-.debate-question::before {
+.debate-question-body {
+  position: relative;
+}
+
+.debate-question-body::before {
   content: "";
   position: absolute;
-  top: -0.35rem;
+  top: calc(-1 * var(--space-6) - 0.35rem);
   left: 50%;
   width: 0.7rem;
   height: 0.7rem;
   translate: -50% 0;
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-string);
-  box-shadow: 0 1px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
 }
 
 .debate-option input,
@@ -634,12 +598,6 @@
   letter-spacing: 0.3em;
 }
 
-.debate-stamp-verdict {
-  font-family: var(--font-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
 .debate-summary {
   max-width: 44ch;
   text-wrap: pretty;
@@ -674,12 +632,6 @@
   width: 100%;
   text-align: left;
   padding: 0;
-  border: 0;
-  background: none;
-}
-
-.verdict-headline {
-  font-family: var(--font-heading);
 }
 
 .verdict-head {
@@ -706,7 +658,6 @@
 }
 
 .verdict-score {
-  font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--color-text-muted);
