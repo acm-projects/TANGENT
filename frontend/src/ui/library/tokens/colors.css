@@ -159,6 +159,9 @@
   --color-danger: var(--oxblood);
   /* Blue means "Gent did this", as red means the user did. */
   --color-gent: var(--blue-gent);
+  /* Gent's flat ink: a solid panel (Panel material="ink") and the text on it */
+  --color-gent-fill: var(--gent-ink);
+  --color-text-on-gent: var(--on-gent-ink);
   /* the ochre highlighter: search hits and marked phrases, ink on top */
   --color-highlight: light-dark(var(--highlight-light), var(--highlight-dark));
 
@@ -177,6 +180,9 @@
    * leather edges. Darker and tighter on the dark board. */
   --shadow-floating: 0 1px 1px light-dark(rgb(40 30 20 / 0.1), rgb(0 0 0 / 0.35)),
     0 3px 8px -2px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45));
+  /* --shadow-floating as a filter, for torn paper: its mask would clip a box-shadow, and drop-shadow follows the tear */
+  --shadow-floating-drop: drop-shadow(0 1px 1px light-dark(rgb(40 30 20 / 0.1), rgb(0 0 0 / 0.35)))
+    drop-shadow(0 3px 8px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45)));
   --shadow-lift: 0 2px 2px light-dark(rgb(40 30 20 / 0.08), rgb(0 0 0 / 0.3)),
     0 14px 24px -8px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.6));
   --shadow-badge: 0 2px 3px rgb(10 6 2 / 0.35), 0 12px 22px -6px rgb(10 6 2 / 0.55);
