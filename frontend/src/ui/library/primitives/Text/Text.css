@@ -12,10 +12,24 @@
     color: inherit;
   }
 
-  /* Headings use the heading face. It is loaded at one weight, so never bold it. */
-  [data-ui="text"]:is(h1, h2, h3, h4, h5, h6) {
+  /* The four faces. content is the base rule above. Heading (Aleo) and stamp (Special Elite)
+   * are loaded at one weight, so they are never bolded. */
+  [data-ui="text"][data-face="heading"] {
     font-family: var(--font-heading);
     line-height: var(--line-height-tight);
+  }
+
+  [data-ui="text"][data-face="mono"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  /* the DS's typed labels (CASE FILE, THE CASE); uppercase comes only from here and mono labels */
+  [data-ui="text"][data-face="stamp"] {
+    font-family: var(--font-stamp);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
   }
 
   /* hierarchy */
@@ -23,7 +37,8 @@
     font-weight: var(--font-weight-medium);
   }
 
-  [data-ui="text"][data-hierarchy="primary"]:is(h1, h2, h3, h4, h5, h6) {
+  [data-ui="text"][data-hierarchy="primary"][data-face="heading"],
+  [data-ui="text"][data-hierarchy="primary"][data-face="stamp"] {
     font-weight: var(--font-weight-regular);
   }
 

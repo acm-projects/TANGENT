@@ -23,6 +23,11 @@
     color: var(--color-text-muted);
   }
 
+  /* on leather the DS embosses icons with a 1px light-from-above shadow */
+  [data-ui="panel"][data-material="leather"] [data-ui="icon"] {
+    text-shadow: 0 1px 0 var(--color-string-shadow);
+  }
+
   /* sizes — one per TextSize */
   [data-ui="icon"][data-size="xxs"]     { font-size: var(--font-size-xxs); }
   [data-ui="icon"][data-size="xs"]      { font-size: var(--font-size-xs); }
