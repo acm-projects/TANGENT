@@ -1,6 +1,9 @@
 /* Page-level layout only, unlayered (DESIGN.md §2). */
 
 .login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-height: 100dvh;
   justify-content: center;
   padding: var(--space-4);

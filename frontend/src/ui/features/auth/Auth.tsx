@@ -30,13 +30,27 @@ const COPY = {
   },
 };
 
+/* The case badge lockup: a stitched leather tab, CASE FILE and a number, a pressed groove, then the name.
+ * Shared by the sign-in, onboarding and invite cards. */
+export function AuthLockup() {
+  return (
+    <Panel material="leather" stitch="all" round="all" className="auth-badge">
+      <Text as="span" face="stamp" size="xxs" content="Case file" />
+      <Text as="span" face="heading" size="s" content="01" />
+      <span aria-hidden="true" className="auth-badge-groove" />
+      <Text as="span" face="heading" size="m" content="Tangent" className="auth-wordmark" />
+    </Panel>
+  );
+}
+
 export function Auth({ mode, next }: AuthProps) {
   const copy = COPY[mode];
   return (
-    <Panel as="section" hierarchy="secondary" elevation="floating" className="auth">
+    <Panel as="section" edge="torn" elevation="floating" className="auth">
+      <span aria-hidden="true" className="auth-pin" />
       <Frame gap="6">
         <Frame as="header" gap="2" align="center" className="auth-header">
-          <Text as="span" size="s" hierarchy="primary" content="TANGENT" className="auth-wordmark" />
+          <AuthLockup />
           <Text as="h1" size="xl" content={copy.heading} />
           <Text size="s" hierarchy="tertiary" content={copy.subtext} />
         </Frame>

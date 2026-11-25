@@ -10,7 +10,7 @@
 }
 
 /* the red pin every string on the board runs to */
-.auth::before {
+.auth-pin {
   content: "";
   position: absolute;
   top: -0.4rem;
@@ -22,11 +22,11 @@
   background:
     var(--texture-pin),
     var(--color-string);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
-  animation: auth-pin var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  box-shadow: var(--shadow-pin);
+  animation: auth-pin-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
 }
 
-@keyframes auth-pin {
+@keyframes auth-pin-in {
   from {
     opacity: 0;
     scale: 2.5;
@@ -38,11 +38,26 @@
   text-align: center;
 }
 
-/* One-off: the wordmark is brand-coloured, spaced out, in the heading face. */
+/* The case badge lockup: a leather tab (CASE FILE, number, groove, name) on the card's top edge. */
+.auth-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+
+/* the pressed groove between the file number and the name */
+.auth-badge-groove {
+  align-self: stretch;
+  width: 3px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-press);
+}
+
+/* the name: regular weight, never bold or uppercase; colour comes from the leather */
 .auth-wordmark {
-  font-family: var(--font-heading);
-  letter-spacing: 0.2em;
-  color: var(--color-brand);
+  font-weight: 400;
+  text-transform: none;
 }
 
 .auth-field {
@@ -60,7 +75,7 @@
 }
 
 /* The card drops onto the board with a tilt and settles; its contents deal in
- * after it, top to bottom, and the wordmark breathes out to its spacing. */
+ * after it, top to bottom. */
 .auth {
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 0 -3rem;
@@ -74,15 +89,4 @@
   --pop-from: 0 1rem;
   --pop-rotate: 0deg;
   --pop-scale: 0.96;
-}
-
-.auth-wordmark {
-  animation: wordmark-in var(--motion-slow) var(--ease-out) var(--motion-fast) backwards;
-}
-
-@keyframes wordmark-in {
-  from {
-    letter-spacing: 0.8em;
-    opacity: 0;
-  }
 }

@@ -16,7 +16,6 @@
   position: absolute;
   width: 14vw;
   padding: var(--space-4);
-  border-radius: var(--radius-md);
   /* out of focus: the board is behind the card you are reading */
   filter: blur(1.2px);
   opacity: 0.8;
@@ -31,7 +30,7 @@
 .case-board-card:nth-child(4) { left: 77%; top: 62%; rotate: -3deg;  --pop-from: 4rem 3rem; }
 
 /* each card's pin: red for the one strung in red, graphite for the rest */
-.case-board-card::before {
+.case-board-pin {
   content: "";
   position: absolute;
   top: -0.3rem;
@@ -43,16 +42,19 @@
   background:
     var(--texture-pin),
     var(--color-text-faint);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
 }
 
-.case-board-card:nth-child(1)::before {
+.case-board-card:nth-child(1) .case-board-pin {
   background-color: var(--color-string);
 }
 
-.case-board-exhibit {
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+/* a newspaper scrap at the bottom edge, between the lower cards */
+.case-board-scrap {
+  position: absolute;
+  left: 40%;
+  bottom: -1rem;
+  rotate: -6deg;
 }
 
 /* the strings, over the cards and under the auth card */

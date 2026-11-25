@@ -5,6 +5,7 @@ import { api, setAccessToken } from "@/api";
 import { Button, Frame, Panel, Text } from "@/ui/library";
 import { invitePath, loginPath, signupPath } from "./paths";
 import { useInvite } from "./useInvite";
+import { AuthLockup } from "./Auth";
 import "./Auth.css";
 
 /* The invitation card (/invite/{token}). Reuses the .auth card styles, like
@@ -24,10 +25,11 @@ export function InviteCard({ token }: { token: string }) {
   }
 
   return (
-    <Panel as="section" hierarchy="secondary" elevation="floating" className="auth">
+    <Panel as="section" edge="torn" elevation="floating" className="auth">
+      <span aria-hidden="true" className="auth-pin" />
       <Frame gap="6">
         <Frame as="header" gap="2" align="center" className="auth-header">
-          <Text as="span" size="s" hierarchy="primary" content="TANGENT" className="auth-wordmark" />
+          <AuthLockup />
           {invite.status === "loading" && <Text as="h1" size="xl" content="Loading invitation…" />}
           {invite.status === "invalid" && (
             <>

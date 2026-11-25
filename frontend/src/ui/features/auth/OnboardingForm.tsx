@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/api";
 import { Button, Frame, Panel, Text, Input } from "@/ui/library";
 import { useSessionBoot } from "./useSessionBoot";
+import { AuthLockup } from "./Auth";
 import "./Auth.css";
 
 /* The workspace-name card shown to a brand-new user (POST /auth/onboarding).
@@ -32,15 +33,16 @@ export function OnboardingForm({ next }: { next?: string }) {
   };
 
   return (
-    <Panel as="section" hierarchy="secondary" elevation="floating" className="auth">
+    <Panel as="section" edge="torn" elevation="floating" className="auth">
+      <span aria-hidden="true" className="auth-pin" />
       <Frame as="form" gap="6" onSubmit={submit}>
         <Frame as="header" gap="2" align="center" className="auth-header">
-          <Text as="span" size="s" hierarchy="primary" content="TANGENT" className="auth-wordmark" />
+          <AuthLockup />
           <Text as="h1" size="xl" content="Name your workspace" />
           <Text size="s" hierarchy="tertiary" content="You can change this later." />
         </Frame>
 
-        <Panel className="auth-field">
+        <Panel stock="composer" className="auth-field">
           <Input
             aria-label="Workspace name"
             placeholder="Workspace name"
