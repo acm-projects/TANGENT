@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { GentEvent } from "@/api/types";
-import { inkColors, reducedMotion } from "@/ui/library/components/Ink/ink";
+import { inkColors, reducedMotion } from "@/ui/library/primitives/Ink/ink";
 import { jolt } from "@/ui/library/tokens/jolt";
 import { routeBetween, type Pt } from "./route";
 import { HOME, NOTES, SEARCH, nodeStation, stationEl } from "@/store/gentStations";

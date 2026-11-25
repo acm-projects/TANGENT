@@ -1,4 +1,4 @@
-import { reducedMotion } from "../components/Ink/ink";
+import { reducedMotion } from "../primitives/Ink/ink";
 
 /* Momentum for anything on screen: knock an element by (dx, dy) px and it springs back, overshooting a little,
  * like a pinned card hit in passing. Added on top of whatever the element is already doing (`composite: add`

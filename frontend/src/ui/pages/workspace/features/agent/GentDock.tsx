@@ -7,7 +7,7 @@ import { api } from "@/api";
 import type { AvailableModel } from "@/api/types";
 import { Button, Frame, Icon, InkPanel, Input, Loading, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
-import { reducedMotion } from "@/ui/library/components/Ink/ink";
+import { reducedMotion } from "@/ui/library/primitives/Ink/ink";
 import { readModel, readShowNudges, useGentStore, writeModel, type GentStep, type GentTurn } from "@/store/gentStore";
 import { HOME, useGentStation } from "@/store/gentStations";
 import { selectExhibits, useTreeStore } from "@/store/treeStore";

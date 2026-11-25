@@ -199,16 +199,21 @@
     box-shadow: var(--shadow-press);
   }
 
-  /* ── ink ── Gent's flat ink; the living edge is InkPanel */
+  /* ── ink ── Gent's living ink: the canvas (InkLayer) draws it, so no fill here; text tokens match InkPanel's */
   [data-ui="panel"][data-hierarchy="secondary"][data-material="ink"] {
-    background: var(--color-gent-fill);
-    border-color: transparent;
+    position: relative;
+    isolation: isolate;
+    background: transparent;
+    border: 0;
     color: var(--color-text-on-gent);
     --color-text: var(--color-text-on-gent);
     --color-text-secondary: var(--color-text-on-gent);
     --color-text-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
-    --color-border: color-mix(in srgb, var(--color-text-on-gent) 40%, transparent);
+    --color-border: color-mix(in srgb, var(--color-text-on-gent) 30%, transparent);
+    --color-border-strong: color-mix(in srgb, var(--color-text-on-gent) 55%, transparent);
+    --color-border-emphasis: var(--color-text-on-gent);
     --color-focus-ring: var(--color-text-on-gent);
+    --color-selection: color-mix(in srgb, var(--color-text-on-gent) 25%, transparent);
   }
 
   /* ── cork ── the board: a background, not a card. Straight on the board, text reads like leather ink;

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { GentNote } from "@/api/types";
 import { useGentStore } from "@/store/gentStore";
 import { NOTES } from "@/store/gentStations";
-import { reducedMotion } from "@/ui/library/components/Ink/ink";
+import { reducedMotion } from "@/ui/library/primitives/Ink/ink";
 import { workAt } from "./travel/traveller";
 
 /* Gent writes in the Field Notes only once he's there. His changes join his travel queue as work at the notes
