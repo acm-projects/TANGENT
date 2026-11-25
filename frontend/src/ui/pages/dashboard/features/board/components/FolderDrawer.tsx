@@ -74,14 +74,14 @@ function Folder({ workspace, projects, open, onOpen }: FolderProps) {
       // The button below is for keyboards; a mouse may press anywhere, the peeking cards included.
       onClick={onOpen}
     >
-      <span className="folder-back" aria-hidden="true">
-        <span className="folder-tab">
+      <Panel as="div" material="paper" stock="card-alt" elevation="floating" className="folder-back" aria-hidden="true">
+        <Panel as="div" material="paper" stock="card-alt" className="folder-tab">
           {open && <span className="folder-tab-pin" />}
-          <Text as="span" size="s" className="folder-tab-name" content={workspace.workspace_name} />
+          <Text as="span" face="heading" size="s" className="folder-tab-name" content={workspace.workspace_name} />
           {/* keyed, so a new or deleted project bumps the count */}
           <Text key={count} as="span" size="xxs" className="folder-tab-count" content={String(count)} />
-        </span>
-      </span>
+        </Panel>
+      </Panel>
       <span className="folder-stack" aria-hidden="true">
         {cards.map((p, i) => {
           const peek = hover && i < FAN.length;
@@ -99,7 +99,7 @@ function Folder({ workspace, projects, open, onOpen }: FolderProps) {
           );
         })}
       </span>
-      <span className="folder-front" aria-hidden="true" />
+      <Panel as="div" material="paper" stock="card" className="folder-front" aria-hidden="true" />
       <button
         type="button"
         className="folder-hit"
@@ -142,10 +142,10 @@ function NewFolder({ onCreate }: { onCreate(name: string): Promise<void> }) {
       whileHover={{ y: "-20%" }}
       transition={spring.lift}
     >
-      <span className="folder-back" aria-hidden="true" />
+      <Panel as="div" hierarchy="tertiary" className="folder-back" aria-hidden="true" />
       {naming ? (
         <Frame as="form" gap="0" className="folder-new-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setNaming(false)}>
-          <Panel className="folder-new-field">
+          <Panel material="paper" stock="paper" className="folder-new-field">
             <Input
               aria-label="New workspace name"
               placeholder="Workspace name"

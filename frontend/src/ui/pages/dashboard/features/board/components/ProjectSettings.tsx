@@ -105,7 +105,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
             animate="open"
             exit="closed"
           >
-            <Panel elevation="floating">
+            <Panel material="paper" stock="paper" edge="torn" elevation="floating">
               <Frame gap="3">
                 <motion.form variants={row} onSubmit={rename}>
                   <Frame gap="1">

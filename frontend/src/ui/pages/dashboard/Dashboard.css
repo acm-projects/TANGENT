@@ -1,7 +1,29 @@
-/* Page-level layout only, unlayered (DESIGN.md §2). */
+/* Page-level layout and lighting only, unlayered (DESIGN.md §2). */
 
 .dashboard {
   min-height: 100dvh;
-  /* the board the paper lies on, as in the workspace */
+  /* the board the paper lies on: the page's lamp pool and dark corners over the cork Panel */
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
+}
+
+/* Decals sit on the cork, under the board's content; the cork Panel clips what pokes off its edge. */
+.dashboard-decal {
+  position: absolute;
+  z-index: 0;
+}
+
+.dashboard-scrap {
+  top: var(--space-2);
+  right: 7rem;
+  rotate: 4deg;
+}
+
+.dashboard-ring {
+  bottom: -2rem;
+  left: 55%;
+}
+
+.dashboard > .board {
+  position: relative;
+  z-index: 1;
 }

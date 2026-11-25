@@ -73,7 +73,7 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
       aria-label="New project"
       aria-busy={busy}
     >
-      <Panel elevation="floating" className="case-card case-draft">
+      <Panel material="paper" stock="card" edge="torn" elevation="floating" className="case-card case-draft">
         <span className="case-card-pin" aria-hidden="true" />
         <span className="case-card-photo">
           <CaseSketch pins={LONE_ROOT} />
