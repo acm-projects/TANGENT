@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, Divider, Frame, Icon, Image, Input, Link, Panel, Select, Text, TextArea } from "@/ui/library";
+import { Button, Decal, Divider, Frame, Icon, Image, InkPanel, Input, Link, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { Hierarchy, TextSize } from "@/ui/library";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
 import "./DevLibrary.css";
@@ -170,10 +170,15 @@ export function DevLibrary() {
           </Specimen>
         </Section>
 
-        <Section title="Leather" description="Stitching, pressed, elevation, and a rail strip.">
-          {(["all", "none"] as const).map((stitch) => (
-            <Specimen key={stitch} caption={`material="leather" stitch="${stitch}"`}>
+        <Section title="Leather" description="Stitching, rounding, pressed, the rail, and leather Buttons.">
+          {(["all", "none", ["right"], ["top", "bottom"]] as ("all" | "none" | ("top" | "right" | "bottom" | "left")[])[]).map((stitch) => (
+            <Specimen key={String(stitch)} caption={`material="leather" stitch=${JSON.stringify(stitch)}`}>
               <Panel material="leather" stitch={stitch}><Text content="Dashboard" /></Panel>
+            </Specimen>
+          ))}
+          {(["all", "none", ["top-right", "bottom-right"]] as ("all" | "none" | ("top-right" | "bottom-right")[])[]).map((round) => (
+            <Specimen key={String(round)} caption={`material="leather" round=${JSON.stringify(round)}`}>
+              <Panel material="leather" round={round}><Text content="Cases" /></Panel>
             </Specimen>
           ))}
           {[true, false].map((pressed) => (
@@ -186,18 +191,28 @@ export function DevLibrary() {
               <Panel material="leather" elevation={elevation}><Text content="Cases" /></Panel>
             </Specimen>
           ))}
-          <Specimen caption='as="nav" strip with three tertiary icon Buttons'>
-            <Panel as="nav" material="leather" className="dev-library-strip">
+          <Specimen caption={'the rail: as="nav" stitch=["right"] round=["top-right","bottom-right"], four leather Buttons'}>
+            <Panel as="nav" material="leather" stitch={["right"]} round={["top-right", "bottom-right"]} className="dev-library-strip">
               <Frame gap="2" align="center">
-                <Button hierarchy="tertiary" showIcon showLabel={false} icon="home" label="Dashboard" />
-                <Button hierarchy="tertiary" showIcon showLabel={false} icon="folder" label="Cases" pressed />
-                <Button hierarchy="tertiary" showIcon showLabel={false} icon="search" label="Search" />
+                <Button material="leather" hierarchy="secondary" showIcon showLabel={false} icon="home" label="Dashboard" />
+                <Button material="leather" hierarchy="secondary" showIcon showLabel={false} icon="search" label="Search" pressed />
+                <Button material="leather" hierarchy="secondary" showIcon showLabel={false} icon="folder" label="Cases" />
+                <Button material="leather" hierarchy="secondary" showIcon showLabel={false} icon="settings" label="Settings" />
+              </Frame>
+            </Panel>
+          </Specimen>
+          <Specimen caption='leather Buttons on leather: rest, pressed, disabled'>
+            <Panel material="leather">
+              <Frame gap="2">
+                <Button material="leather" hierarchy="secondary" showIcon icon="folder" label="Cases" />
+                <Button material="leather" hierarchy="secondary" showIcon icon="folder" label="Cases" pressed />
+                <Button material="leather" hierarchy="secondary" showIcon icon="folder" label="Cases" disabled />
               </Frame>
             </Panel>
           </Specimen>
         </Section>
 
-        <Section title="Ink (flat)" description="The ink Panel with text, tertiary text and an icon.">
+        <Section title="Ink" description="living ink: the edge is drawn per panel, so seeds differ.">
           <Specimen caption='material="ink"'>
             <Panel material="ink">
               <Frame gap="2">
@@ -207,23 +222,59 @@ export function DevLibrary() {
               </Frame>
             </Panel>
           </Specimen>
-        </Section>
-
-        <Section title="Cork" description="The board: lamp on or off, scraps, and text straight on the cork.">
-          <Specimen caption={'material="cork"'}>
-            <Panel material="cork" className="dev-library-scrap">
-              <Text content="Board text, straight on the cork" />
+          <Specimen caption='material="ink" calm, large'>
+            <Panel material="ink" calm className="dev-library-ink-large">
+              <Frame gap="2">
+                <Text content="Pollen cores, Sea of Galilee" />
+                <Text content="CASE NOTES · NODE 1.2.1" hierarchy="tertiary" />
+                <Icon icon="call_split" size="l" />
+              </Frame>
             </Panel>
           </Specimen>
-          {(["card"] as const).map((k) => (
-            <Specimen key={k} caption={'a torn card on cork'}>
-              <Panel material="cork" className="dev-library-scrap">
-                <Frame gap="3">
-                  <Text content="Drought records" />
-                  <Panel material="paper" stock="card" edge="torn" elevation="floating">
-                    <Text content="Node 1.2.1" />
-                  </Panel>
-                </Frame>
+          {[3, 11].map((seed) => (
+            <Specimen key={seed} caption={`material="ink" seed={${seed}}`}>
+              <Panel material="ink" seed={seed}><Text content="Drought records" /></Panel>
+            </Specimen>
+          ))}
+          <Specimen caption='InkPanel radius={14}, for comparison'>
+            <InkPanel radius={14}>
+              <Frame gap="2">
+                <Text content="Pollen cores, Sea of Galilee" />
+                <Text content="CASE NOTES · NODE 1.2.1" hierarchy="tertiary" />
+                <Icon icon="call_split" size="l" />
+              </Frame>
+            </InkPanel>
+          </Specimen>
+        </Section>
+
+        <Section title="Cork" description="Real cork: text straight on it, and Decals sitting under content.">
+          <Specimen caption='material="cork", plain'>
+            <Panel material="cork" className="dev-library-cork">
+              <Frame gap="3">
+                <Text content="Board text, straight on the cork" />
+                <Panel material="paper" stock="card" edge="torn" elevation="floating">
+                  <Text content="Node 1.2.1" />
+                </Panel>
+              </Frame>
+            </Panel>
+          </Specimen>
+          <Specimen caption='material="cork" with Decals (scrap -8deg, scrap 6deg, coffee-ring)'>
+            <Panel material="cork" className="dev-library-cork dev-library-decals">
+              <Decal kind="scrap" className="dev-library-decal-a" />
+              <Decal kind="scrap" className="dev-library-decal-b" />
+              <Decal kind="coffee-ring" className="dev-library-decal-c" />
+              <Panel material="paper" stock="card" edge="torn" elevation="floating" className="dev-library-decal-card">
+                <Text content="Drought records" />
+              </Panel>
+            </Panel>
+          </Specimen>
+        </Section>
+
+        <Section title="Decal" description="Marks that sit on a material, each at its default size.">
+          {(["scrap", "coffee-ring"] as const).map((kind) => (
+            <Specimen key={kind} caption={`kind="${kind}"`}>
+              <Panel material="cork" className="dev-library-decal-slot">
+                <Decal kind={kind} />
               </Panel>
             </Specimen>
           ))}
