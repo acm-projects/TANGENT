@@ -6,18 +6,18 @@ The plan and decisions: `docs/retheme-queue.md`. The look: `docs/VISUAL_LANGUAGE
 
 ## Rules every agent follows
 
-1. **You are in your own git worktree**, on your own branch. Other agents are working at the same time
-   on other files. Touch only the files your brief lists. If you believe another file must change, say so
-   in your report instead of changing it.
-2. **Setup** (node_modules aren't in a fresh worktree). From your worktree root:
-   ```bash
-   cp -al /home/ryanstrobel/Projects/ACM/TANGENT/frontend/node_modules frontend/node_modules
-   ```
-   (a hard-linked copy: instant, no download. Don't symlink it: Turbopack rejects symlinks.)
+1. **You work in the git worktree Claude made for you** (`.claude/worktrees/retheme-<batch>-<task>`, branch
+   `retheme/<batch>-<task>`), named in your prompt. Your shell's working directory resets between
+   commands, so start every command with `cd <your worktree> && …` and use absolute paths. Never touch any
+   other worktree. Other agents are working at the same time on other files. Touch only the files your
+   brief lists. If you believe another file must change, say so in your report instead of changing it.
+2. **Setup:** none. `frontend/node_modules` is already in your worktree (a hard-linked copy of the main
+   checkout's; if it's ever missing: `cp -al /home/ryanstrobel/Projects/ACM/TANGENT/frontend/node_modules
+   frontend/node_modules`. Don't symlink it: Turbopack rejects symlinks).
 3. **Don't run a dev server** (`npm run dev`, `dev:mock`, `next build`). The user is on battery. Your
    checks are, from `frontend/`:
    ```bash
-   npx tsc --noEmit -p .
+   npm run typecheck        # next typegen (generates PageProps etc.), then tsc
    npx eslint <the files you changed>
    ```
    Both must pass for your files. Claude checks the result visually afterwards.
