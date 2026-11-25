@@ -12,12 +12,11 @@
   pointer-events: auto;
 }
 
-/* Gent's question: a speech bubble in his blue, its tail on the pill it came out of */
-.gent-ask {
+/* Gent's question: a speech bubble of his ink (Panel material ink), its tail on the pill it came out of. The body
+ * scrolls, not the panel, so the ink's bleed isn't clipped. */
+.gent-ask-body {
   max-height: min(32rem, 100cqh - 6rem);
   overflow-y: auto;
-  padding: var(--space-4);
-  border-color: var(--color-gent);
 }
 
 .gent-ask-pop::after {
@@ -29,9 +28,36 @@
   height: 0.9rem;
   translate: -50% -50%;
   rotate: 45deg;
-  border: solid var(--color-gent);
-  border-width: 0 1px 1px 0;
-  background: var(--texture-grain), var(--color-surface); /* the panel's own paper, so the join doesn't show */
+  background: var(--color-gent-fill);
+}
+
+/* the choices are quiet in the ink: pale lines, a wash on hover, your pick marked by a pale margin, not red */
+.gent-ask .question-choice:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text-on-gent) 12%, transparent);
+}
+
+.gent-ask .question-choice[aria-pressed="true"] {
+  border-color: var(--color-text-on-gent);
+  background: color-mix(in srgb, var(--color-text-on-gent) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-text-on-gent);
+}
+
+.gent-ask [data-ui="input"] {
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-text-on-paper) 14%, transparent);
+  color: var(--color-text);
+}
+
+.gent-ask [data-ui="input"]::placeholder {
+  color: var(--color-text-muted);
+}
+
+.gent-ask [data-component="button"][data-hierarchy="tertiary"] {
+  color: var(--color-text);
+}
+
+.gent-ask .question-error {
+  color: color-mix(in srgb, var(--color-danger) 55%, var(--color-text-on-gent));
 }
 
 .gent-ask-foot > [data-component="button"][data-hierarchy="primary"] {

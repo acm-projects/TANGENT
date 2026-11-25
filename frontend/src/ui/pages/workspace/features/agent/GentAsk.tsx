@@ -66,8 +66,8 @@ function Questions({ id, questions }: { id: string; questions: GentQuestion[] })
   }
 
   return (
-    <Panel as="section" elevation="floating" className="gent-ask" aria-label="Gent asks you">
-      <Frame gap="3">
+    <Panel as="section" material="ink" calm seed={3} className="gent-ask" aria-label="Gent asks you">
+      <Frame gap="3" className="gent-ask-body">
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={at}

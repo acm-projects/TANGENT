@@ -55,7 +55,7 @@ export function FieldNotes({ className }: { className?: string }) {
             exit={{ opacity: 0, scale: 0.6, x: 40, y: 30, rotate: 4, transition: spring.lift }}
             style={{ transformOrigin: "bottom right" }}
           >
-            <Panel as="section" ref={station} elevation="floating" className="field-notes-book" aria-label="Field Notes">
+            <Panel as="section" material="paper" stock="paper" ref={station} elevation="floating" className="field-notes-book" aria-label="Field Notes">
               {/* a reporter's pad: spiral rings through punched holes along the top */}
               <span className="field-notes-spiral" aria-hidden>
                 {Array.from({ length: RINGS }, (_, i) => (

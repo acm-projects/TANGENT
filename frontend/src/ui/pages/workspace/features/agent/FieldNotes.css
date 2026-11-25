@@ -1,6 +1,6 @@
 /* Field Notes: a small ruled notebook on the board, with a blue margin line (Gent plans here too). Unlayered. */
 
-/* A reporter's pad: spiral rings along the top, a ruled page with a blue margin line (Gent plans here too).
+/* A reporter's pad (a paper Panel; the grain, border and shadow are its): spiral rings along the top, a ruled page with a blue margin line (Gent plans here too).
  * Items sit on the lines. */
 .field-notes-book {
   --line: 1.75rem;
@@ -13,7 +13,6 @@
   margin-top: 0.6rem; /* room for the rings standing above the page */
   padding: var(--space-4) var(--space-3) var(--space-2) 0;
   border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-surface);
 }
 
 /* the spiral: a ring through a punched hole every few millimetres */
@@ -71,7 +70,6 @@
 
 .field-notes-head h2 {
   font-family: var(--font-heading);
-  text-shadow: 0 0 0.25px currentColor;
 }
 
 .field-notes-count {
@@ -285,8 +283,8 @@
   height: 1.15rem;
   padding-inline: 0.25rem;
   border-radius: var(--radius-full);
-  background: var(--gent-ink);
-  color: var(--on-gent-ink);
+  background: var(--color-gent-fill);
+  color: var(--color-text-on-gent);
   font-size: var(--font-size-xxs, 0.65rem);
   line-height: 1.15rem;
   text-align: center;

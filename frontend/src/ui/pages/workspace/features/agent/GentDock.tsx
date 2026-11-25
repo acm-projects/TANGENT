@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type Key
 import { useShallow } from "zustand/react/shallow";
 import { api } from "@/api";
 import type { AvailableModel } from "@/api/types";
-import { Button, Frame, Icon, InkPanel, Input, Loading, Text } from "@/ui/library";
+import { Button, Frame, Icon, InkPanel, Input, Loading, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { reducedMotion } from "@/ui/library/primitives/Ink/ink";
 import { readModel, readShowNudges, useGentStore, writeModel, type GentStep, type GentTurn } from "@/store/gentStore";
@@ -142,7 +142,7 @@ export function GentDock() {
         ref={panelRef}
         inked={home}
         calm={mode === "chat"}
-        radius={mode === "chat" ? 14 : 26}
+        radius={mode === "chat" ? 14 : 20}
         seed={5}
         className="gent-dock"
         data-mode={mode}
@@ -183,7 +183,7 @@ export function GentDock() {
         {/* the pill row: the composer in every size (only the socket shows in the circle) */}
         <div className="gent-dock-bar">
           <span ref={socket} className="gent-socket" data-home={home || undefined} data-phase={phase}>
-            <GentAvatar state={state} size={28} />
+            <GentAvatar state={state} size={22} />
           </span>
           <span role="status" className="gent-live">{busy ? status : (outcome?.label ?? "")}</span>
           {showing === "status" && <NowLine status={status} />}
@@ -512,7 +512,7 @@ function Step({ step }: { step: GentStep }) {
 /** A card's answer in his log: the card's paper, who sent it, and its first two lines; opening it shows the rest. */
 function AnswerSlip({ address, text }: { address: string; text: string }) {
   return (
-    <li className="gent-answer">
+    <Panel as="li" stock="card" edge="torn" elevation="floating" className="gent-answer">
       <details>
         <summary>
           <span className="gent-answer-from">
@@ -521,7 +521,7 @@ function AnswerSlip({ address, text }: { address: string; text: string }) {
           <span className="gent-answer-text">{text}</span>
         </summary>
       </details>
-    </li>
+    </Panel>
   );
 }
 
