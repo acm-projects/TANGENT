@@ -96,8 +96,8 @@ frontend/src/
   ui/
     library/                   ← the design library: knows nothing about Tangent
       tokens/
-        colors.css             ← palette (tier 1) + colour meanings (tier 2) + dark theme
-        shape.css              ← spacing scale, radii, paper grain, wash mix
+        colors.css             ← materials + ink (tier 1), colour meanings (tier 2), Day/Night
+        shape.css              ← spacing, radii, shadows, opacities, layout widths, material textures
         text.css               ← typography: font families, size scale, weights, line heights
         motion.css             ← durations, easings, reduced-motion rule
         index.css              ← imports the four above
@@ -323,10 +323,12 @@ written once with both values and there is no theme attribute or JS.
 Typography tokens live in their own file, `tokens/text.css`.
 
 - **Fonts are loaded by `next/font`** in `app/layout.tsx`, which puts
-  `--font-heading`, `--font-content` and `--font-symbols` on `<html>`.
-  `text.css` maps those to the three roles a component may use:
-  - `--font-heading` (Aleo): headings and display text.
+  `--font-heading`, `--font-content`, `--font-mono`, `--font-stamp` and `--font-symbols` on `<html>`.
+  `text.css` maps those to the five roles a component may use:
+  - `--font-heading` (Aleo, one weight, never bold): headings, card titles, slips, the wordmark.
   - `--font-content` (Outfit): everything else. `body` uses it, so it is the default.
+  - `--font-mono` (IBM Plex Mono): node numbers, counts, meters.
+  - `--font-stamp` (Special Elite): typed labels and eyebrows, uppercase, a few words.
   - `--font-icon` (Material Symbols Rounded, filled): only `Icon` uses it.
     `next/font/google` doesn't carry it, so `layout.tsx` loads the file from the
     `@material-symbols/font-400` package with `next/font/local` and
@@ -336,8 +338,8 @@ Typography tokens live in their own file, `tokens/text.css`.
   "Shared types" below): `xxs, xs, s, base, m, l, xl, xxl, display`. Every step
   in the type needs a matching `--font-size-*` token, and each component maps its
   `size` prop onto those tokens. A size in the type with no token is a bug.
-- **Light and dark both ship; the OS picks** (`prefers-color-scheme`, through `light-dark()` in
-  `colors.css`) unless the reader picks in Settings, which sets `data-lighting` on `<html>`
+- **Day and Night both ship; the OS picks** (`prefers-color-scheme`, through `light-dark()` in
+  `colors.css`) unless the reader picks Day or Night in Settings (stored as `light`/`dark`), which sets `data-lighting` on `<html>`
   (`tokens/lighting.ts`). Not an inline `color-scheme`: the build polyfills `light-dark()` with
   media-query variables an inline style can't reach. Check both by emulating the preference in devtools.
 
@@ -365,8 +367,9 @@ export type Elevation = "flat" | "floating";
   surfaces take it: Panel, and Button (which hands it to its Panel). It's separate
   from `Hierarchy` because it's a different property. Every combination works:
   floating only adds `--shadow-floating`, so it combines with any hierarchy without
-  touching the background. Surfaces carry the paper grain (`--texture-grain`);
-  `primary` is solid ink and `tertiary` is transparent, so neither does.
+  touching the background. What a `secondary` surface is made of is Panel's
+  `material` (§4, Panel materials); `primary` is solid ink and `tertiary` is
+  transparent, so neither takes a material.
 - **A shared type must mean something to every component that takes it.** If a
   value would do nothing on one of them, it belongs in a separate prop.
 - Add a type here only once a **second** component needs it, the same rule as for
@@ -610,6 +613,7 @@ export function Panel<T extends PanelTag = "div">({ as, hierarchy = "secondary",
 |-----------|--------|---------|
 | `data-ui` | every library piece | Identifies it: `panel`, `text`, `icon`, `frame` |
 | `data-hierarchy`, `data-elevation`, `data-size` | props | Styled from the piece's own CSS |
+| `data-material` + its parameters (`data-stock`, `data-edge`, `data-stitch`, …) | Panel's props | The surface's material (§4, Panel materials) |
 | `data-direction`, `data-gap`, `data-align` | Frame's props | Layout |
 | `data-icon-only` | Button | Derived state: icon shown, label hidden |
 | `data-component` | a component | Marks the primitive root it owns (`data-component="button"`) |
@@ -641,6 +645,37 @@ so **a component must not set a property the primitive's prop rules set.** Butto
 leaves background, border, colour and shadow to Panel and adds only layout, padding,
 cursor and interaction states. Its hover rules carry `:hover:not(:disabled)`, so they
 outrank Panel's hierarchy rules by specificity, not source order.
+
+### Panel materials
+
+A `secondary` Panel is made of something: `material` says what, and each material
+has its own parameters. Swapping a surface from paper to leather is one prop, and
+every recipe (fill, grain, edge, stitch, shadow) lives once, in `Panel.css`.
+
+| `material` | Job | Parameters (each one `data-*` attribute) |
+|---|---|---|
+| `paper` (default) | anything you read | `stock`: `paper` \| `card` \| `card-alt` \| `slip` \| `composer` · `edge`: `clean` \| `torn` · `ruled`: `none` \| `lines` \| `margin` · `holes`: boolean |
+| `leather` | navigation and identity | `stitch`: `none` \| `dashed` · `pressed`: boolean |
+| `ink` | Gent, flat | none: `gent-ink` fill, `on-gent-ink` text. The living, bleeding edge is `InkPanel` (`components/Ink/`), a separate component that stays as it is. |
+| `cork` | the board | `lamp`: boolean · `scraps`: `none` \| `app` \| `marketing` |
+
+The props are a discriminated union on `material`, so a parameter only type-checks
+with its own material (`<Panel material="leather" stitch="dashed">`, never
+`<Panel stock="slip" stitch="dashed">`). The union stays inline in `Panel.tsx`:
+only Panel takes it (Shared types). Defaults are written in the destructuring, like
+`hierarchy`, so every attribute always has a value and the CSS needs no fallback.
+
+**Material and hierarchy.** They both touch `background`, so they never compete:
+material applies only to `secondary`. Its rules are qualified with all three,
+`[data-ui="panel"][data-hierarchy="secondary"][data-material="leather"]` (0,3,0),
+which beats both the base rule and the hierarchy rules. `primary` stays solid ink and
+`tertiary` stays transparent whatever the material; a tertiary Button on the rail
+reads correctly because its text inherits `leather-ink` from the leather around it.
+Parameter rules add one more attribute (`…[data-material="leather"][data-stitch="dashed"]`).
+
+**Adding a material** is one CSS block in `Panel.css` (plus its parameter rules), one
+member of the union in `Panel.tsx`, and its tokens in `colors.css`/`shape.css`. No other
+file changes, and nothing outside the library names a material's recipe.
 
 ### Writing the CSS
 

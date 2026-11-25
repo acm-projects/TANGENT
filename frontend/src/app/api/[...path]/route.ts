@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { mock } from "./mock";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +23,7 @@ async function proxy(
   context: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
   const { path } = await context.params;
+  if (process.env.MOCK === "1") return mock(request, path);
   const incoming = new URL(request.url);
   const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
   const pathSuffix = path.map(encodeURIComponent).join("/");
