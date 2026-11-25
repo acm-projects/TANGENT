@@ -32,13 +32,7 @@
 }
 
 .account-kicker {
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--color-text-secondary);
-}
-
-.account-title {
-  font-family: var(--font-heading);
 }
 
 /* ── the aside: the badge and the index ───────────────────── */
@@ -97,31 +91,14 @@
   box-shadow: 1px 2px 2px var(--color-string-shadow);
 }
 
+/* a leather badge: its stitched edge is the Panel's, so no punched slot (::before is the stitch) */
 .id-badge {
   position: relative;
   width: 14rem;
-  padding: var(--space-6) var(--space-4) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--texture-grain), var(--color-surface);
-}
-
-/* the punched slot the clip goes through */
-.id-badge::before {
-  content: "";
-  position: absolute;
-  top: var(--space-2);
-  left: 50%;
-  width: 2.4rem;
-  height: 0.45rem;
-  translate: -50% 0;
-  border-radius: var(--radius-full);
-  background: var(--color-board);
-  box-shadow: inset 0 1px 2px var(--color-string-shadow);
+  padding: var(--space-8) var(--space-4) var(--space-4);
 }
 
 .id-badge-kicker {
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
@@ -140,17 +117,12 @@
   display: grid;
   place-items: center;
   background: var(--texture-grain), var(--color-card-alt);
-  font-family: var(--font-heading);
-  color: var(--color-text);
+  color: var(--color-text-on-paper);
 }
 
 .id-badge-caption {
   max-width: 100%;
   text-align: center;
-}
-
-.id-badge-name {
-  font-family: var(--font-heading);
 }
 
 .id-badge-name,
@@ -165,10 +137,8 @@
 .id-badge-stamp {
   padding: 0.15em 0.6em;
   rotate: -4deg;
-  border: 0.14em solid var(--color-string);
+  border: 0.14em solid var(--color-text-muted);
   border-radius: var(--radius-sm);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--color-text-secondary);
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
   --pop-from: 0 0;
@@ -181,8 +151,6 @@
 .contents {
   align-self: stretch;
   padding: var(--space-4) var(--space-4) var(--space-3) var(--space-6);
-  border-radius: var(--radius-md);
-  background: var(--texture-grain), var(--color-surface);
   rotate: 1deg;
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
   --pop-from: 0 2rem;
@@ -193,10 +161,8 @@
 .contents-heading {
   padding-bottom: var(--space-2);
   border-bottom: 3px double var(--color-border-strong);
-  font-family: var(--font-heading);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--color-text);
 }
 
 .contents-item {
@@ -243,10 +209,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.contents-number {
-  font-family: var(--font-heading);
-}
-
 /* a paperclip slid onto the card's left edge: an outer loop and an inner one */
 .contents-clip {
   position: absolute;
@@ -271,14 +233,11 @@
 
 /* ── the sections ─────────────────────────────────────────── */
 
-/* A section is a folder: a sheet with a tab standing up off its top-left
- * edge, carrying the section's number. */
+/* A section is a torn sheet on the board; its number is stamped across the head. */
 .account-section {
   position: relative;
-  margin-top: 1.6rem;
   padding: var(--space-6);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  scroll-margin-top: calc(var(--space-8) + 1.6rem);
+  scroll-margin-top: var(--space-8);
   transform-origin: left top;
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   animation-delay: calc(var(--motion-fast) + sibling-index() * var(--motion-fast) / 2);
@@ -303,17 +262,8 @@
 }
 
 .account-section-tab {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  padding: 0.45rem var(--space-4) 0.3rem;
-  border: 1px solid var(--color-border);
-  border-bottom: 0;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-card-alt);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-text);
+  align-self: start;
+  color: var(--color-text-secondary);
 }
 
 /* the section's own head on the sheet, ruled off from its body */
@@ -322,22 +272,13 @@
   border-bottom: 1px dashed var(--color-border-strong);
 }
 
-.account-section-title {
-  font-family: var(--font-heading);
-}
-
 .account-error {
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
 }
 
-/* a field's paper well; its focus ring comes from Panel */
+/* a field's paper well (composer stock); its focus ring comes from Panel */
 .settings-field {
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
 }
 
 .account-name-field {
@@ -356,16 +297,14 @@
 
 /* ── workspaces ───────────────────────────────────────────── */
 
-/* the rows' hover wash bleeds past the sheet's text edge, so their contents line up with it */
-.workspace-list {
-  margin-inline: calc(-1 * var(--space-3));
-}
-
+/* each workspace is an index card laid on the sheet */
 .workspace-row {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
-  transition: background-color var(--motion-base) var(--ease-out);
+  transition: border-color var(--motion-base) var(--ease-out);
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   animation-delay: calc(var(--motion-base) + sibling-index() * var(--motion-fast) / 2);
   --pop-from: -1.5rem 0;
@@ -373,7 +312,7 @@
 }
 
 .workspace-row:is(:hover, :focus-within) {
-  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
 }
 
 /* a little folder, with the workspace's initial written on its front */
@@ -385,11 +324,9 @@
   width: 2.5rem;
   height: 1.9rem;
   margin-top: 0.35rem;
-  border: 1px solid var(--color-border-strong);
+  padding: 0;
+  border-color: var(--color-border-strong);
   border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
-  background: var(--texture-grain), var(--color-card-alt);
-  font-family: var(--font-heading);
-  color: var(--color-text);
   transform-origin: left bottom;
   transition: rotate var(--motion-base) var(--ease-spring);
 }
@@ -472,8 +409,6 @@
   rotate: -3deg;
   border: 0.14em solid var(--color-string);
   border-radius: var(--radius-sm);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 

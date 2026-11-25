@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { WorkspaceSummary } from "@/api/types";
 import { Button, DangerButton, Frame, Input, Link, Panel, Popup, Text } from "@/ui/library";
 
-/* One workspace in Settings: a folder tab with its name and how many cases it
+/* One workspace in Settings: a card with a folder tab, its name and how many cases it
  * holds. The whole row opens that workspace's board (its name is the link,
  * stretched over the row; the actions sit above it). Rename swaps the name for a field (Enter saves, Escape or leaving
  * cancels); delete asks first, by holding, since every project goes with it. */
@@ -33,19 +33,21 @@ export function WorkspaceRow({ workspace, projects, current, canDelete, onRename
   }
 
   return (
-    <Frame as="li" direction="row" gap="3" align="center" className="workspace-row">
-      <Text as="span" size="s" className="workspace-row-tab" content={title.charAt(0).toUpperCase()} aria-hidden="true" />
+    <Panel as="li" stock="card" className="workspace-row">
+      <Panel as="div" stock="card-alt" className="workspace-row-tab" aria-hidden="true">
+        <Text as="span" size="s" face="heading" content={title.charAt(0).toUpperCase()} />
+      </Panel>
       <Frame gap="0" className="workspace-row-body">
         {name === null ? (
           <Frame direction="row" gap="2" align="center">
             <Link href={`/${encodeURIComponent(workspace.workspace_slug)}/dashboard`} className="workspace-row-link">
               <Text as="span" size="m" hierarchy="primary" className="workspace-row-name" content={title} />
             </Link>
-            {current && <Text as="span" size="xxs" className="workspace-row-here" content="Current" />}
+            {current && <Text as="span" size="xxs" face="stamp" className="workspace-row-here" content="Current" />}
           </Frame>
         ) : (
           <Frame as="form" gap="0" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setName(null)}>
-            <Panel className="settings-field">
+            <Panel stock="composer" className="settings-field">
               <Input
                 aria-label={`New name for ${title}`}
                 value={name}
@@ -91,6 +93,6 @@ export function WorkspaceRow({ workspace, projects, current, canDelete, onRename
           />
         </Frame>
       </Popup>
-    </Frame>
+    </Panel>
   );
 }

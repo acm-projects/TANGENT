@@ -1,26 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Frame } from "@/ui/library";
+import { Button, Panel } from "@/ui/library";
 import { readLighting, setLighting, type Lighting } from "@/ui/library/tokens/lighting";
 import "./Settings.css";
 
-/* The lighting switch: three switches on one plate, the lit one pressed in.
+/* The lighting switch: three leather switches on a leather plate, the lit one pressed in.
  * The new lighting spreads out from the switch that was pressed (lighting.ts). */
 
 const LIGHTING: { value: Lighting; icon: string; label: string }[] = [
   { value: "system", icon: "brightness_auto", label: "System" },
-  { value: "light", icon: "light_mode", label: "Lamp on" },
-  { value: "dark", icon: "dark_mode", label: "Lamp off" },
+  { value: "light", icon: "light_mode", label: "Day" },
+  { value: "dark", icon: "dark_mode", label: "Night" },
 ];
 
 export function LightingPicker({ labelledBy }: { labelledBy: string }) {
   const [lighting, setPicked] = useState(readLighting);
   return (
-    <Frame direction="row" gap="1" role="group" aria-labelledby={labelledBy} className="settings-lighting">
+    <Panel material="leather" stitch="none" role="group" aria-labelledby={labelledBy} className="settings-lighting">
       {LIGHTING.map((option) => (
         <Button
           key={option.value}
+          material="leather"
           size="xs"
           icon={option.icon}
           label={option.label}
@@ -33,6 +34,6 @@ export function LightingPicker({ labelledBy }: { labelledBy: string }) {
           className="settings-lighting-option"
         />
       ))}
-    </Frame>
+    </Panel>
   );
 }

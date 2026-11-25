@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Button, Frame, Input, Link, Loading, Panel, Text } from "@/ui/library";
+import { Button, DangerButton, Frame, Input, Link, Loading, Panel, Text } from "@/ui/library";
 import { FieldGuide } from "@/ui/features/settings/FieldGuide";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
 import { ShowNudges } from "@/ui/features/settings/ShowNudges";
@@ -42,8 +42,8 @@ export function Account() {
         <Link href={back ?? `/${slug}/dashboard`} className="account-back">
           <Text as="span" size="s" content={back ? "← Back" : "← Back to the board"} />
         </Link>
-        <Text as="span" size="xs" className="account-kicker" content="Personnel file" />
-        <Text as="h1" size="display" hierarchy="primary" className="account-title" content="Settings" />
+        <Text as="span" size="xs" face="stamp" className="account-kicker" content="Personnel file" />
+        <Text as="h1" size="display" hierarchy="primary" content="Settings" />
       </Frame>
 
       {state.status === "loading" && <Loading label="Pulling your file…" />}
@@ -57,7 +57,7 @@ export function Account() {
           </Frame>
 
           <Frame gap="6" className="account-sections">
-            {actionError && <Text role="alert" size="s" className="account-error" content={actionError} />}
+            {actionError && <Panel stock="card" role="alert" className="account-error"><Text size="s" content={actionError} /></Panel>}
 
             <Section id="profile" number={1} title="Profile" note="How you appear to people you share a case with.">
               <NameForm name={state.account.name} onSave={renameSelf} />
@@ -86,7 +86,7 @@ export function Account() {
 
             <Section id="appearance" number={3} title="Appearance" note="Light the board your way. Kept in this browser.">
               <Frame gap="2" className="account-lighting">
-                <Text as="h3" id="account-lighting" size="xs" className="settings-heading" content="Lighting" />
+                <Text as="h3" id="account-lighting" size="xs" face="stamp" className="settings-heading" content="Lighting" />
                 <LightingPicker labelledBy="account-lighting" />
               </Frame>
               <ShowNudges />
@@ -110,7 +110,7 @@ export function Account() {
                   <Text size="xs" hierarchy="tertiary" content="Closes your file for good: every workspace and case goes with it." />
                 </Frame>
                 {/* TODO(backend): GET /auth/reauth/google needs a Bearer token, which a browser redirect can't carry, so this can't be reached yet. */}
-                <Button size="s" icon="person_remove" label="Not available yet" showIcon disabled />
+                <DangerButton size="s" icon="person_remove" label="Not available yet" showIcon disabled onHold={() => {}} />
               </Frame>
             </Section>
           </Frame>
@@ -154,15 +154,14 @@ function useReading(ready: boolean) {
   return { id, pick };
 }
 
-/* One section of the file: a sheet with a manila band across its head. */
+/* One section of the file: a torn sheet on the board, its number stamped across its head. */
 function Section({ id, number, title, note, children }: { id: string; number: number; title: string; note?: string; children: ReactNode }) {
   return (
-    <Panel as="section" id={id} elevation="floating" className="account-section" aria-labelledby={`${id}-heading`}>
+    <Panel as="section" id={id} stock="paper" edge="torn" elevation="floating" className="account-section" aria-labelledby={`${id}-heading`}>
       <Frame gap="4">
         <Frame as="header" gap="1" className="account-section-head">
-          {/* the folder's tab, standing up off the sheet */}
-          <Text as="span" size="xxs" className="account-section-tab" content={`Section ${number}`} />
-          <Text as="h2" id={`${id}-heading`} size="xl" hierarchy="primary" className="account-section-title" content={title} />
+                    <Text as="span" size="xxs" face="stamp" className="account-section-tab" content={`Section ${number}`} />
+          <Text as="h2" id={`${id}-heading`} size="xl" hierarchy="primary" content={title} />
           {note && <Text size="xs" hierarchy="secondary" content={note} />}
         </Frame>
         {children}
@@ -183,7 +182,7 @@ function NameForm({ name, onSave }: { name: string; onSave(name: string): void }
     <Frame as="form" gap="1" onSubmit={submit}>
       <Text as="label" htmlFor="account-name" size="xs" hierarchy="tertiary" content="Name" />
       <Frame direction="row" gap="2" align="center">
-        <Panel className="settings-field account-name-field">
+        <Panel stock="composer" className="settings-field account-name-field">
           <Input id="account-name" value={draft} maxLength={100} autoComplete="name" onChange={(e) => setDraft(e.target.value)} />
         </Panel>
         <Button type="submit" hierarchy="primary" size="s" label="Save" disabled={!trimmed || trimmed === name} />
