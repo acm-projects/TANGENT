@@ -4,7 +4,7 @@ Source: the **Tangent** design-system artifact (https://claude.ai/artifact/WmPTf
 derived from the **Tanget Design System** canvas (https://claude.ai/artifact/Pf2jhiWECCLzcMrtH7LyMq).
 Day = vanilla leather on pale kraft cork; Night = charcoal leather on dark wood. Paper stays light in both.
 
-Status: **docs and foundations done; batch 1a (primitives) running.** Work runs bottom up.
+Status: **batch 1a (primitives) merged; in review.** Work runs bottom up.
 
 ## How we build
 
