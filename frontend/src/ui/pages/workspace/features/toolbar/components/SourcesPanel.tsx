@@ -24,6 +24,7 @@ function SourceList({
       {sources.map((s) => (
         <Panel
           as="li"
+          hierarchy="tertiary"
           key={s.id}
           className="source-card"
           tabIndex={0}
@@ -80,14 +81,14 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
   const nodeLabels = selectExhibits({ rootId, nodesById, childrenByParent });
 
   return (
-    <Panel as="section" elevation="floating" className="toolbar-panel sources" aria-labelledby="sources-heading">
+    <Panel as="section" edge="torn" elevation="floating" className="toolbar-panel sources" aria-labelledby="sources-heading">
       <Frame gap="6">
         <Frame as="header" direction="row" justify="between" align="center" className="toolbar-panel-head">
           <Frame gap="0">
-            <Text as="span" size="xxs" className="toolbar-panel-kicker" content="Evidence" />
-            <Text as="h2" id="sources-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Sources" />
+            <Text as="span" size="xxs" face="stamp" className="toolbar-panel-kicker" content="Evidence" />
+            <Text as="h2" id="sources-heading" size="xl" face="heading" hierarchy="primary" className="toolbar-panel-title" content="Sources" />
           </Frame>
-          <Button label="Close sources" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
+          <Button label="Close sources" icon="chevron_left" hierarchy="tertiary" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
         <Button
@@ -118,20 +119,20 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
 
         {globalReadable.length > 0 && (
           <Frame as="section" gap="2" aria-labelledby="sources-project-heading">
-            <Text as="h3" id="sources-project-heading" size="xxs" className="toolbar-panel-kicker" content="Global sources" />
+            <Text as="h3" face="stamp" id="sources-project-heading" size="xxs" className="toolbar-panel-kicker" content="Global sources" />
             <SourceList sources={globalReadable} onOpen={open} />
           </Frame>
         )}
         {globalAbstractOnly.length > 0 && (
           <Frame as="section" gap="2" aria-labelledby="sources-abstract-heading">
-            <Text as="h3" id="sources-abstract-heading" size="xxs" className="toolbar-panel-kicker" content="Abstract only" />
+            <Text as="h3" face="stamp" id="sources-abstract-heading" size="xxs" className="toolbar-panel-kicker" content="Abstract only" />
             <Text size="xs" hierarchy="tertiary" content="No full text is available, so chats can only use their abstracts." />
             <SourceList sources={globalAbstractOnly} onOpen={open} />
           </Frame>
         )}
         {nodeLevel.length > 0 && (
           <Frame as="section" gap="2" aria-labelledby="sources-node-heading">
-            <Text as="h3" id="sources-node-heading" size="xxs" className="toolbar-panel-kicker" content="Node-level sources" />
+            <Text as="h3" face="stamp" id="sources-node-heading" size="xxs" className="toolbar-panel-kicker" content="Node-level sources" />
             <SourceList sources={nodeLevel} onOpen={open} nodeLabels={nodeLabels} />
           </Frame>
         )}

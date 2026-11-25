@@ -14,14 +14,14 @@ export function SettingsPanel({ slug, onClose }: SettingsPanelProps) {
   // the settings page's Back returns here (Account.tsx)
   const here = usePathname();
   return (
-    <Panel as="section" elevation="floating" className="toolbar-panel settings" aria-labelledby="settings-heading">
+    <Panel as="section" edge="torn" elevation="floating" className="toolbar-panel settings" aria-labelledby="settings-heading">
       <Frame gap="4">
         <Frame as="header" direction="row" justify="between" align="center" className="toolbar-panel-head">
           <Frame gap="0">
-            <Text as="span" size="xxs" className="toolbar-panel-kicker" content="House rules" />
-            <Text as="h2" id="settings-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Settings" />
+            <Text as="span" size="xxs" face="stamp" className="toolbar-panel-kicker" content="House rules" />
+            <Text as="h2" id="settings-heading" size="xl" face="heading" hierarchy="primary" className="toolbar-panel-title" content="Settings" />
           </Frame>
-          <Button label="Close settings" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
+          <Button label="Close settings" icon="chevron_left" hierarchy="tertiary" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
         <Frame gap="2">

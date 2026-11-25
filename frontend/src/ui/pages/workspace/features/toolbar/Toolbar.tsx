@@ -4,7 +4,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type Ref } from "react";
 import { SEARCH, useGentStation } from "@/store/gentStations";
-import { Button, Frame } from "@/ui/library";
+import { Button, Frame, Panel } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -15,7 +15,7 @@ import "./Toolbar.css";
 /* The floating tool rail on the workspace's left edge (Figma "Toolbar",
  * 126:1115, built from "ToolBar Tile", 18:140).
  *
- *   top:     Home · Search · Sources
+ *   top:     Home · Search · Sources · groove
  *   bottom:  Share · Settings
  *
  * Search, Sources, Share and Settings open a panel beside the rail; Escape or the panel's own
@@ -44,18 +44,19 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
   return (
     <MotionConfig reducedMotion="user">
     <Frame direction="row" gap="2" className={["toolbar", className].filter(Boolean).join(" ")}>
-      <Frame as="nav" justify="between" align="center" aria-label="Workspace tools" className="toolbar-rail">
-        <Frame gap="2">
-          <Tile icon="home" label="Dashboard" onClick={() => router.push(`/${slug}/dashboard`)} />
-          <Tile icon="search" label="Search" pressed={open === "search"} onClick={() => toggle("search")} station={searchStation} />
-          <Tile icon="folder" label="Sources" pressed={open === "sources"} onClick={() => toggle("sources")} />
+      <Panel as="nav" material="leather" stitch={["right"]} round={["top-right", "bottom-right"]} aria-label="Workspace tools" className="toolbar-rail">
+        <Frame gap="2" align="center">
+          <Tile material="leather" icon="home" label="Dashboard" onClick={() => router.push(`/${slug}/dashboard`)} />
+          <Tile material="leather" icon="search" label="Search" pressed={open === "search"} onClick={() => toggle("search")} station={searchStation} />
+          <Tile material="leather" icon="folder" label="Sources" pressed={open === "sources"} onClick={() => toggle("sources")} />
+          <div className="toolbar-groove" aria-hidden="true" />
         </Frame>
 
-        <Frame gap="2">
-          <Tile icon="ios_share" label="Share" pressed={open === "share"} onClick={() => toggle("share")} />
-          <Tile icon="settings" label="Settings" pressed={open === "settings"} onClick={() => toggle("settings")} />
+        <Frame gap="2" align="center">
+          <Tile material="leather" icon="ios_share" label="Share" pressed={open === "share"} onClick={() => toggle("share")} />
+          <Tile material="leather" icon="settings" label="Settings" pressed={open === "settings"} onClick={() => toggle("settings")} />
         </Frame>
-      </Frame>
+      </Panel>
 
       <AnimatePresence mode="wait">
         {open && (
@@ -80,8 +81,10 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
 }
 
 /* Figma "ToolBar Tile": a round icon-only button (Default / Hover / Open). Also the folded Field Notes. */
-export function Tile({ icon, label, pressed, disabled, onClick, station, tip = "right" }: {
+export function Tile({ icon, label, pressed, disabled, onClick, station, tip = "right", material }: {
   icon: string; label: string; pressed?: boolean; disabled?: boolean; onClick(): void; station?: Ref<HTMLButtonElement>;
+  /** leather when the tile sits in the rail; paper (default) when it floats on the board */
+  material?: "paper" | "leather";
   /** which side its name tag slides out: left for tiles at the board's right edge, so the chat doesn't cover it */
   tip?: "left" | "right";
 }) {
@@ -89,8 +92,9 @@ export function Tile({ icon, label, pressed, disabled, onClick, station, tip = "
     <Button
       ref={station}
       disabled={disabled}
-      elevation="floating"
-      size="l"
+      material={material}
+      elevation={material === "leather" ? "flat" : "floating"}
+      size="base"
       icon={icon}
       label={label}
       title={label}

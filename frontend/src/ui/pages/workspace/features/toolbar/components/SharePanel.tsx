@@ -28,14 +28,14 @@ export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePane
   }
 
   return (
-    <Panel as="section" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
+    <Panel as="section" edge="torn" elevation="floating" className="toolbar-panel share" aria-labelledby="share-heading">
       <Frame gap="3">
         <Frame as="header" direction="row" justify="between" align="center" className="toolbar-panel-head">
           <Frame gap="0">
-            <Text as="span" size="xxs" className="toolbar-panel-kicker" content="On the case" />
-            <Text as="h2" id="share-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content={branchNodeId ? "Share branch" : "Share"} />
+            <Text as="span" size="xxs" face="stamp" className="toolbar-panel-kicker" content="On the case" />
+            <Text as="h2" id="share-heading" size="xl" face="heading" hierarchy="primary" className="toolbar-panel-title" content={branchNodeId ? "Share branch" : "Share"} />
           </Frame>
-          <Button label="Close share" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
+          <Button label="Close share" icon="chevron_left" hierarchy="tertiary" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
 
         {role === "shared" && (
