@@ -89,7 +89,6 @@
   [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"],
   [data-ui="panel"][data-component="button"][data-hierarchy="secondary"][data-material="leather"]:hover:not(:disabled) {
     background: var(--texture-leather), var(--color-leather);
-    background-blend-mode: multiply;
     border-color: transparent;
     box-shadow: none;
   }

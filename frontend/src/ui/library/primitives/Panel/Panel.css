@@ -149,7 +149,6 @@
   [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"] {
     position: relative;
     background: var(--texture-leather), var(--color-leather);
-    background-blend-mode: multiply;
     border-color: transparent;
     border-radius: 0;
     box-shadow: var(--shadow-wear);
