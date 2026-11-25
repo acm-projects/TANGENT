@@ -28,6 +28,13 @@
     text-shadow: 0 1px 0 var(--color-string-shadow);
   }
 
+  /* pressed leather: the icon is stamped into it: shadow along its top edge, light caught on its lower
+   * lip, and the ink sunk toward the leather's own colour */
+  [data-ui="panel"][data-material="leather"][data-pressed="true"] [data-ui="icon"] {
+    color: color-mix(in srgb, var(--color-text-on-leather) 72%, var(--color-leather));
+    text-shadow: 0 -1px 0 var(--color-deboss-shadow), 0 1px 0 var(--color-deboss-light);
+  }
+
   /* sizes — one per TextSize */
   [data-ui="icon"][data-size="xxs"]     { font-size: var(--font-size-xxs); }
   [data-ui="icon"][data-size="xs"]      { font-size: var(--font-size-xs); }

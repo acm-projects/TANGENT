@@ -133,8 +133,9 @@ edge. Grain stays faint and never sits inside long text.
 `leather` with a fine pebble grain at low strength, worn edges (`shadow-wear`) and a
 dashed `stitch` on the sides that need it, and rounded only on the corners that need it
 (the rail is square against the screen edge). Text and icons on it are `leather-ink` with a 1px emboss.
-A leather button is debossed into the leather while pressed (`shadow-press`) and flush when not: no
-outline, no red. Leather is
+A leather button always sits flush with the leather; while pressed, its icon is debossed, stamped
+into the leather (shadow inside the top edge, light on the lower lip), and on hover it sinks a little.
+No outline, no red, no box of its own. Leather is
 never given to content.
 
 ### Gent's ink

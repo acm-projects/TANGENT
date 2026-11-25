@@ -194,10 +194,7 @@
   [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-round~="top-right"]::before { border-top-right-radius: calc(var(--radius-xxl) - 7px); }
   [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-round~="bottom-right"]::before { border-bottom-right-radius: calc(var(--radius-xxl) - 7px); }
   [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-round~="bottom-left"]::before { border-bottom-left-radius: calc(var(--radius-xxl) - 7px); }
-  /* pressed = debossed into the leather; no colour change, nothing red */
-  [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-pressed="true"] {
-    box-shadow: var(--shadow-press);
-  }
+  /* pressed leather stays flat: what's on it is debossed instead (Icon.css) */
 
   /* ── ink ── Gent's living ink: the canvas (InkLayer) draws it, so no fill here; text tokens match InkPanel's */
   [data-ui="panel"][data-hierarchy="secondary"][data-material="ink"] {
