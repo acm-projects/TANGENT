@@ -11,8 +11,8 @@
  * the cork board doesn't inherit the board's light text.
  *
  * Pseudo-elements are taken: torn paper draws on ::before (a mask would clip
- * the Panel's own shadow), ruled lines and holes on ::after, cork's scraps on
- * both. Consumers must not use them on those Panels. */
+ * the Panel's own shadow), ruled lines and holes on ::after, cork has none
+ * (Decals are its own elements). Consumers must not use them on those Panels. */
 
 @layer ui {
   [data-ui="panel"] {
@@ -185,7 +185,7 @@
   }
 
   /* ── cork ── the board: a background, not a card. Straight on the board, text reads like leather ink;
-   * overflow clip keeps the scraps inside it. */
+   * overflow clip keeps Decals inside it. */
   [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"] {
     position: relative;
     isolation: isolate;
@@ -200,40 +200,7 @@
     --color-border: var(--color-stitch);
     --color-focus-ring: var(--color-text-on-leather);
   }
-  /* lamp, then marketing's stronger lamp, then no lamp (later wins; all (0,3,0)) */
-  [data-ui="panel"][data-hierarchy="secondary"][data-lamp="true"] {
-    background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
-  }
-  [data-ui="panel"][data-hierarchy="secondary"][data-scraps="marketing"] {
-    background: var(--board-vignette), var(--board-lamp), var(--board-lamp), var(--texture-cork), var(--color-board);
-  }
-  [data-ui="panel"][data-hierarchy="secondary"][data-lamp="false"] {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"] {
     background: var(--texture-cork), var(--color-board);
-  }
-  /* newspaper scraps pushed to the edges, never under the middle */
-  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::before,
-  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::after {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    width: 170px;
-    height: 150px;
-    pointer-events: none;
-    clip-path: polygon(0 4%, 9% 0, 22% 3%, 40% 0, 58% 4%, 76% 0, 100% 3%, 98% 24%, 100% 46%, 97% 70%, 100% 100%, 78% 96%, 60% 100%, 38% 97%, 20% 100%, 0 97%, 3% 72%, 0 48%, 2% 25%);
-    /* headline bar, then text lines, on the scrap's paper */
-    background:
-      linear-gradient(var(--color-scrap-line) 0 0) 16px 16px / 58% 9px no-repeat,
-      repeating-linear-gradient(to bottom, transparent 0 8px, var(--color-scrap-line) 8px 9px) 16px 40px / calc(100% - 32px) calc(100% - 58px) no-repeat,
-      var(--color-scrap);
-  }
-  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::before {
-    top: 7%;
-    left: -36px;
-    rotate: -8deg;
-  }
-  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::after {
-    top: 48%;
-    right: -44px;
-    rotate: 6deg;
   }
 }
