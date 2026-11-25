@@ -82,7 +82,7 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
   ) : null;
 
   return (
-    <Panel as="section" className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
+    <Panel as="section" stock="card" edge={inCourt ? "clean" : "torn"} hierarchy={inCourt ? "tertiary" : "secondary"} elevation={inCourt ? "flat" : "floating"} className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
       <Frame gap="3">
         {warning && (
           <Panel className="verdict-warning" role="note">
@@ -94,7 +94,7 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
         )}
         <Frame gap="2" align="center" className="verdict-head">
           <Frame gap="0" align="center" className="debate-stamp" data-contested={contested || undefined} data-picked={picked || undefined}>
-            <Text as="span" size="xxs" className="debate-kicker" content="Judgment of the court" />
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Verdict" />
             <Text as="h3" size="l" hierarchy="primary" className="debate-stamp-verdict" content={headline} />
           </Frame>
           <Text size="s" hierarchy="tertiary" className="verdict-subline" content={subline} />
@@ -125,8 +125,8 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
             <Frame direction="row" align="end" className="verdict-tally" aria-label="Scores out of 10">
               {(["for", "against"] as const).map((side) => (
                 <Frame key={side} gap="0" align="center" className="verdict-side" data-lead={result.winner === side || undefined}>
-                  <Text as="span" size="xxs" className="debate-kicker" content={`Counsel ${SIDE[side]!.toLowerCase()}`} />
-                  <Text as="span" size="xxl" hierarchy="primary" className="verdict-score" content={result.scores?.[side]?.toFixed(1) ?? "–"} />
+                  <Text as="span" size="xxs" face="stamp" className="debate-kicker" content={`Counsel ${SIDE[side]!.toLowerCase()}`} />
+                  <Text as="span" size="xxl" hierarchy="primary" face="heading" className="verdict-score" content={result.scores?.[side]?.toFixed(1) ?? "–"} />
                 </Frame>
               ))}
             </Frame>
@@ -184,12 +184,12 @@ function Transcript({ nodeId, turns }: { nodeId: string; turns: number }) {
             <Fragment key={i}>
               {(i === 0 || data[i - 1]!.phase !== t.phase || data[i - 1]!.round !== t.round) && (
                 <Frame as="li" direction="row" align="center" gap="3" className="debate-phase">
-                  <Text as="span" size="xs" className="debate-kicker" content={phaseLabel(t.phase, t.round)} />
+                  <Text as="span" size="xs" face="stamp" className="debate-kicker" content={phaseLabel(t.phase, t.round)} />
                 </Frame>
               )}
               <Frame as="li" gap="1" className="debate-turn" data-side={t.side}>
                 <Frame direction="row" gap="2" align="center" className="debate-speaker">
-                  <Text as="span" size="xxs" className="debate-kicker" content={REPORTED[t.side] ?? t.side} />
+                  <Text as="span" size="xxs" face="stamp" className="debate-kicker" content={REPORTED[t.side] ?? t.side} />
                   {t.truncated && <Text as="span" size="xxs" hierarchy="tertiary" content="(cut short)" />}
                 </Frame>
                 {t.argument && <Text className="debate-speech" content={t.argument} />}
@@ -226,7 +226,7 @@ function Reasoning({ result }: { result: DebateResult }) {
       <List title="What would flip it" items={result.verdict_flips_if ?? []} />
       {!!result.citations?.length && (
         <Frame gap="1">
-          <Text as="span" size="xxs" className="debate-kicker" content="Papers cited" />
+          <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Papers cited" />
           {result.citations.map((c, i) => (
             <Frame key={c.id ?? i} as="li" className="verdict-item">
               {c.url ? (
@@ -249,7 +249,7 @@ function List({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
     <Frame as="ol" gap="1">
-      <Text as="span" size="xxs" className="debate-kicker" content={title} />
+      <Text as="span" size="xxs" face="stamp" className="debate-kicker" content={title} />
       {items.map((item, i) => (
         <Frame key={i} as="li" className="verdict-item">
           <Text size="xs" content={item} />

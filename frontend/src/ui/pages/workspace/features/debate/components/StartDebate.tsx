@@ -67,7 +67,7 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
       }}
     >
       <Text size="s" hierarchy="tertiary" content="State the motion. Counsel for and against argue it with papers to back them, the bench scores the case, and the judgment lands as a new card." />
-      <Text as="span" size="xxs" className="debate-kicker" content="The motion" />
+      <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="The motion" />
       <Panel className="debate-start-topic">
         <TextArea
           aria-label="The motion before the court"

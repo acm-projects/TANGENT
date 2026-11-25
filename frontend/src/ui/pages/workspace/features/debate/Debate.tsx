@@ -5,7 +5,7 @@ import { apiErrorMessage } from "@/api";
 import type { DebateSide } from "@/api/types";
 import { speaking, visibleEntries, waiting, useDebateStore, type DebateEntry, type DebateTurn, type DebateView } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
-import { Button, DangerButton, Frame, Icon, Loading, Popup, Text } from "@/ui/library";
+import { Button, DangerButton, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
 import { QuestionCard } from "./components/QuestionCard";
 import { VerdictCard } from "./components/VerdictCard";
 import { phaseLabel, REPORTED } from "./debateLabels";
@@ -149,17 +149,17 @@ export function Debate({ projectId, className }: DebateProps) {
   const sealed = view.ended && view.log.length === 0;
 
   return (
-    <Frame as="section" gap="0" className="court" data-live={live || undefined} data-sealed={sealed || undefined} aria-label="Debate">
+    <Panel as="section" material="cork" className="court" data-live={live || undefined} data-sealed={sealed || undefined} aria-label="Debate">
       <Frame as="header" direction="row" align="center" gap="3" className="court-caption">
         <Frame direction="row" gap="2" align="center" className="court-caption-side">
           <Icon icon="balance" size="l" hierarchy="tertiary" />
           <Frame gap="0">
-            <Text as="span" size="xxs" className="debate-kicker" content={live ? "Court in session" : "Court adjourned"} />
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content={live ? "Court in session" : "Court adjourned"} />
             <Text as="span" size="xxs" className="debate-docket" content={`Docket No. ${view.id.slice(0, 6).toUpperCase()}`} />
           </Frame>
         </Frame>
         <Frame gap="0" align="center" className="court-matter">
-          <Text as="span" size="s" hierarchy="tertiary" className="debate-inre" content="In re" />
+          <Text as="span" size="s" hierarchy="tertiary" face="heading" className="debate-inre" content="In re" />
           <Text as="h2" size="xl" hierarchy="primary" className="debate-title" content={view.info?.topic ?? "Debate"} />
         </Frame>
         <Frame direction="row" gap="1" justify="end" className="court-caption-side">
@@ -170,7 +170,8 @@ export function Debate({ projectId, className }: DebateProps) {
       <Frame className="court-floor">
         <Bench view={view} />
         {!sealed && <Table view={view} side="for" />}
-        <Frame
+        <Panel
+          as="div"
           ref={recordRef}
           className="court-record"
           onScroll={(e) => {
@@ -193,12 +194,12 @@ export function Debate({ projectId, className }: DebateProps) {
           {asking && <QuestionCard key={view.questions!.map((q) => q.id).join()} debateId={view.id} questions={view.questions!} />}
           <Outcome view={view} onOpen={() => setMinimised(true)} />
           </Frame>
-        </Frame>
+        </Panel>
         {!sealed && <Table view={view} side="against" />}
       </Frame>
 
       {(live || error) && (
-        <Frame as="footer" direction="row" gap="3" justify="center" align="center" className="court-dock">
+        <Panel as="footer" hierarchy="tertiary" className="court-dock">
           {error && <Text role="alert" size="s" className="debate-error" content={error} />}
           {live &&
             (view.wrappingUp ? (
@@ -216,7 +217,7 @@ export function Debate({ projectId, className }: DebateProps) {
               <Button hierarchy="tertiary" icon="block" showIcon label="End" onClick={() => setConfirmingEnd(true)} />
             </Frame>
           )}
-        </Frame>
+        </Panel>
       )}
 
       <Popup open={confirmingEnd} onClose={() => setConfirmingEnd(false)} title="End this debate?">
@@ -236,7 +237,7 @@ export function Debate({ projectId, className }: DebateProps) {
           />
         </Frame>
       </Popup>
-    </Frame>
+    </Panel>
   );
 }
 
@@ -260,11 +261,11 @@ function Bench({ view }: { view: DebateView }) {
   const at = now?.kind === "phase" ? order.findIndex((p) => p.phase === now.phase && p.round === now.round) : -1;
   return (
     <Frame align="center" gap="3" className="court-bench-row">
-      <Frame align="center" gap="0" className="debate-bench" data-floor={floor === "judge" || undefined} data-ruled={view.ended || undefined}>
+      <Panel as="div" stock="card-alt" elevation="floating" className="debate-bench" data-floor={floor === "judge" || undefined} data-ruled={view.ended || undefined}>
         <Icon icon="gavel" size="xl" className="debate-bench-gavel" />
-        <Text as="span" size="xxs" className="debate-kicker" content="The bench" />
+        <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="The bench" />
         <Text as="span" size="s" hierarchy="tertiary" content={view.ended ? "Judgment entered" : now?.kind === "phase" ? phaseLabel(now.phase, now.round) : "Presiding"} />
-      </Frame>
+      </Panel>
       {view.info && view.log.length > 0 && (
         <Frame as="ol" direction="row" align="center" className="court-order" aria-label="Order of proceedings">
           {order.map((p, i) => (
@@ -297,28 +298,30 @@ function Table({ view, side }: { view: DebateView; side: DebateSide }) {
   return (
     <Frame as="aside" gap="4" className="debate-table" data-side={side} data-floor={floor || undefined} aria-label={`Counsel ${SPEAKER[side]!.toLowerCase()}`}>
       <Frame gap="0" className="debate-placard">
-        <Text as="span" size="xs" className="debate-kicker" content={`Counsel ${SPEAKER[side]!.toLowerCase()}`} />
+        <Text as="span" size="xs" face="stamp" className="debate-kicker" content={`Counsel ${SPEAKER[side]!.toLowerCase()}`} />
         <Text as="span" size="xs" hierarchy="tertiary" className="debate-table-status" content={status} />
       </Frame>
       {notes.length > 0 && (
         <Frame gap="1">
-          <Text as="span" size="xxs" className="debate-kicker" content="Notes" />
-          <Frame as="ol" gap="0" className="debate-pad">
+          <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Notes" />
+          <Frame as="ol" gap="2" className="debate-pad">
             {notes.slice(-6).map((note, i, shown) => (
-              <Frame as="li" key={notes.length - shown.length + i} className="debate-pad-line" data-latest={i === shown.length - 1 || undefined}>
+              <Panel as="li" key={notes.length - shown.length + i} stock="card-alt" edge="torn" elevation="floating" className="debate-pad-line" data-latest={i === shown.length - 1 || undefined}>
                 <Text size="xs" content={note} />
-              </Frame>
+              </Panel>
             ))}
           </Frame>
         </Frame>
       )}
       {exhibits.length > 0 && (
         <Frame gap="1" className="debate-exhibits-block">
-          <Text as="span" size="xxs" className="debate-kicker" content="Exhibits" />
+          <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Exhibits" />
           <Frame as="ol" gap="1" className="debate-exhibits">
             {exhibits.map((q, i) => (
               <Frame as="li" key={i} direction="row" gap="2" align="start" className="debate-exhibit">
-                <Text as="span" size="xxs" className="debate-exhibit-mark" content={`${side === "for" ? "F" : "A"}-${i + 1}`} />
+                <Panel as="div" stock="card" className="debate-exhibit-mark">
+                  <Text as="span" size="xxs" face="stamp" content={`${side === "for" ? "F" : "A"}-${i + 1}`} />
+                </Panel>
                 <Text size="xs" hierarchy="tertiary" content={q} />
               </Frame>
             ))}
@@ -333,7 +336,7 @@ function Entry({ entry, view }: { entry: DebateEntry; view: DebateView }) {
   if (entry.kind === "phase") {
     return (
       <Frame as="li" direction="row" align="center" gap="3" className="debate-phase">
-        <Text as="span" size="xs" className="debate-kicker" content={phaseLabel(entry.phase, entry.round)} />
+        <Text as="span" size="xs" face="stamp" className="debate-kicker" content={phaseLabel(entry.phase, entry.round)} />
       </Frame>
     );
   }
@@ -354,10 +357,10 @@ function Speech({ turn, speaking }: { turn: DebateTurn; speaking: boolean }) {
   return (
     <Frame as="li" gap="1" className="debate-turn" data-side={turn.side} data-speaking={speaking || undefined}>
       <Frame direction="row" gap="2" align="center" className="debate-speaker">
-        <Text as="span" size="xxs" className="debate-kicker" content={REPORTED[turn.side] ?? turn.side} />
+        <Text as="span" size="xxs" face="stamp" className="debate-kicker" content={REPORTED[turn.side] ?? turn.side} />
         {turn.truncated && <Text as="span" size="xxs" hierarchy="tertiary" content="(cut short)" />}
       </Frame>
-      <Text className="debate-speech" content={turn.text.slice(0, turn.shown)} />
+      <Text face={turn.side === "judge" ? "heading" : undefined} className="debate-speech" content={turn.text.slice(0, turn.shown)} />
     </Frame>
   );
 }
@@ -384,7 +387,7 @@ function Outcome({ view, onOpen }: { view: DebateView; onOpen(): void }) {
       ) : (
         <>
           <Frame gap="0" align="center" className="debate-stamp" data-contested={(v && !decided) || undefined} data-picked={view.info.end_reason === "user_picked" || undefined}>
-            <Text as="span" size="xxs" className="debate-kicker" content="Judgment" />
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Verdict" />
             <Text as="h3" size="xl" hierarchy="primary" className="debate-stamp-verdict" content={headline} />
           </Frame>
           {v?.summary && <Text className="debate-summary" content={v.summary} />}

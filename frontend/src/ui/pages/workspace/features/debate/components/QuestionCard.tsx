@@ -51,9 +51,9 @@ export function QuestionCard({ debateId, questions }: QuestionCardProps) {
     });
 
   return (
-    <Panel as="section" elevation="floating" className="debate-question" aria-label="The court asks you">
-      <Frame gap="3">
-        <Text as="span" size="xxs" className="debate-kicker" content="The court asks you" />
+    <Panel as="section" stock="card" edge="torn" elevation="floating" className="debate-question" aria-label="The court asks you">
+      <Frame gap="3" className="debate-question-body">
+        <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="The court asks you" />
         {questions.map((q, i) => (
           <Frame key={q.id} gap="2" role="group" aria-labelledby={`${base}-${i}`}>
             <Text id={`${base}-${i}`} size="s" hierarchy="primary" content={q.prompt} />
