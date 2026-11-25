@@ -3,7 +3,8 @@
  * "File Explorer" (273:7599), "Share" (293:9185). */
 
 .toolbar {
-  padding: var(--space-4);
+  /* the rail runs the screen's full height, flush with its left edge */
+  padding: 0;
   /* the rail is only as wide as its tiles; clicks between tiles reach the map */
   pointer-events: none;
 }
@@ -12,7 +13,15 @@
   pointer-events: auto;
 }
 
+/* the leather rail: a strip --space-rail wide, its shadow cast onto the board */
 .toolbar-rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  width: var(--space-rail);
+  padding-block: var(--space-4);
+  box-shadow: var(--shadow-wear), var(--shadow-rail);
   pointer-events: none;
   /* slides in from off the left edge when the workspace opens */
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
@@ -22,6 +31,7 @@
 /* the panel's wrapper, which Motion swings out from the rail */
 .toolbar-slot {
   display: flex;
+  margin: var(--space-4) 0;
   transform-origin: left center;
 }
 
@@ -39,7 +49,14 @@
   position: relative;
   width: 3rem;
   height: 3rem;
-  color: var(--color-text-secondary);
+}
+
+/* a pressed groove under Sources: a dark 2px rule over a light line, cut into the leather */
+.toolbar-groove {
+  width: 2rem;
+  height: 3px;
+  margin-block: var(--space-1);
+  background: linear-gradient(var(--color-deboss-shadow) 0 2px, var(--color-deboss-light) 2px 3px);
 }
 
 /* A tile's name, on a paper tag that slides out from behind it on hover or
@@ -93,41 +110,19 @@
 }
 
 /* a tile tips as it lifts, like a card nudged on the board */
-[data-ui="panel"][data-component="button"].toolbar-tile:hover:not(:disabled, :active) {
+[data-ui="panel"][data-component="button"].toolbar-tile:not([data-material="leather"]):hover:not(:disabled, :active) {
   rotate: -4deg;
-}
-
-/* The open tool is pinned: a red pin dot drops in beside its tile (red, since
- * the panel beside it is connected to it). */
-.toolbar-tile[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -0.65rem;
-  width: 0.45rem;
-  height: 0.45rem;
-  translate: 0 -50%;
-  border-radius: var(--radius-full);
-  background: var(--color-string);
-  box-shadow: 0 1px 1px var(--color-string-shadow);
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  /* a translate, so it starts above the -50% that centres the dot */
-  --pop-from: 0 -200%;
-  --pop-scale: 2;
-  --pop-rotate: 0deg;
 }
 
 /* ── panels opened from the rail ────────────────────────────── */
 
 .toolbar-panel {
   padding: var(--space-6);
+  /* clear of the torn edge */
+  margin-left: var(--space-2);
 }
 
-.toolbar-panel-title {
-  font-family: var(--font-content);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-}
+
 
 /* Sources: a full-height column beside the rail */
 .sources {
@@ -142,42 +137,40 @@
   overflow-y: auto;
 }
 
-/* A panel is a case folder: a manila band heads it, bled to its edges. */
-.toolbar-panel:is(.sources, .search) {
-  padding-top: 0;
-}
-
 .search-results {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* each result an index card: its exhibit number, its title, and the words round the match */
+/* the match count, tabular so it doesn't jitter as you type */
+.search-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* results ruled apart like an index card: exhibit number, title, and the words round the match */
 .search-result {
   display: grid;
   gap: var(--space-1);
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--texture-grain), var(--color-surface);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+  transition: background var(--motion-fast) var(--ease-out);
 }
 
-.search-result:hover,
-.search-result:focus-visible {
-  border-color: var(--color-border-emphasis);
-  box-shadow: var(--shadow-floating);
+.search-result:is(:hover, :focus-visible) {
+  background: var(--color-track);
 }
 
-/* the card picked: red, as the user's selection is everywhere */
+/* the card picked */
 .search-result[aria-current] {
-  border-color: var(--color-string);
+  background: var(--color-selection);
 }
 
 .search-result-head {
@@ -199,6 +192,8 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: var(--font-heading);
+  font-size: var(--font-size-s);
+  color: var(--color-text);
 }
 
 .search-result-snippet {
@@ -211,7 +206,7 @@
 .search-result-snippet mark {
   padding-inline: 0.1em;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--color-string) 22%, transparent);
+  background: var(--color-highlight);
   color: inherit;
 }
 
@@ -219,23 +214,15 @@
   color: var(--color-danger);
 }
 
+/* the sheet's head: title and close, ruled off from the list below */
 .toolbar-panel-head {
-  margin-inline: calc(-1 * var(--space-6));
-  padding: var(--space-6) var(--space-6) var(--space-4);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border);
-  background: var(--texture-grain), var(--color-card-alt);
-  color: var(--color-text);
 }
 
 .toolbar-panel-kicker {
   letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--color-text-secondary);
-}
-
-.toolbar-panel-head .toolbar-panel-title {
-  font-family: var(--font-heading);
-  color: var(--color-text);
 }
 
 /* Add is an empty evidence bag: a dashed pocket that firms up under the pointer. */
@@ -255,7 +242,7 @@
 [data-ui="panel"][data-component="button"].sources-add:hover:not(:disabled) {
   border-color: var(--color-border-emphasis);
   border-style: solid;
-  background: var(--color-surface-raised);
+  background: var(--color-track);
   scale: 1.02;
 }
 
@@ -264,21 +251,16 @@
   padding-inline: var(--space-4);
 }
 
+/* rows ruled apart; the row under the pointer takes the track colour */
 .source-card {
   padding: var(--space-3);
-  border-radius: var(--radius-lg);
+  border-bottom: 1px solid var(--color-border);
   cursor: default;
-  transition:
-    border-color var(--motion-fast) var(--ease-out),
-    translate var(--motion-spring) var(--ease-spring),
-    box-shadow var(--motion-fast) var(--ease-out);
+  transition: background var(--motion-fast) var(--ease-out);
 }
 
-.source-card:hover,
-.source-card:focus-visible {
-  border-color: var(--color-border-strong);
-  translate: 0 -2px;
-  box-shadow: var(--shadow-lift);
+.source-card:is(:hover, :focus-visible) {
+  background: var(--color-track);
 }
 
 .source-card:focus-visible {
@@ -362,14 +344,6 @@
 .share,
 .settings {
   width: 20rem;
-  padding: 0 var(--space-4) var(--space-4);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.share .toolbar-panel-head,
-.settings .toolbar-panel-head {
-  margin-inline: calc(-1 * var(--space-4));
   padding: var(--space-4);
 }
 
@@ -382,7 +356,7 @@
   height: 2rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-full);
-  background: var(--texture-grain), var(--color-surface-raised);
+  background: var(--color-surface-raised);
   font-family: var(--font-heading);
   color: var(--color-text);
 }
@@ -394,13 +368,12 @@
 }
 
 
-.share-invite {
+.share-invite,
+.search-field {
   flex: 1;
   min-width: 0;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
-  color: var(--color-text-secondary);
 }
 
 
@@ -408,6 +381,11 @@
 .share-list {
   max-height: 14rem;
   overflow-y: auto;
+}
+
+.share-list > li {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .share-member {

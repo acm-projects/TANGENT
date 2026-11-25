@@ -45,16 +45,17 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
 
   const shown = words ? results : null;
   return (
-    <Panel as="section" elevation="floating" className="toolbar-panel search" aria-labelledby="search-heading">
+    <Panel as="section" edge="torn" elevation="floating" className="toolbar-panel search" aria-labelledby="search-heading">
       <Frame gap="4">
         <Frame as="header" direction="row" justify="between" align="center" className="toolbar-panel-head">
           <Frame gap="0">
-            <Text as="span" size="xxs" className="toolbar-panel-kicker" content="Case file" />
-            <Text as="h2" id="search-heading" size="xl" hierarchy="primary" className="toolbar-panel-title" content="Search" />
+            <Text as="span" size="xxs" face="stamp" className="toolbar-panel-kicker" content="Case file" />
+            <Text as="h2" id="search-heading" size="xl" face="heading" hierarchy="primary" className="toolbar-panel-title" content="Search" />
           </Frame>
-          <Button label="Close search" icon="chevron_left" showIcon showLabel={false} size="m" onClick={onClose} />
+          <Button label="Close search" icon="chevron_left" hierarchy="tertiary" showIcon showLabel={false} size="m" onClick={onClose} />
         </Frame>
-        <Input
+        <Panel className="search-field">
+          <Input
           autoFocus
           type="search"
           aria-label="Search this project's cards"
@@ -62,11 +63,12 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && shown?.[0] && open(shown[0].id)}
-        />
+          />
+        </Panel>
         {busy && <Loading size="s" label="Searching…" />}
         {error && <Text role="alert" size="s" className="search-error" content={error} />}
         {shown && !busy && !error && (
-          <Text role="status" size="xs" hierarchy="tertiary" content={shown.length ? `${shown.length} card${shown.length === 1 ? "" : "s"}` : "No cards mention that."} />
+          <Text role="status" size="xs" hierarchy="tertiary" className="search-count" content={shown.length ? `${shown.length} card${shown.length === 1 ? "" : "s"}` : "No cards mention that."} />
         )}
         {shown && shown.length > 0 && (
           <Frame as="ol" gap="2" className="search-results" aria-label="Search results">
