@@ -5,14 +5,14 @@
  * Floating paper lies on the board with a contact shadow. Primary is solid ink
  * and tertiary is see-through, so neither carries grain.
  *
- * Materials (secondary only; primary stays ink and tertiary see-through) are
- * written with :where() around the material and its parameters, so each rule
- * is (0,2,0): above the base, below Button's hover (0,4,0). Same-property
- * combinations are separate rules, later in the file winning.
+ * Materials apply to secondary only (primary stays ink, tertiary see-through).
+ * Every rule that sets `background` stays at (0,3,0) so Button's hover (0,4,0)
+ * wins. Each material sets the text tokens from its own source, so a card on
+ * the cork board doesn't inherit the board's light text.
  *
- * Torn paper draws on ::before (a mask would clip the Panel's own shadow), so
- * consumers must not use ::before on a torn Panel. Cork uses ::before and
- * ::after for its scraps, so not there either. */
+ * Pseudo-elements are taken: torn paper draws on ::before (a mask would clip
+ * the Panel's own shadow), ruled lines and holes on ::after, cork's scraps on
+ * both. Consumers must not use them on those Panels. */
 
 @layer ui {
   [data-ui="panel"] {
@@ -49,67 +49,103 @@
     outline-offset: 2px;
   }
 
-  /* ── paper ── per-stock fill; ruling and holes are layer fragments that are empty when off. */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"]) {
-    --_fill: var(--color-surface);
-    --_holes: ;
-    --_ruled: ;
-    --_layers: var(--_holes) var(--_ruled) var(--texture-grain), var(--_fill);
+  /* ── paper ── text tokens from paper's own ink; the fill per stock (the sheet is the base rule's) */
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="paper"] {
+    color: var(--color-text-on-paper);
+    --color-text: var(--color-text-on-paper);
+    --color-text-secondary: var(--color-text-on-paper-secondary);
+    --color-text-muted: var(--color-text-on-paper-muted);
+    --color-border: var(--color-border-on-paper);
+    --color-focus-ring: var(--color-focus-ring-on-paper);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="card"]) { --_fill: var(--color-card); }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="card-alt"]) { --_fill: var(--color-card-alt); }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="slip"]) { --_fill: var(--color-slip); }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="composer"]) { --_fill: var(--color-composer); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-stock="card"] { background: var(--texture-grain), var(--color-card); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-stock="card-alt"] { background: var(--texture-grain), var(--color-card-alt); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-stock="slip"] { background: var(--texture-grain), var(--color-slip); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-stock="composer"] { background: var(--texture-grain), var(--color-composer); }
 
+  /* ruled lines and binder holes: an overlay on ::after, above the fill, below the content */
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="lines"],
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="margin"],
+  [data-ui="panel"][data-hierarchy="secondary"][data-holes="true"] {
+    position: relative;
+    isolation: isolate;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="lines"]::after,
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="margin"]::after,
+  [data-ui="panel"][data-hierarchy="secondary"][data-holes="true"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  /* legal-pad margin and binder holes push the text past them */
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="margin"],
+  [data-ui="panel"][data-hierarchy="secondary"][data-holes="true"] {
+    padding-left: var(--space-12);
+  }
   /* index-card lines every 1.75rem from below the top padding */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-ruled="lines"]) {
-    --_ruled: repeating-linear-gradient(to bottom, transparent 0 calc(1.75rem - 1px), var(--color-ruling) calc(1.75rem - 1px) 1.75rem)
-      0 var(--space-4) / 100% calc(100% - var(--space-4)) no-repeat,;
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="lines"]::after {
+    background: repeating-linear-gradient(to bottom, transparent 0 calc(1.75rem - 1px), var(--color-ruling) calc(1.75rem - 1px) 1.75rem) 0 var(--space-4) / 100% calc(100% - var(--space-4)) no-repeat;
   }
-  /* legal-pad margin: one red line (the slip is the user's), text pushed past it */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-ruled="margin"]) {
-    --_ruled: linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat,;
-    padding-left: var(--space-12);
+  /* one red line (the slip is the user's) */
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="margin"]::after {
+    background: linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat;
   }
-  /* three punched binder holes, 14px across, 18px from the left, at 20/50/80% */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-holes="true"]) {
-    --_holes: radial-gradient(circle 7px at 25px 20%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+  /* three punched holes, 14px across, 18px from the left, at 20/50/80% */
+  [data-ui="panel"][data-hierarchy="secondary"][data-holes="true"]::after {
+    background: radial-gradient(circle 7px at 25px 20%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
       radial-gradient(circle 7px at 25px 50%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
-      radial-gradient(circle 7px at 25px 80%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,;
-    padding-left: var(--space-12);
+      radial-gradient(circle 7px at 25px 80%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat;
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="clean"]) {
-    background: var(--_layers);
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="lines"][data-holes="true"]::after {
+    background:
+      radial-gradient(circle 7px at 25px 20%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 50%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 80%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      repeating-linear-gradient(to bottom, transparent 0 calc(1.75rem - 1px), var(--color-ruling) calc(1.75rem - 1px) 1.75rem) 0 var(--space-4) / 100% calc(100% - var(--space-4)) no-repeat;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"][data-ruled="margin"][data-holes="true"]::after {
+    background:
+      radial-gradient(circle 7px at 25px 20%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 50%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 80%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat;
   }
 
   /* torn: the paper moves to ::before so its mask doesn't clip the shadow. Strips along each edge round a
-   * solid centre; no border (the tear would cut it). */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"]) {
+   * solid centre; the radius rounds off the corners where two strips overlap. No border (the tear would cut it). */
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"] {
     position: relative;
     isolation: isolate;
     background: transparent;
     border-color: transparent;
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"])::before {
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"]::before {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
-    border-radius: inherit;
-    background: var(--_layers);
+    border-radius: var(--radius-xl);
+    background: var(--texture-grain), var(--color-surface);
     mask-image: var(--mask-torn-top), var(--mask-torn-bottom), var(--mask-torn-left), var(--mask-torn-right), linear-gradient(#000 0 0);
     mask-size: 160px 8px, 160px 8px, 8px 160px, 8px 160px, calc(100% - 12px) calc(100% - 12px);
     mask-position: 0 0, 0 100%, 0 0, 100% 0, 6px 6px;
     mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y, no-repeat;
     mask-composite: add;
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"][data-elevation="floating"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card"]::before { background: var(--texture-grain), var(--color-card); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card-alt"]::before { background: var(--texture-grain), var(--color-card-alt); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="slip"]::before { background: var(--texture-grain), var(--color-slip); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="composer"]::before { background: var(--texture-grain), var(--color-composer); }
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-elevation="floating"] {
     box-shadow: none;
     filter: var(--shadow-floating-drop);
   }
 
   /* ── leather ── text tokens are redefined so Text, Icon and Button read on it unaware */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"] {
     background: var(--texture-leather), var(--color-leather);
     background-blend-mode: multiply;
     border-color: transparent;
@@ -122,22 +158,22 @@
     --color-border: var(--color-stitch);
     --color-focus-ring: var(--color-text-on-leather);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-elevation="floating"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-elevation="floating"] {
     box-shadow: var(--shadow-wear), var(--shadow-badge);
   }
   /* a dashed thread inset from the edge; outline follows the radius */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-stitch="dashed"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-stitch="dashed"] {
     outline: 1.3px dashed var(--color-stitch);
     outline-offset: -7px;
   }
   /* the current rail item, pressed in: the user's place, so red */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-pressed="true"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="leather"][data-pressed="true"] {
     box-shadow: var(--shadow-press);
     border-color: var(--color-string);
   }
 
   /* ── ink ── Gent's flat ink; the living edge is InkPanel */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="ink"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="ink"] {
     background: var(--color-gent-fill);
     border-color: transparent;
     color: var(--color-text-on-gent);
@@ -148,10 +184,12 @@
     --color-focus-ring: var(--color-text-on-gent);
   }
 
-  /* ── cork ── the board: a background, not a card. Straight on the board, text reads like leather ink. */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]) {
+  /* ── cork ── the board: a background, not a card. Straight on the board, text reads like leather ink;
+   * overflow clip keeps the scraps inside it. */
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"] {
     position: relative;
     isolation: isolate;
+    overflow: clip;
     border: 0;
     border-radius: 0;
     padding: 0;
@@ -159,19 +197,22 @@
     --color-text: var(--color-text-on-leather);
     --color-text-secondary: var(--color-text-on-leather);
     --color-text-muted: var(--color-text-on-leather-muted);
+    --color-border: var(--color-stitch);
+    --color-focus-ring: var(--color-text-on-leather);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="true"]) {
+  /* lamp, then marketing's stronger lamp, then no lamp (later wins; all (0,3,0)) */
+  [data-ui="panel"][data-hierarchy="secondary"][data-lamp="true"] {
     background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="true"][data-scraps="marketing"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-scraps="marketing"] {
     background: var(--board-vignette), var(--board-lamp), var(--board-lamp), var(--texture-cork), var(--color-board);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="false"]) {
+  [data-ui="panel"][data-hierarchy="secondary"][data-lamp="false"] {
     background: var(--texture-cork), var(--color-board);
   }
   /* newspaper scraps pushed to the edges, never under the middle */
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::before,
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::after {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::before,
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::after {
     content: "";
     position: absolute;
     z-index: -1;
@@ -185,12 +226,12 @@
       repeating-linear-gradient(to bottom, transparent 0 8px, var(--color-scrap-line) 8px 9px) 16px 40px / calc(100% - 32px) calc(100% - 58px) no-repeat,
       var(--color-scrap);
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::before {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::before {
     top: 7%;
     left: -36px;
     rotate: -8deg;
   }
-  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::after {
+  [data-ui="panel"][data-hierarchy="secondary"][data-material="cork"]:not([data-scraps="none"])::after {
     top: 48%;
     right: -44px;
     rotate: 6deg;

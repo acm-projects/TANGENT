@@ -132,14 +132,21 @@
    *   text-muted      labels, metadata, placeholders, exhibit numbers
    *                   (the lightest text: 4.5:1 on card and paper)
    *   text-faint      graphics only: idle string (under 4.5:1, never text) */
-  --color-text: light-dark(var(--ink-light), var(--ink-dark));
-  --color-text-secondary: light-dark(var(--ink-2-light), var(--ink-2-dark));
-  --color-text-muted: light-dark(var(--ink-3-light), var(--ink-3-dark));
+  /* Ink on paper. Every Panel material sets the text tokens from its own source, so a paper card inside the
+   * cork board doesn't inherit the board's light text; the page default is paper's. */
+  --color-text-on-paper: light-dark(var(--ink-light), var(--ink-dark));
+  --color-text-on-paper-secondary: light-dark(var(--ink-2-light), var(--ink-2-dark));
+  --color-text-on-paper-muted: light-dark(var(--ink-3-light), var(--ink-3-dark));
+  --color-border-on-paper: light-dark(var(--rule-light), var(--rule-dark));
+  --color-focus-ring-on-paper: light-dark(var(--ink-3-light), var(--ink-3-dark));
+  --color-text: var(--color-text-on-paper);
+  --color-text-secondary: var(--color-text-on-paper-secondary);
+  --color-text-muted: var(--color-text-on-paper-muted);
   --color-text-faint: light-dark(var(--graphite-light), var(--graphite-dark));
   --color-text-on-brand: light-dark(var(--paper-light), var(--paper-dark));
 
   /* Three border emphases: resting, on the selected path, active/hovered. */
-  --color-border: light-dark(var(--rule-light), var(--rule-dark));
+  --color-border: var(--color-border-on-paper);
   --color-border-strong: light-dark(var(--ink-3-light), var(--ink-3-dark));
   --color-border-emphasis: light-dark(var(--ink-light), var(--ink-dark));
   /* the empty part of a meter; hovered and selected rows */
@@ -173,7 +180,7 @@
 
   --color-selection: light-dark(rgb(42 40 38 / 0.16), rgb(31 25 19 / 0.18));
 
-  --color-focus-ring: light-dark(var(--ink-3-light), var(--ink-3-dark));
+  --color-focus-ring: var(--color-focus-ring-on-paper);
 
   /* Shadows. Paper lying on the board, and lifted off it; leather's heavier
    * cast; a pin head; the current rail item pressed into the leather; worn
