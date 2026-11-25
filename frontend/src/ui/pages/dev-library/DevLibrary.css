@@ -28,7 +28,6 @@
 
 .dev-library-strip {
   width: 72px;
-  height: 20rem;
 }
 
 .dev-library-scrap {
@@ -39,4 +38,41 @@
 .dev-library-thumb {
   width: 8rem;
   height: 8rem;
+}
+
+.dev-library-strip {
+  height: 22rem;
+}
+
+.dev-library-ink-large {
+  min-height: 14rem;
+}
+
+.dev-library-cork {
+  width: 100%;
+  height: 16rem;
+}
+
+.dev-library-decals {
+  position: relative;
+}
+
+.dev-library-decals > [data-ui="decal"] {
+  position: absolute;
+}
+
+.dev-library-decal-a { top: 0.5rem; left: 0.5rem; rotate: -8deg; }
+.dev-library-decal-b { bottom: 0.5rem; right: 0.5rem; rotate: 6deg; }
+.dev-library-decal-c { top: 4rem; left: 40%; }
+
+.dev-library-decal-card {
+  position: relative;
+  z-index: 1;
+  width: 10rem;
+  margin: 3rem auto 0;
+}
+
+.dev-library-decal-slot {
+  position: relative;
+  height: 10rem;
 }
