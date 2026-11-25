@@ -3,7 +3,16 @@
  *
  * A surface is a sheet of paper: the colour with the grain texture under it.
  * Floating paper lies on the board with a contact shadow. Primary is solid ink
- * and tertiary is see-through, so neither carries grain. */
+ * and tertiary is see-through, so neither carries grain.
+ *
+ * Materials (secondary only; primary stays ink and tertiary see-through) are
+ * written with :where() around the material and its parameters, so each rule
+ * is (0,2,0): above the base, below Button's hover (0,4,0). Same-property
+ * combinations are separate rules, later in the file winning.
+ *
+ * Torn paper draws on ::before (a mask would clip the Panel's own shadow), so
+ * consumers must not use ::before on a torn Panel. Cork uses ::before and
+ * ::after for its scraps, so not there either. */
 
 @layer ui {
   [data-ui="panel"] {
@@ -38,5 +47,152 @@
   [data-ui="panel"]:has(> [data-ui="input"]:focus-visible) {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
+  }
+
+  /* ── paper ── per-stock fill; ruling and holes are layer fragments that are empty when off. */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"]) {
+    --_fill: var(--color-surface);
+    --_holes: ;
+    --_ruled: ;
+    --_layers: var(--_holes) var(--_ruled) var(--texture-grain), var(--_fill);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="card"]) { --_fill: var(--color-card); }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="card-alt"]) { --_fill: var(--color-card-alt); }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="slip"]) { --_fill: var(--color-slip); }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-stock="composer"]) { --_fill: var(--color-composer); }
+
+  /* index-card lines every 1.75rem from below the top padding */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-ruled="lines"]) {
+    --_ruled: repeating-linear-gradient(to bottom, transparent 0 calc(1.75rem - 1px), var(--color-ruling) calc(1.75rem - 1px) 1.75rem)
+      0 var(--space-4) / 100% calc(100% - var(--space-4)) no-repeat,;
+  }
+  /* legal-pad margin: one red line (the slip is the user's), text pushed past it */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-ruled="margin"]) {
+    --_ruled: linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat,;
+    padding-left: var(--space-12);
+  }
+  /* three punched binder holes, 14px across, 18px from the left, at 20/50/80% */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-holes="true"]) {
+    --_holes: radial-gradient(circle 7px at 25px 20%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 50%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,
+      radial-gradient(circle 7px at 25px 80%, var(--color-hole) 98%, transparent) 0 0 / 100% 100% no-repeat,;
+    padding-left: var(--space-12);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="clean"]) {
+    background: var(--_layers);
+  }
+
+  /* torn: the paper moves to ::before so its mask doesn't clip the shadow. Strips along each edge round a
+   * solid centre; no border (the tear would cut it). */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"]) {
+    position: relative;
+    isolation: isolate;
+    background: transparent;
+    border-color: transparent;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"])::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--_layers);
+    mask-image: var(--mask-torn-top), var(--mask-torn-bottom), var(--mask-torn-left), var(--mask-torn-right), linear-gradient(#000 0 0);
+    mask-size: 160px 8px, 160px 8px, 8px 160px, 8px 160px, calc(100% - 12px) calc(100% - 12px);
+    mask-position: 0 0, 0 100%, 0 0, 100% 0, 6px 6px;
+    mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y, no-repeat;
+    mask-composite: add;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="paper"][data-edge="torn"][data-elevation="floating"]) {
+    box-shadow: none;
+    filter: var(--shadow-floating-drop);
+  }
+
+  /* ── leather ── text tokens are redefined so Text, Icon and Button read on it unaware */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"]) {
+    background: var(--texture-leather), var(--color-leather);
+    background-blend-mode: multiply;
+    border-color: transparent;
+    border-radius: var(--radius-xxl);
+    box-shadow: var(--shadow-wear);
+    color: var(--color-text-on-leather);
+    --color-text: var(--color-text-on-leather);
+    --color-text-secondary: var(--color-text-on-leather);
+    --color-text-muted: var(--color-text-on-leather-muted);
+    --color-border: var(--color-stitch);
+    --color-focus-ring: var(--color-text-on-leather);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-elevation="floating"]) {
+    box-shadow: var(--shadow-wear), var(--shadow-badge);
+  }
+  /* a dashed thread inset from the edge; outline follows the radius */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-stitch="dashed"]) {
+    outline: 1.3px dashed var(--color-stitch);
+    outline-offset: -7px;
+  }
+  /* the current rail item, pressed in: the user's place, so red */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="leather"][data-pressed="true"]) {
+    box-shadow: var(--shadow-press);
+    border-color: var(--color-string);
+  }
+
+  /* ── ink ── Gent's flat ink; the living edge is InkPanel */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="ink"]) {
+    background: var(--color-gent-fill);
+    border-color: transparent;
+    color: var(--color-text-on-gent);
+    --color-text: var(--color-text-on-gent);
+    --color-text-secondary: var(--color-text-on-gent);
+    --color-text-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+    --color-border: color-mix(in srgb, var(--color-text-on-gent) 40%, transparent);
+    --color-focus-ring: var(--color-text-on-gent);
+  }
+
+  /* ── cork ── the board: a background, not a card. Straight on the board, text reads like leather ink. */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]) {
+    position: relative;
+    isolation: isolate;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    color: var(--color-text-on-leather);
+    --color-text: var(--color-text-on-leather);
+    --color-text-secondary: var(--color-text-on-leather);
+    --color-text-muted: var(--color-text-on-leather-muted);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="true"]) {
+    background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="true"][data-scraps="marketing"]) {
+    background: var(--board-vignette), var(--board-lamp), var(--board-lamp), var(--texture-cork), var(--color-board);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"][data-lamp="false"]) {
+    background: var(--texture-cork), var(--color-board);
+  }
+  /* newspaper scraps pushed to the edges, never under the middle */
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::before,
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 170px;
+    height: 150px;
+    pointer-events: none;
+    clip-path: polygon(0 4%, 9% 0, 22% 3%, 40% 0, 58% 4%, 76% 0, 100% 3%, 98% 24%, 100% 46%, 97% 70%, 100% 100%, 78% 96%, 60% 100%, 38% 97%, 20% 100%, 0 97%, 3% 72%, 0 48%, 2% 25%);
+    /* headline bar, then text lines, on the scrap's paper */
+    background:
+      linear-gradient(var(--color-scrap-line) 0 0) 16px 16px / 58% 9px no-repeat,
+      repeating-linear-gradient(to bottom, transparent 0 8px, var(--color-scrap-line) 8px 9px) 16px 40px / calc(100% - 32px) calc(100% - 58px) no-repeat,
+      var(--color-scrap);
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::before {
+    top: 7%;
+    left: -36px;
+    rotate: -8deg;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"]:where([data-material="cork"]:not([data-scraps="none"]))::after {
+    top: 48%;
+    right: -44px;
+    rotate: 6deg;
   }
 }
