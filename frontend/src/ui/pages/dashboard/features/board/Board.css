@@ -55,7 +55,6 @@
 }
 
 .board-title {
-  font-family: var(--font-heading);
   overflow-wrap: anywhere;
 }
 
@@ -109,7 +108,7 @@
   outline-offset: 4px;
 }
 
-/* ── the card: an instant photo pinned to the board ───────── */
+/* ── the card: a paper case card pinned to the board (a torn-edge Panel) ── */
 
 .case-card {
   position: relative;
@@ -120,16 +119,14 @@
   /* 1em is 1/14 of the card's width */
   font-size: calc(100cqi / 14);
   padding: 0.7em 0.7em 0.9em;
-  border-radius: var(--radius-md);
   transition: box-shadow var(--motion-base) var(--ease-out);
 }
 
 .case-link:is(:hover, :focus-visible) .case-card {
-  border-color: var(--color-border-strong);
   box-shadow: var(--shadow-lift);
 }
 
-/* a red pushpin, its head lit from the top left */
+/* a grey pushpin, its head lit from the top left */
 .case-card-pin {
   position: absolute;
   top: -0.35em;
@@ -139,8 +136,8 @@
   height: 0.8em;
   translate: -50% 0;
   border-radius: var(--radius-full);
-  background: var(--texture-pin), var(--color-string);
-  box-shadow: 0 0.12em 0.15em rgb(0 0 0 / 0.3);
+  background: var(--texture-pin), var(--color-pin);
+  box-shadow: var(--shadow-pin);
 }
 
 .case-card-photo {
@@ -161,7 +158,7 @@
 }
 
 .case-sketch line {
-  stroke: var(--color-text-faint);
+  stroke: var(--color-text-faint); /* graphite, off the path */
   stroke-width: 0.9;
   stroke-linecap: round;
 }
@@ -184,7 +181,6 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   padding-inline: 0.15em;
-  font-family: var(--font-heading);
   font-size: 1.15em;
   line-height: 1.2;
   overflow: hidden;
@@ -193,6 +189,7 @@
 
 .case-card-meta {
   padding-inline: 0.15em;
+  font-variant-numeric: tabular-nums;
   font-size: 0.75em;
 }
 
@@ -208,10 +205,7 @@
   border: 0.14em solid var(--color-danger);
   border-radius: var(--radius-sm);
   color: var(--color-danger);
-  font-family: var(--font-heading);
   font-size: 0.8em;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   opacity: 0.85;
 }
 
@@ -269,11 +263,15 @@
 .case-new {
   width: 100%;
   aspect-ratio: 5 / 6;
-  border: 2px dashed var(--color-border-strong);
+  border: 2px dashed var(--color-text-on-leather-muted);
   border-radius: var(--radius-md);
-  color: var(--color-text-muted);
+  color: var(--color-text-on-leather-muted);
   transition:
+    translate var(--motion-base) var(--ease-spring),
+    rotate var(--motion-base) var(--ease-spring),
     border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
     color var(--motion-fast) var(--ease-out);
 }
 
@@ -292,9 +290,13 @@
 }
 
 [data-ui="panel"][data-component="button"].case-new:hover {
-  border-color: var(--color-text-muted);
-  background: transparent;
-  color: var(--color-text);
+  /* paper about to be pinned: it lifts and turns into a blank card */
+  translate: 0 -0.4rem;
+  rotate: -1.5deg;
+  border-color: var(--color-border-strong);
+  background: var(--texture-grain), var(--color-card);
+  box-shadow: var(--shadow-lift);
+  color: var(--color-text-on-paper-muted);
 }
 
 .case-draft {
@@ -345,9 +347,8 @@
 .folder-back {
   position: absolute;
   inset: 1.4rem 0 0;
+  padding: 0;
   border-radius: 0 var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-card-alt);
-  box-shadow: var(--shadow-floating);
 }
 
 .folder-tab {
@@ -361,8 +362,6 @@
   height: 1.5rem;
   padding: 0 var(--space-3);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--texture-grain), var(--color-card-alt);
-  color: var(--color-text-secondary);
 }
 
 .folder-tab-name {
@@ -378,6 +377,7 @@
   border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
   text-align: center;
   /* swells and settles when the count changes */
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
@@ -392,11 +392,7 @@
   height: 0.5rem;
   border-radius: var(--radius-full);
   background: var(--color-string);
-  box-shadow: 0 1px 1px rgb(0 0 0 / 0.3);
-}
-
-.folder[data-open] .folder-tab {
-  color: var(--color-text);
+  box-shadow: var(--shadow-pin);
 }
 
 /* the cards inside, standing on the folder's floor */
@@ -416,20 +412,15 @@
   container-type: inline-size;
 }
 
-/* the front flap, a touch lighter, with a thumb notch cut from its top edge */
+/* the front flap, a lighter stock than the back */
 .folder-front {
   position: absolute;
   inset: auto 0 0;
   z-index: 20;
   height: 4.6rem;
+  padding: 0;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background:
-    radial-gradient(ellipse 1.4rem 0.6rem at 50% 0, rgb(0 0 0 / 0.08), transparent 70%),
-    var(--texture-grain),
-    color-mix(in oklab, var(--color-card-alt) 45%, var(--color-surface));
-  box-shadow:
-    0 -1px 0 var(--color-border),
-    0 -0.25rem 0.6rem rgb(0 0 0 / 0.08);
+  box-shadow: var(--shadow-floating);
   transform-origin: bottom;
   transition: transform var(--motion-spring) var(--ease-spring);
 }
@@ -455,11 +446,9 @@
   outline-offset: 2px;
 }
 
-/* the new-workspace folder: an outline of one */
+/* the new-workspace folder: an outline of one, on the board */
 .folder-new .folder-back {
-  border: 2px dashed var(--color-border-strong);
-  background: transparent;
-  box-shadow: none;
+  border: 2px dashed var(--color-text-on-leather-muted);
 }
 
 .folder-new .folder-hit {

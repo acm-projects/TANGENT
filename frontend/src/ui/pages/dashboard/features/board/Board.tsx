@@ -115,10 +115,10 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
 
   return (
     <Frame as="header" gap="1" className="board-head">
-      <Text as="span" size="xs" hierarchy="tertiary" className="board-kicker" content="Workspace" />
+      <Text as="span" face="stamp" size="xs" hierarchy="tertiary" className="board-kicker" content="Workspace" />
       {name === null ? (
         <Frame direction="row" gap="2" align="center">
-          <Text as="h1" size="display" hierarchy="primary" className="board-title" content={title} />
+          <Text as="h1" face="heading" size="display" hierarchy="primary" className="board-title" content={title} />
           {canRename && (
             <Button
               hierarchy="tertiary"
