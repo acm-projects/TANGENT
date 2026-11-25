@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { InkSurface, onInkFrame, reducedMotion } from "@/ui/library/components/Ink/ink";
+import { InkSurface, onInkFrame, reducedMotion } from "@/ui/library/primitives/Ink/ink";
 import { useGentStore } from "@/store/gentStore";
 import { GentAvatar } from "../avatar/GentAvatar";
 import { avatarState } from "../avatar/avatarState";

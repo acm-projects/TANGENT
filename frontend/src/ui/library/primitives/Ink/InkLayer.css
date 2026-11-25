@@ -1,0 +1,15 @@
+/* InkLayer: the canvas under its host's content, spilling past the box for the bleed. The host must be
+ * position: relative; isolation: isolate (Panel's ink rule and InkPanel both are). */
+
+@layer ui {
+  [data-ui="ink-layer"] {
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+    transition: opacity var(--motion-base) var(--ease-out);
+  }
+
+  [data-inked="false"] > [data-ui="ink-layer"] {
+    opacity: 0;
+  }
+}

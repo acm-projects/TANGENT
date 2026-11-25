@@ -2,7 +2,7 @@
 
 import { MotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
-import { PACE_REST, setInkPace } from "@/ui/library/components/Ink/ink";
+import { PACE_REST, setInkPace } from "@/ui/library/primitives/Ink/ink";
 import { useChatLayout } from "@/store/chatLayout";
 import { useGentStore } from "@/store/gentStore";
 import { useTreeStore } from "@/store/treeStore";
