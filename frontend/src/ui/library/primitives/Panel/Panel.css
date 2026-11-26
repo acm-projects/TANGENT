@@ -114,8 +114,11 @@
       linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat;
   }
 
-  /* torn: the paper moves to ::before so its mask doesn't clip the shadow. Strips along each edge round a
-   * solid centre; the radius rounds off the corners where two strips overlap. No border (the tear would cut it). */
+  /* torn: the paper moves to ::before so its mask doesn't clip the shadow. Layers, top first: a 4px-inset
+   * rectangle (intersect: trims the top/bottom strips' nubs at the corners, inside every tear), top and bottom
+   * strips, a solid centre, then a cap that stops the side strips 8px short of each end (intersect: it only
+   * sees the two side strips below it). So no strip can poke past another at a corner. No border (the tear
+   * would cut it). The ruling overlay (::after) takes the same mask so it can't show past the tear. */
   [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"] {
     position: relative;
     isolation: isolate;
@@ -127,13 +130,18 @@
     position: absolute;
     inset: 0;
     z-index: -1;
-    border-radius: var(--radius-xl);
     background: var(--texture-grain), var(--color-surface);
-    mask-image: var(--mask-torn-top), var(--mask-torn-bottom), var(--mask-torn-left), var(--mask-torn-right), linear-gradient(#000 0 0);
-    mask-size: 160px 8px, 160px 8px, 8px 160px, 8px 160px, calc(100% - 12px) calc(100% - 12px);
-    mask-position: 0 0, 0 100%, 0 0, 100% 0, 6px 6px;
-    mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y, no-repeat;
-    mask-composite: add;
+  }
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"]::before,
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"]::after {
+    mask-image: linear-gradient(#000 0 0), var(--mask-torn-top), var(--mask-torn-bottom), linear-gradient(#000 0 0),
+      linear-gradient(transparent 8px, #000 8px, #000 calc(100% - 8px), transparent calc(100% - 8px)),
+      var(--mask-torn-left), var(--mask-torn-right);
+    mask-size: calc(100% - 8px) 100%, 160px 8px, 160px 8px, calc(100% - 12px) calc(100% - 12px),
+      100% 100%, 8px 160px, 8px 160px;
+    mask-position: 4px 0, 0 0, 0 100%, 6px 6px, 0 0, 0 0, 100% 0;
+    mask-repeat: no-repeat, repeat-x, repeat-x, no-repeat, no-repeat, repeat-y, repeat-y;
+    mask-composite: intersect, add, add, add, intersect, add, add;
   }
   [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card"]::before { background: var(--texture-grain), var(--color-card); }
   [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card-alt"]::before { background: var(--texture-grain), var(--color-card-alt); }
