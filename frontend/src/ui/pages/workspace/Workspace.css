@@ -68,7 +68,8 @@
   container: gent-layer / size;
 }
 
-/* bottom right: the Field Notes (a tile until there is something on them) */
+/* bottom right: the Field Notes (tucked past the board's edge until opened). The corner lets clicks through to the
+ * map: the notebook moves off its own box when it tucks, so only the notebook takes them. */
 .workspace-gent > .gent-layer-corner {
   grid-area: 1 / 2;
   align-self: end;
@@ -76,7 +77,7 @@
   align-items: flex-end;
   gap: var(--space-2);
   min-height: 0;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 /* bottom centre: the open chat grows up from the bottom of the board, never past it */

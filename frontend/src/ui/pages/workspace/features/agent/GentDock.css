@@ -170,11 +170,19 @@
     border-radius var(--motion-spring) var(--ease-spring),
     background-color var(--motion-base) var(--ease-out),
     border-color var(--motion-base) var(--ease-out),
-    box-shadow var(--motion-base) var(--ease-out);
+    box-shadow var(--motion-base) var(--ease-out),
+    translate var(--motion-spring) var(--ease-spring);
 }
 
+/* At rest he waits half under the board's bottom edge (past the layer's bottom padding too), so the board's edge
+ * is clean; pointed at, he rises a little; clicked, the pill comes all the way up. */
 .gent-dock[data-mode="circle"] {
+  translate: 0 calc(50% + var(--space-4));
   cursor: pointer;
+}
+
+.gent-dock[data-mode="circle"][data-peek] {
+  translate: 0 calc(15% + var(--space-4));
 }
 
 /* the pill hugs what's in it: his status, or what you type */

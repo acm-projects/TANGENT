@@ -1,20 +1,17 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
 import { useState, useSyncExternalStore } from "react";
 import type { GentNote } from "@/api/types";
 import { Button, Frame, Input, Panel, Text, TextArea } from "@/ui/library";
-import { spring } from "@/ui/library/tokens/motion";
 import { useGentStore } from "@/store/gentStore";
 import { editNotes } from "./gentActions";
 import { flushNotes, noteKey, useNoteChange } from "./notesQueue";
 import { NOTES, useGentStation } from "@/store/gentStations";
-import { Tile } from "../toolbar/Toolbar";
 import "./FieldNotes.css";
 
 /* Field Notes: the case's to-do list, a small paper notebook on the board's bottom right. It's the user's tool
- * (tick, reword, strike, add); Gent plans in it too, and visits it when he writes in it. It folds into a
- * notebook tile in the same spot, and Gent visits the tile instead. Items are unnumbered here; Gent knows them
+ * (tick, reword, strike, add); Gent plans in it too, and visits it when he writes in it. Folded, it tucks down
+ * past the board's edge with its heading showing (FieldNotes.css), and Gent visits that. Items are unnumbered here; Gent knows them
  * by stable ids (n1, n2…) the user never sees. */
 
 const OPEN_KEY = "tangent:field-notes:open";
@@ -56,46 +53,50 @@ export function FieldNotes({ className }: { className?: string }) {
 
   return (
     <div className={["field-notes", className].filter(Boolean).join(" ")}>
-      <AnimatePresence mode="wait" initial={false}>
-        {open ? (
-          <motion.div
-            key="open"
-            initial={{ opacity: 0, scale: 0.6, x: 40, y: 30, rotate: 4 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0, rotate: 0, transition: spring.pin }}
-            exit={{ opacity: 0, scale: 0.6, x: 40, y: 30, rotate: 4, transition: spring.lift }}
-            style={{ transformOrigin: "bottom right" }}
-          >
-            <Panel as="section" material="paper" stock="paper" ref={station} elevation="floating" className="field-notes-book" aria-label="Field Notes">
-              {/* a reporter's pad: spiral rings through punched holes along the top */}
-              <span className="field-notes-spiral" aria-hidden>
-                {Array.from({ length: RINGS }, (_, i) => (
-                  <span key={i} />
-                ))}
-              </span>
-              <Frame as="header" direction="row" justify="between" align="center" className="field-notes-head">
-                <Frame direction="row" gap="2" align="center">
-                  <Text as="h2" size="s" content="Field Notes" />
-                  <Text as="span" size="xs" className="field-notes-count" content={notes.length ? `${left} open` : "empty"} />
-                </Frame>
-                <Button hierarchy="tertiary" size="s" label="Fold the Field Notes" icon="chevron_right" showIcon showLabel={false} onClick={() => toggle(false)} />
-              </Frame>
-              <NoteList notes={notes} />
-            </Panel>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="tile"
-            initial={{ opacity: 0, scale: 0.4, rotate: -20 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0, transition: spring.pin }}
-            exit={{ opacity: 0, scale: 0.4, rotate: -20, transition: spring.lift }}
-          >
-            <span className="field-notes-tile-wrap">
-              <Tile tip="left" icon="menu_book" label={left ? `Field Notes (${left} open)` : "Field Notes"} onClick={() => toggle(true)} station={station} />
-              {left > 0 && <span className="field-notes-badge" aria-hidden>{left}</span>}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* One notebook, never swapped for a button: folded, it slides down past the board's bottom edge with only its
+          rings and heading showing; pointing at it lifts it a little, and a click brings the whole pad up. */}
+      <Panel
+        as="section"
+        material="paper"
+        stock="paper"
+        ref={station}
+        elevation="floating"
+        className="field-notes-book"
+        aria-label="Field Notes"
+        data-tucked={!open || undefined}
+        onClick={open ? undefined : () => toggle(true)}
+      >
+        {/* a reporter's pad: spiral rings through punched holes along the top */}
+        <span className="field-notes-spiral" aria-hidden>
+          {Array.from({ length: RINGS }, (_, i) => (
+            <span key={i} />
+          ))}
+        </span>
+        <Frame as="header" direction="row" justify="between" align="center" className="field-notes-head">
+          <Frame direction="row" gap="2" align="center">
+            <Text as="h2" size="s" content="Field Notes" />
+            <Text as="span" size="xs" className="field-notes-count" content={notes.length ? `${left} open` : "empty"} />
+          </Frame>
+          <Button
+            hierarchy="tertiary"
+            size="s"
+            label={open ? "Fold the Field Notes" : "Open the Field Notes"}
+            icon={open ? "keyboard_arrow_down" : "keyboard_arrow_up"}
+            showIcon
+            showLabel={false}
+            aria-expanded={open}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle(!open);
+            }}
+            className="field-notes-fold"
+          />
+        </Frame>
+        {/* out of reach while folded: only the heading's button is */}
+        <div className="field-notes-body" inert={!open}>
+          <NoteList notes={notes} />
+        </div>
+      </Panel>
     </div>
   );
 }

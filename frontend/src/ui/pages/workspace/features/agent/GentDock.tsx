@@ -24,8 +24,8 @@ import "./GentDock.css";
 
 /* Gent's dock, at the bottom of the board between the toolbar and the chat: ONE container that morphs, never
  * remounting, so what you've typed and your focus survive every change.
- *   circle  at rest: just Gent in his socket
- *   pill    while hovered, focused, holding text, or while he works (his status is the field's placeholder)
+ *   circle  at rest: just Gent in his socket, half under the board's bottom edge; pointing at him lifts him a little
+ *   pill    clicked or focused, holding text, or while he works (his status is the field's placeholder)
  *   chat    click the pill or press ↑ in an empty field: the conversation unrolls upward above the pill row,
  *           which stays as the composer; a slim header carries the model, clear and collapse.
  *           Esc, a click outside or collapse close it.
@@ -56,7 +56,9 @@ export function GentDock() {
   const socket = useGentStation<HTMLSpanElement>(HOME);
   // how his last task ended, stamped on the pill until the chat is opened or he starts again
   const outcome = useOutcome(busy, status, chatOpen);
-  const mode: Mode = chatOpen ? "chat" : hovered || focused || text || busy || asking || outcome ? "pill" : "circle";
+  // At rest he waits half under the board's edge (GentDock.css); pointing lifts him a little, and only a click (or
+  // keyboard focus) brings the pill up to type in. His work, questions and stamp bring it up on their own.
+  const mode: Mode = chatOpen ? "chat" : focused || text || busy || asking || outcome ? "pill" : "circle";
   const panelRef = useRef<HTMLElement>(null);
   // the pill shows his status (or his stamp) in place of the field until you go to type
   const showing = mode === "pill" && !focused && !text ? (busy ? "status" : outcome ? "stamp" : null) : null;
@@ -148,6 +150,7 @@ export function GentDock() {
         seed={5}
         className="gent-dock"
         data-mode={mode}
+        data-peek={(mode === "circle" && hovered) || undefined}
         data-state={asking ? "waiting" : busy ? "working" : outcome ? outcome.kind : "idle"}
         aria-label="Gent"
         onPointerEnter={(e: PointerEvent) => e.pointerType === "mouse" && setHovered(true)}

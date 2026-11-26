@@ -13,6 +13,44 @@
   margin-top: 0.6rem; /* room for the rings standing above the page */
   padding: var(--space-4) var(--space-3) var(--space-2) 0;
   border-radius: var(--radius-sm);
+  pointer-events: auto;
+  transform-origin: bottom right;
+  transition:
+    translate var(--motion-spring) var(--ease-spring),
+    rotate var(--motion-spring) var(--ease-spring);
+}
+
+/* Folded: the pad slides down past the board's bottom edge (through the layer's bottom padding too), leaving its
+ * rings and heading in view, a touch askew like something set down. Pointed at, it lifts a little; a click opens it. */
+.field-notes-book[data-tucked] {
+  --peek: 3rem;
+  translate: 0 calc(100% - var(--peek) + var(--space-4));
+  rotate: -1.5deg;
+  cursor: pointer;
+}
+
+.field-notes-book[data-tucked]:is(:hover, :focus-within) {
+  --peek: 4.25rem;
+  rotate: -0.5deg;
+}
+
+/* the page's body fades as it goes under the edge, so a half-seen list doesn't flicker past while it slides */
+.field-notes-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+
+.field-notes-book[data-tucked] .field-notes-body {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-notes-book {
+    transition: none;
+  }
 }
 
 /* the spiral: a ring through a punched hole every few millimetres */
@@ -270,27 +308,6 @@
 }
 
 /* folded: a notebook tile, with how many items are open */
-.field-notes-tile-wrap {
-  position: relative;
-  display: inline-block;
-}
-
-.field-notes-badge {
-  position: absolute;
-  top: -0.25rem;
-  right: -0.25rem;
-  min-width: 1.15rem;
-  height: 1.15rem;
-  padding-inline: 0.25rem;
-  border-radius: var(--radius-full);
-  background: var(--color-gent-fill);
-  color: var(--color-text-on-gent);
-  font-size: var(--font-size-xxs);
-  line-height: 1.15rem;
-  text-align: center;
-  pointer-events: none;
-}
-
 /* Gent writing in, one change at a time (notesQueue.ts): his blue ink wipes on a new item, washes a reworded
  * one, stamps a tick, draws the strike-through */
 .field-note[data-gent-writes="add"] {
