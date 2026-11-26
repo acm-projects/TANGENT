@@ -2,8 +2,12 @@
  * --tool-wash (Gent's dock sets them to his pale ink). */
 
 .tool-row {
+  --tool-fg: var(--color-text-muted);
+  --tool-alert: var(--color-danger);
+  --tool-rule: var(--color-border);
+  --tool-wash: var(--color-surface-raised);
   font-size: var(--font-size-xs);
-  color: var(--tool-fg, var(--color-text-muted));
+  color: var(--tool-fg);
 }
 
 .tool-row summary,
@@ -76,18 +80,18 @@
 }
 
 .tool-row[data-failed] :is(summary, .tool-row-head) {
-  color: var(--tool-alert, var(--color-danger));
+  color: var(--tool-alert);
 }
 
 .tool-row-substeps {
   margin: var(--space-1) 0;
   padding-inline-start: var(--space-3);
   list-style: none;
-  border-inline-start: 1px dashed var(--tool-rule, var(--color-border));
+  border-inline-start: 1px dashed var(--tool-rule);
 }
 
 .tool-row-substeps [data-failed] {
-  color: var(--tool-alert, var(--color-danger));
+  color: var(--tool-alert);
 }
 
 .tool-row-body {
@@ -102,7 +106,7 @@
   padding: var(--space-2);
   overflow: auto;
   border-radius: var(--radius-sm);
-  background: var(--tool-wash, var(--color-surface-raised));
+  background: var(--tool-wash);
   font-size: var(--font-size-xs);
 }
 

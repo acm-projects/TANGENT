@@ -87,9 +87,11 @@ export function GentDock() {
   }, []);
 
   // his questions pop up out of the pill: the chat folds away so it doesn't cover them
-  useEffect(() => {
+  const [wasAsking, setWasAsking] = useState(asking);
+  if (wasAsking !== asking) {
+    setWasAsking(asking);
     if (asking) setChatOpen(false);
-  }, [asking]);
+  }
 
   // the open chat closes with Esc or a click anywhere outside it
   useEffect(() => {
@@ -217,7 +219,7 @@ export function GentDock() {
           <Frame direction="row" gap="0" align="center" className="gent-dock-actions">
             {busy && <Button hierarchy="tertiary" size="s" label="Stop Gent" icon="stop" showIcon showLabel={false} onClick={() => void stopTask()} />}
             <Button hierarchy="tertiary" size="s" label={busy ? "Tell Gent" : "Send to Gent"} icon="arrow_upward" showIcon showLabel={false} disabled={!text.trim() || !model} onClick={submit} />
-            {!chatOpen && <Button hierarchy="tertiary" size="s" label="Open Gent's conversation" icon="keyboard_arrow_up" showIcon showLabel={false} onClick={() => setChatOpen(true)} />}
+            {!chatOpen && <Button hierarchy="tertiary" size="s" label="Open Gent&apos;s conversation" icon="keyboard_arrow_up" showIcon showLabel={false} onClick={() => setChatOpen(true)} />}
           </Frame>
           )}
         </div>
@@ -231,16 +233,17 @@ type Outcome = { kind: "done" | "stopped" | "error"; label: string };
 /** How his last task ended, from the moment it ends until the chat is opened or a new task starts. */
 function useOutcome(busy: boolean, status: string, chatOpen: boolean): Outcome | null {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const wasBusy = useRef(busy);
-  useEffect(() => {
-    if (wasBusy.current && !busy)
-      setOutcome(status === "Stopped" ? { kind: "stopped", label: "Stopped" } : status === "Done" ? { kind: "done", label: "Report in" } : { kind: "error", label: status });
-    if (busy) setOutcome(null);
-    wasBusy.current = busy;
-  }, [busy, status]);
-  useEffect(() => {
-    if (chatOpen) setOutcome(null);
-  }, [chatOpen]);
+  // adjusted during render when the inputs change (no effect), in the same order the effects ran
+  const [prev, setPrev] = useState({ busy, status, chatOpen });
+  if (prev.busy !== busy || prev.status !== status || prev.chatOpen !== chatOpen) {
+    setPrev({ busy, status, chatOpen });
+    if (prev.busy !== busy || prev.status !== status) {
+      if (prev.busy && !busy)
+        setOutcome(status === "Stopped" ? { kind: "stopped", label: "Stopped" } : status === "Done" ? { kind: "done", label: "Report in" } : { kind: "error", label: status });
+      if (busy) setOutcome(null);
+    }
+    if (prev.chatOpen !== chatOpen && chatOpen) setOutcome(null);
+  }
   return outcome;
 }
 
@@ -379,7 +382,7 @@ function GentTurnRows({ turn, index, live }: { turn: Extract<GentTurn, { role: "
       )}
       {turn.error && (
         <li className="gent-end">
-          <span className="gent-stamp" data-outcome="error">Couldn't finish</span>
+          <span className="gent-stamp" data-outcome="error">Couldn&apos;t finish</span>
           <Text role="alert" size="xs" className="gent-error" content={turn.error} />
         </li>
       )}

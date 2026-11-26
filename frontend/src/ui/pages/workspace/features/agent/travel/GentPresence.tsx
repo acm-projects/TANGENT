@@ -23,6 +23,13 @@ export function GentPresence({ layer }: { layer: HTMLElement | null }) {
   return createPortal(<Outline key={at} seed={seedOf(at)} host={host} layer={layer} phase={phase} since={since} state={state} />, host);
 }
 
+function isolate(el: HTMLElement) {
+  const restore = { position: el.style.position, isolation: el.style.isolation };
+  if (getComputedStyle(el).position === "static") el.style.position = "relative";
+  el.style.isolation = "isolate";
+  return restore;
+}
+
 function seedOf(key: string) {
   let h = 7;
   for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -44,9 +51,7 @@ function Outline({ host, layer, seed, phase, since, state }: OutlineProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     // the ink goes under the station's own content (a card's New stamp), so the host gets its own stacking context
-    const restore = { position: host.style.position, isolation: host.style.isolation };
-    if (getComputedStyle(host).position === "static") host.style.position = "relative";
-    host.style.isolation = "isolate";
+    const restore = isolate(host);
     const surface = new InkSurface(canvas, "outline", seed);
     const build = () => {
       const scale = host.getBoundingClientRect().width / (host.offsetWidth || 1); // the map's zoom

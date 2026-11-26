@@ -126,7 +126,9 @@ export function Chat({ className }: ChatProps) {
   const { layout, setLayout } = useChatLayout();
   // a question card answered on the map continues its research through this chat's send
   const continueIn = useRef(chat.continueIn);
-  continueIn.current = chat.continueIn;
+  useEffect(() => {
+    continueIn.current = chat.continueIn;
+  });
   useEffect(() => useChatLayout.setState({ continueIn: (nodeId, prompt) => continueIn.current(nodeId, prompt) }), []);
 
   // "Show earlier" above a compact card's summary, for the card it was pressed on (picking another folds them again)
