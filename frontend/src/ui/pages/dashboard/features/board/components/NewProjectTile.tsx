@@ -29,12 +29,12 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
       <motion.div layoutId="new-project" className="case-slot" transition={spring.pin}>
         <Button
           hierarchy="tertiary"
-          size={names.length === 0 ? "xl" : "display"}
+          size="xl"
           icon="add"
           label={names.length === 0 ? "Pin your first case" : "New case"}
           showIcon
-          // alone on the board, the tile says what it does
-          showLabel={names.length === 0}
+          // an empty spot on the cork always says what goes there: a bare + reads as a stray mark
+          showLabel
           className="case-new"
           onClick={() => {
             setError(null);

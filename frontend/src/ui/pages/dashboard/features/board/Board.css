@@ -87,7 +87,7 @@
 /* the open cases are what you came for: they take the whole first row; the cold and the closed share the next,
  * each wrapping its own cards */
 .board-pile {
-  flex: 1 1 20rem;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
