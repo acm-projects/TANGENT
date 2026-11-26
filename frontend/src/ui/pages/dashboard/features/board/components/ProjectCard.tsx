@@ -5,7 +5,7 @@ import type { ProjectSummary } from "@/api/types";
 import { Link } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { leanOf, tiltOf } from "../sketch";
-import { CardFace } from "./CardFace";
+import { CardFace, rememberCase } from "./CardFace";
 import { ProjectSettings } from "./ProjectSettings";
 
 /* A project in the open folder's grid. It shares its layoutId with its copy in
@@ -38,7 +38,7 @@ export function ProjectCard({ project, index, dropIn, slug, onRename, onDelete }
       whileTap={{ y: lean.y, rotate: 0, scale: 0.96, transition: spring.lift }}
       transition={{ ...spring.fly, delay: index * 0.035 }}
     >
-      <Link href={`/${slug}/${project.id}`} aria-label={`Open ${project.project_name}`} className="case-link">
+      <Link href={`/${slug}/${project.id}`} aria-label={`Open ${project.project_name}`} className="case-link" onClick={() => rememberCase(project.id)}>
         <CardFace project={project} />
       </Link>
       <ProjectSettings project={project} onRename={onRename} onDelete={onDelete} />
