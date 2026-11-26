@@ -7,7 +7,7 @@ import { Button, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
 import { useDebateStore } from "@/store/debateStore";
 import { StartDebate } from "../debate/components/StartDebate";
 import { useSearchHighlight } from "./searchHighlight";
-import { MergeChoices, MergeStack, PathBar, mergeKey } from "./components/MergeStack";
+import { MergeChoices, MergeStack, mergeKey } from "./components/MergeStack";
 import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
@@ -67,13 +67,10 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
         const isActive = item.node.id === activeNodeId;
         return (
           <Fragment key={item.node.id}>
-            {/* where this card's part of the thread starts: the path bar's crumbs scroll here */}
-            {i > 0 ? (
-              <Frame as="li" data-node-divider={item.node.id}>
+            {i > 0 && (
+              <Frame as="li">
                 <BranchDivider exhibit={item.exhibit} title={item.node.title} />
               </Frame>
-            ) : (
-              <li className="chat-node-start" data-node-divider={item.node.id} aria-hidden="true" />
             )}
             {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
             {item.node.node_type === "debate" && isActive && (
@@ -156,7 +153,7 @@ export function Chat({ className }: ChatProps) {
   const loaded = chat.loadedMessageCount;
   // A reply starting counts; its tokens don't (the observer below keeps up with them, without re-pinning per token).
   const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming !== null}`;
-  // which page of each merge's stack is in front, shared by the stacks and the path bar
+  // which page of each merge's stack is in front
   const [fronts, setFronts] = useState<Record<string, number>>({});
   const choices = useMemo(
     () => ({ front: (key: string) => fronts[key] ?? 0, choose: (key: string, lane: number) => setFronts((f) => ({ ...f, [key]: lane })) }),
@@ -272,12 +269,7 @@ export function Chat({ className }: ChatProps) {
         {activeNode && (
           <Frame key={activeNode.id} gap="1" className="chat-title">
             <Text as="h2" size="xl" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
-            {/* with a merge on the way, the path is a bar to pick which branch to read; otherwise one quiet line */}
-            {chat.history.some((it) => it.kind === "merge") ? (
-              <PathBar items={chat.history} activeNodeId={chat.activeNodeId} />
-            ) : (
-              path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />
-            )}
+            {path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />}
           </Frame>
         )}
 

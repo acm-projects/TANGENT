@@ -242,11 +242,6 @@
   --pop-scale: 0.97;
 }
 
-/* the first card's start in the thread, for the path bar to scroll to (it has no divider) */
-.chat-node-start {
-  height: 0;
-}
-
 /* ── a merge: pages clipped together (components/MergeStack) ── */
 
 .merge-stack {
@@ -386,96 +381,6 @@
 .merge-stack-foot {
   padding: var(--space-3) var(--space-2) 0;
   color: var(--color-text-muted);
-}
-
-/* ── the path map, under the sheet's title, when the thread runs through a merge (MergeStack PathBar) ──
- * pins on string: red where the thread being read runs, graphite on the branches behind */
-
-.path-bar {
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.path-map {
-  display: block;
-  overflow: visible;
-}
-
-.path-map-string {
-  fill: none;
-  stroke: var(--color-text-faint);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-dasharray: 3 4;
-  transition: stroke var(--motion-base) var(--ease-out), stroke-width var(--motion-base) var(--ease-out);
-}
-
-.path-map-lane[data-on] .path-map-string {
-  stroke: var(--color-string);
-  stroke-width: 2.2;
-  stroke-dasharray: none;
-}
-
-/* an unread branch: wide and invisible to click, and it darkens under the pointer */
-.path-map-hit {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 14;
-  cursor: pointer;
-}
-
-.path-map-lane:not([data-on]):hover .path-map-string {
-  stroke: var(--color-text-secondary);
-  stroke-dasharray: none;
-}
-
-.path-map-pin {
-  cursor: pointer;
-  outline: none;
-}
-
-.path-map-target {
-  fill: transparent;
-}
-
-.path-map-head {
-  fill: var(--color-pin);
-  stroke: var(--color-surface);
-  stroke-width: 1.5;
-  transition: fill var(--motion-base) var(--ease-out), r var(--motion-base) var(--ease-spring);
-}
-
-.path-map-pin[data-on] .path-map-head {
-  fill: var(--color-string);
-}
-
-.path-map-pin:is(:hover, :focus-visible) .path-map-head {
-  r: 6;
-}
-
-.path-map-pin:focus-visible .path-map-target {
-  stroke: var(--color-focus-ring);
-  stroke-width: 2;
-}
-
-/* the card being read: a ring round its pin */
-.path-map-ring {
-  fill: none;
-  stroke: var(--color-string);
-  stroke-width: 1.5;
-}
-
-.path-map-label {
-  font-family: var(--font-content);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  text-anchor: middle;
-  fill: var(--color-text-muted);
-}
-
-.path-map-pin[data-current] .path-map-label {
-  fill: var(--color-text);
-  font-weight: var(--font-weight-medium);
 }
 
 .message-text {
