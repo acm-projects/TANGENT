@@ -125,7 +125,13 @@
 
 .chat-title-kicker {
   flex: 1;
+  min-width: 0;
   text-align: center;
+  /* one line: in a narrow sheet "Case notes ·" gives way first, never the card's number */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
