@@ -183,10 +183,6 @@
 
 .chat-field,
 .chat-error,
-.chat-token-usage {
-  flex: none;
-}
-
 .chat-hint {
   padding-block: var(--space-4);
   text-align: center;
@@ -1034,81 +1030,27 @@
   color: var(--color-text-secondary);
 }
 
-.chat-token-usage {
-  padding-inline: var(--space-2);
-  color: var(--color-text-secondary);
-  /* bookkeeping, not reading: out of the way until you're writing, point at it, or the context is filling up */
-  opacity: 0;
-  transition: opacity var(--motion-base) var(--ease-out);
-}
-
-.chat-token-usage:is(:hover, :focus-within, [open], [data-filling]),
-.chat-inner:has(.chat-field:focus-within) .chat-token-usage {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .chat-token-usage {
-    opacity: 1;
-  }
-}
-
-/* the folded line: icon, counts, the meter, the limit and a caret, quiet until pointed at */
-.chat-token-usage > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: fit-content;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  list-style: none;
-  transition: color var(--motion-fast) var(--ease-out);
-}
-
-/* 6px bar: this card solid, the rest of the branch faded, over the empty track */
-.chat-meter {
+/* the context bar (Chat.tsx ContextBar): a hairline over the field, filled as far as the thread uses the model's
+ * context; red once it's filling up. Thicker under the pointer, where its tooltip gives the numbers. */
+.chat-context {
   flex: none;
-  width: 5rem;
-  height: 6px;
+  height: 3px;
+  margin-inline: var(--space-2);
   border-radius: var(--radius-full);
   background:
-    linear-gradient(var(--color-text-secondary), var(--color-text-secondary)) 0 0 / var(--meter-node) 100% no-repeat,
-    linear-gradient(color-mix(in srgb, var(--color-text-secondary) 35%, transparent), color-mix(in srgb, var(--color-text-secondary) 35%, transparent)) 0 0 / var(--meter-branch) 100% no-repeat,
+    linear-gradient(var(--color-text-muted), var(--color-text-muted)) 0 0 / var(--context-fill) 100% no-repeat,
     var(--color-track);
+  transition: height var(--motion-fast) var(--ease-out);
 }
 
-.chat-token-usage > summary::-webkit-details-marker {
-  display: none;
+.chat-context:hover {
+  height: 6px;
 }
 
-.chat-token-usage > summary::after {
-  content: "expand_more";
-  font-family: var(--font-symbols);
-  font-size: 1rem;
-  transition: rotate var(--motion-spring) var(--ease-spring);
-}
-
-.chat-token-usage[open] > summary::after {
-  rotate: 180deg;
-}
-
-.chat-token-usage > summary:is(:hover, :focus-visible),
-.chat-token-usage[open] > summary {
-  color: var(--color-text-secondary);
-}
-
-.chat-token-details {
-  padding-top: var(--space-2);
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  --pop-from: 0 -0.5rem;
-  --pop-rotate: 0deg;
-  --pop-scale: 0.97;
-}
-
-.chat-token-counts {
-  flex-wrap: wrap;
+.chat-context[data-filling] {
+  background:
+    linear-gradient(var(--color-string), var(--color-string)) 0 0 / var(--context-fill) 100% no-repeat,
+    var(--color-track);
 }
 
 /* Stop takes Send's place while a reply streams: stamped in with a twist, a square ink mark */

@@ -244,21 +244,6 @@
 /* A card's token count: tucked in its bottom corner, shown only while the card
  * is pointed at, focused or picked, so cards at rest stay clean. Absolute, so
  * showing it never changes the card's height. */
-.mindmap-node-tokens {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-1);
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  opacity: 0;
-  transition: opacity var(--motion-base) var(--ease-out);
-}
-
-/* bookkeeping: only on the card you've picked, not on every card you point at */
-.mindmap-node[data-state="selected"] .mindmap-node-tokens {
-  opacity: 1;
-}
-
 /* The pin each card hangs from, where its string is wound: an 18px domed head
  * centred on the top edge. Graphite at rest; red on the selected path, since red
  * means connected. On ::after: torn paper's ::before is the paper. */
@@ -368,11 +353,6 @@
 /* the token count sits inside the inner rule */
 .mindmap-node[data-debate] {
   padding-bottom: var(--space-3);
-}
-
-.mindmap-node[data-debate] .mindmap-node-tokens {
-  right: calc(var(--space-3) + 2px);
-  bottom: calc(var(--space-1) + 4px);
 }
 
 /* the seal takes the corner a tag would, so tags shift along */

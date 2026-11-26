@@ -3,7 +3,7 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
 import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { Button, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
+import { Button, Frame, Loading, Panel, Popup, Text } from "@/ui/library";
 import { useDebateStore } from "@/store/debateStore";
 import { StartDebate } from "../debate/components/StartDebate";
 import { putCardBack } from "../mindmap/nodeActions";
@@ -157,10 +157,6 @@ export function Chat({ className }: ChatProps) {
   // the cards above the picked one on its thread, for the breadcrumb
   const path = chat.history.flatMap((item) => (item.kind === "node" && item.node.id !== chat.activeNodeId ? [item.node.title ?? untitled(item.node)] : []));
   const classes = ["chat", className].filter(Boolean).join(" ");
-  const contextUsagePercentage =
-    chat.usage && chat.usageContextLength
-      ? (chat.usage.total_tokens / chat.usageContextLength) * 100
-      : null;
 
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -350,60 +346,9 @@ export function Chat({ className }: ChatProps) {
 
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
-        {activeNode && (
-          // One line (node, branch and, after a reply, how full the context is); open it for the full counts.
-          // Quiet until it matters: it shows while writing or pointed at, and stays out once the context is filling.
-          <details className="chat-token-usage" data-filling={(contextUsagePercentage ?? 0) >= 75 || undefined}>
-            <summary>
-              <Icon icon="data_usage" size="s" hierarchy="tertiary" />
-              <Text
-                as="span"
-                size="xs"
-                content={[
-                  `${compact.format(chat.nodeTokens)} node`,
-                  `${compact.format(chat.branchTokens)} branch`,
-                  contextUsagePercentage !== null && `${contextUsagePercentage.toFixed(0)}% context`,
-                ].filter(Boolean).join(" · ")}
-              />
-              {chat.usageContextLength !== null && (
-                <>
-                  {/* this card solid, the rest of the branch faded, over the empty track */}
-                  <span
-                    className="chat-meter"
-                    aria-hidden="true"
-                    style={{
-                      "--meter-node": `${Math.min(100, (chat.nodeTokens / chat.usageContextLength) * 100)}%`,
-                      "--meter-branch": `${Math.min(100, (chat.branchTokens / chat.usageContextLength) * 100)}%`,
-                    } as CSSProperties}
-                  />
-                  <Text as="span" size="xs" content={`of ${compact.format(chat.usageContextLength)}`} />
-                </>
-              )}
-            </summary>
-            <Frame gap="1" className="chat-token-details" role="status" aria-label="Token usage">
-              <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />
-              <Text size="xs" content={`Branch through node: ${chat.branchTokens.toLocaleString()} tokens`} />
-              {chat.usage && (
-                <>
-                  <Text size="xs" hierarchy="tertiary" content="Latest response" />
-                  <Frame direction="row" gap="3" className="chat-token-counts">
-                    <Text size="xs" content={`Input: ${chat.usage.prompt_tokens.toLocaleString()}`} />
-                    <Text size="xs" content={`Output: ${chat.usage.completion_tokens.toLocaleString()}`} />
-                    <Text size="xs" content={`Total: ${chat.usage.total_tokens.toLocaleString()}`} />
-                    {contextUsagePercentage !== null && chat.usageContextLength !== null && (
-                      <Text
-                        size="xs"
-                        content={`Context: ${contextUsagePercentage.toFixed(1)}% (${chat.usage.total_tokens.toLocaleString()} / ${chat.usageContextLength.toLocaleString()} tokens)`}
-                      />
-                    )}
-                  </Frame>
-                </>
-              )}
-              {chat.usageUnavailable && (
-                <Text size="xs" hierarchy="tertiary" content="Token usage was not included in the provider stream." />
-              )}
-            </Frame>
-          </details>
+        {/* how full the model's context is: a hairline over the field, numbers on hover */}
+        {activeNode && chat.contextLength !== null && (
+          <ContextBar used={chat.usage?.total_tokens ?? chat.branchTokens} of={chat.contextLength} />
         )}
 
         <MessageField
@@ -462,3 +407,24 @@ function nextNodeId(items: HistoryItem[], i: number): string | undefined {
 
 /** A card with no title yet goes by the name the map gives it (toFlow), so the sheet and the board agree. */
 const untitled = (node: { merge_source_ids?: string[] }) => ((node.merge_source_ids?.length ?? 0) > 0 ? UNTITLED_MERGE : UNTITLED);
+
+/** How full the model's context is for this thread: a hairline that stays out of the way, red once it's past 75%.
+ * The numbers are its tooltip and its meter value for assistive tech. */
+function ContextBar({ used, of }: { used: number; of: number }) {
+  const share = Math.min(1, used / of);
+  const text = `Context ${Math.round(share * 100)}% used · ${compact.format(used)} of ${compact.format(of)} tokens`;
+  return (
+    <div
+      className="chat-context"
+      role="meter"
+      aria-label="Context used"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(share * 100)}
+      aria-valuetext={text}
+      title={text}
+      data-filling={share >= 0.75 || undefined}
+      style={{ "--context-fill": `${share * 100}%` } as CSSProperties}
+    />
+  );
+}

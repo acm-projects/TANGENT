@@ -386,13 +386,6 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             </span>
           )}
           {asking && <QuestionPrompt node={asking} />}
-          <Text
-            as="span"
-            size="xs"
-            className="mindmap-node-tokens"
-            content={`${data.tokens.toLocaleString()} tokens`}
-            aria-label={`${data.tokens.toLocaleString()} tokens used on this node`}
-          />
           <AnimatePresence>
             {data.resolvedBy && (
               // a rubber stamp across the card's foot: red when the user resolved it, Gent's blue when he did

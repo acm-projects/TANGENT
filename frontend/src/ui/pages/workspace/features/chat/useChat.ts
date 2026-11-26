@@ -94,6 +94,8 @@ export function useChat() {
   const [usageUnavailable, setUsageUnavailable] = useState(false);
   const [usageModel, setUsageModel] = useState<string | null>(null);
   const usageContextLength = models.find((model) => model.id === usageModel)?.context_length ?? null;
+  // the context window of the model this card uses (or would use), for the sheet's context bar
+  const contextLength = usageContextLength ?? models.find((model) => model.id === activeModel)?.context_length ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -401,6 +403,7 @@ export function useChat() {
     usage,
     usageUnavailable,
     usageContextLength,
+    contextLength,
     send,
     stop,
     canRetry,
