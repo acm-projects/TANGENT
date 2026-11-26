@@ -675,7 +675,8 @@
 }
 
 .mindmap-action-error {
-  border-left: 3px solid var(--color-danger);
+  /* a failed action: the whole slip's edge in oxblood, not a side stripe; the message itself is role="alert" */
+  border-color: var(--color-danger);
 }
 
 /* below the case label when the board is too narrow to sit beside it */
