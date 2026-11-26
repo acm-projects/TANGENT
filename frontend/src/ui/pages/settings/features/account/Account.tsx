@@ -85,8 +85,12 @@ export function Account() {
             </Section>
 
             <Section id="appearance" title="Appearance" note="Light the board your way. Kept in this browser.">
-              <Frame gap="2" className="account-lighting">
-                <Text as="h3" id="account-lighting" size="xs" face="stamp" className="settings-heading" content="Lighting" />
+              {/* a row like every other setting: what it is on the left, its switch on the right */}
+              <Frame direction="row" justify="between" align="center" gap="4" className="account-row">
+                <Frame gap="0">
+                  <Text as="h3" id="account-lighting" size="s" hierarchy="primary" content="Lighting" />
+                  <Text size="xs" hierarchy="tertiary" content="Day, night, or whatever your computer is set to." />
+                </Frame>
                 <LightingPicker labelledBy="account-lighting" />
               </Frame>
               <ShowNudges />

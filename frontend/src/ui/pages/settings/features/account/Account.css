@@ -281,8 +281,10 @@
   max-width: 24rem;
 }
 
-.account-lighting {
-  max-width: 24rem;
+/* a switch plate on a settings row keeps its own width; the words beside it take the rest */
+.account-row > .settings-lighting {
+  flex: none;
+  min-width: 16rem;
 }
 
 .account-row + .account-row {
