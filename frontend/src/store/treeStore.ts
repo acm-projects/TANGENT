@@ -56,6 +56,9 @@ interface ContentSlice {
   /** Ask the map to fly to a card (search): the id, and a stamp so the same card can be asked for twice. */
   flyTo: { id: string; at: number } | null;
   requestFlyTo(id: string): void;
+  /** The open search drawer's words and the ids of the cards it found: the board dims the rest and marks the words. Null when closed. */
+  search: { query: string; ids: string[] } | null;
+  setSearch(search: { query: string; ids: string[] } | null): void;
 }
 
 /**
@@ -99,6 +102,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
   unread: {},
   composeAt: 0,
   flyTo: null,
+  search: null,
   project: null,
   pendingSwitch: null,
   notice: null,
@@ -279,6 +283,7 @@ export const useTreeStore = create<TreeState>()((set) => ({
 
   requestCompose: () => set((s) => ({ composeAt: s.composeAt + 1 })),
   requestFlyTo: (id) => set({ flyTo: { id, at: Date.now() } }),
+  setSearch: (search) => set({ search }),
 
   setChats: (nodeId, chats) => set((s) => ({ chatsByNode: { ...s.chatsByNode, [nodeId]: chats } })),
 

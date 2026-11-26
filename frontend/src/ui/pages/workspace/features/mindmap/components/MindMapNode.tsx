@@ -9,6 +9,7 @@ import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
+import { splitMatches } from "../../toolbar/highlight";
 import { StartDebate } from "../../debate/components/StartDebate";
 import { SharePanel } from "../../toolbar/components/SharePanel";
 import { compactNode, confirmedForks, deleteNode, forkNode, isPending, loadChats, reopenNode, resetProject, resolveNode, tagNode } from "../nodeActions";
@@ -171,6 +172,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // a question Gent asked is in his ink, not on paper
   const gentAsked = useTreeStore((s) => s.nodesById[id]?.question?.asker.by === "gent");
   // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
+  // while the search drawer is open: this card is a hit or a miss, and which words to mark
+  const searchHit = useTreeStore((s) => (s.search ? (s.search.ids.includes(id) ? "hit" : "miss") : undefined));
+  const searchWords = useTreeStore((s) => s.search?.query);
   const unread = useTreeStore((s) => Boolean(s.unread[id]));
   // An empty branch (no messages, nothing under it, no reply on its way) has nothing to lose, so it goes without asking.
   const requestDelete = (e?: MouseEvent) => {
@@ -230,6 +234,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       ref={wrapRef}
       className="mindmap-node-wrap"
       data-peeled={peeled || undefined}
+      data-search={searchHit}
       data-more={menu !== null || undefined}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -349,7 +354,17 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           )}
           <Frame direction="row" gap="2" align="center">
             <Text as="span" face="heading" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
-            <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
+            {searchHit === "hit" && searchWords ? (
+              // Text takes one string, so the marked title is a run of Texts
+              <span className="mindmap-node-title">
+                {splitMatches(data.title, searchWords).map((r, k) => {
+                  const part = <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={r.text} />;
+                  return r.hit ? <mark key={k}>{part}</mark> : <span key={k}>{part}</span>;
+                })}
+              </span>
+            ) : (
+              <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
+            )}
             {data.tags.map((tag) => (
               <Panel key={tag} stock="slip" elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
                 <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />

@@ -68,11 +68,12 @@
   left: calc(100% + var(--space-3));
   z-index: 3;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-on-paper);
   border-radius: var(--radius-sm);
   background: var(--texture-grain), var(--color-surface);
   box-shadow: var(--shadow-floating);
-  color: var(--color-text-secondary);
+  /* the tile is leather, so its text tokens are leather's; the tag is paper */
+  color: var(--color-text-on-paper);
   font-size: var(--font-size-s);
   white-space: nowrap;
   pointer-events: none;
@@ -278,7 +279,8 @@
   height: 3.75rem;
   padding: 3px;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
+  background: var(--texture-grain), var(--color-surface);
+  color: var(--color-text-on-paper);
   box-shadow: var(--shadow-floating);
   overflow: hidden;
   rotate: -3deg;
@@ -354,17 +356,19 @@
   flex: none;
   width: 2rem;
   height: 2rem;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-on-paper);
   border-radius: var(--radius-full);
-  background: var(--color-surface-raised);
+  background: var(--texture-grain), var(--color-surface);
+  box-shadow: var(--shadow-floating);
   font-family: var(--font-heading);
-  color: var(--color-text);
+  color: var(--color-text-on-paper);
 }
 
 .share-avatar[data-pending] {
   border-style: dashed;
   background: transparent;
-  color: var(--color-text-muted);
+  box-shadow: none;
+  color: var(--color-text-on-paper-muted);
 }
 
 
