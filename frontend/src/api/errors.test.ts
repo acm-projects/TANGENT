@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { describe, expect, it } from "vitest";
-import { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";
+import { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf, isNetworkError, OFFLINE } from "./errors";
 
 const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
 const failed = (status: number, data: unknown) =>
@@ -23,8 +23,14 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage(failed(500, "<html>"), "fallback")).toBe("fallback");
   });
 
-  it("falls back for a network error with no response", () => {
-    expect(apiErrorMessage(new AxiosError("Network Error", "ERR_NETWORK"), "fallback")).toBe("fallback");
+  it("says the server couldn't be reached for a network error with no response", () => {
+    expect(apiErrorMessage(new AxiosError("Network Error", "ERR_NETWORK"), "fallback")).toBe(OFFLINE);
+  });
+
+  it("treats fetch's TypeError as offline, but not a cancelled request", () => {
+    expect(isNetworkError(new TypeError("Failed to fetch"))).toBe(true);
+    expect(isNetworkError(new AxiosError("canceled", "ERR_CANCELED"))).toBe(false);
+    expect(isNetworkError(new TypeError("x is not a function"))).toBe(false);
   });
 
   it("falls back for a non-axios error", () => {

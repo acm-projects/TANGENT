@@ -4,10 +4,10 @@ import { ReactFlow, useReactFlow, type Viewport } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { apiErrorMessage } from "@/api";
+import { apiErrorMessage, OFFLINE } from "@/api";
 import { useShallow } from "zustand/react/shallow";
 import { selectThread, useTreeStore } from "@/store/treeStore";
-import { Frame, Link, Loading, Panel, Text } from "@/ui/library";
+import { Button, Frame, Link, Loading, Panel, Text } from "@/ui/library";
 import { glideMs, spring } from "@/ui/library/tokens/motion";
 import { MapProject, Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { mergeNodes, putCardBack } from "./nodeActions";
@@ -237,10 +237,16 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
     >
       {load.status === "loading" && <Loading size="base" label="Loading map…" className="mindmap-status" />}
       {load.status === "error" && (
-        // a case that's gone (deleted, or a wrong link): say so and offer the way back
+        // a case that's gone (deleted, or a wrong link): say so and offer the way back. No connection is not a
+        // missing case: say that instead, and offer to try again
         <Frame gap="3" align="center" className="mindmap-status mindmap-missing">
-          <Text role="alert" face="heading" size="l" content={load.message} />
-          <Text size="s" hierarchy="tertiary" content="It may have been deleted, or the link is wrong." />
+          <Text role="alert" face="heading" size="l" content={load.message === OFFLINE ? "Could not reach the board." : load.message} />
+          <Text
+            size="s"
+            hierarchy="tertiary"
+            content={load.message === OFFLINE ? "Your case is safe. Check your connection and try again." : "It may have been deleted, or the link is wrong."}
+          />
+          {load.message === OFFLINE && <Button hierarchy="secondary" size="s" icon="refresh" showIcon label="Try again" onClick={() => window.location.reload()} />}
           <Link href={`/${slug}/dashboard`} className="mindmap-missing-back">
             <Text as="span" size="s" content="Back to your cases" />
           </Link>

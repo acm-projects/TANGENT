@@ -1,11 +1,21 @@
 import axios from "axios";
 
+/** What to say when the server can't be reached at all: the browser's own words ("Failed to fetch") mean nothing. */
+export const OFFLINE = "Couldn't reach Tangent. Check your connection and try again.";
+
+/** No answer at all: an axios request that got no response, or fetch (the streams) rejecting with a TypeError. */
+export function isNetworkError(e: unknown): boolean {
+  if (axios.isAxiosError(e)) return !e.response && e.code !== "ERR_CANCELED";
+  return e instanceof TypeError && /fetch|network|load failed/i.test(e.message);
+}
+
 /**
  * The backend's own message (FastAPI `{ detail: "..." }`) when it sent a string,
  * else `fallback`. A 422 validation error has an array `detail`, a network
  * failure has no response at all: neither is fit to show a user.
  */
 export function apiErrorMessage(e: unknown, fallback: string): string {
+  if (isNetworkError(e)) return OFFLINE;
   if (!axios.isAxiosError(e)) return fallback;
   const detail = (e.response?.data as { detail?: unknown } | undefined)?.detail;
   if (typeof detail === "string") return detail;

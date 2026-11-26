@@ -44,11 +44,16 @@ export function Board({ slug }: BoardProps) {
             <Link href={`/${encodeURIComponent(board.activeSlug)}/settings`} aria-label="Settings" title="Settings" className="board-settings">
               <Icon icon="settings" size="l" />
             </Link>
-            <BoardTitle key={title} title={title} count={projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
+            <BoardTitle key={title} title={title} count={board.state.status === "error" ? null : projects.length} canRename={Boolean(board.workspace)} onRename={board.renameWorkspace} />
 
             {board.actionError && <Text role="alert" size="s" content={board.actionError} />}
             {board.state.status === "loading" && <Loading size="base" />}
-            {board.state.status === "error" && <Text role="alert" content={board.state.message} />}
+            {board.state.status === "error" && (
+              <Frame direction="row" gap="3" align="center">
+                <Text role="alert" content={board.state.message} />
+                <Button hierarchy="secondary" size="s" icon="refresh" showIcon label="Try again" onClick={() => window.location.reload()} />
+              </Frame>
+            )}
             {ready && (
               <Frame as="ol" className="board-grid" aria-label={`Cases in ${title}`}>
                 {landed &&
@@ -90,7 +95,7 @@ export function Board({ slug }: BoardProps) {
   );
 }
 
-type BoardTitleProps = { title: string; count: number; canRename: boolean; onRename(name: string): Promise<void> };
+type BoardTitleProps = { title: string; /** null while the cases couldn't be loaded: no count to give */ count: number | null; canRename: boolean; onRename(name: string): Promise<void> };
 
 /** The open workspace's name, renamed in place: the pencil swaps it for a field; Enter saves, Escape puts it back. */
 function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
@@ -148,7 +153,9 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
         </Frame>
       )}
       {error && <Text role="alert" size="s" content={error} />}
-      <Text size="s" hierarchy="tertiary" content={count === 0 ? "Nothing pinned yet. Start a case with your first question." : `${count} ${count === 1 ? "case" : "cases"} on the board`} />
+      {count !== null && (
+        <Text size="s" hierarchy="tertiary" content={count === 0 ? "Nothing pinned yet. Start a case with your first question." : `${count} ${count === 1 ? "case" : "cases"} on the board`} />
+      )}
     </Frame>
   );
 }

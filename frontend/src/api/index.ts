@@ -40,6 +40,6 @@ export type Api = typeof api;
 export { DebateGoneError, followGent, followMessage, streamDebate, streamGent, streamMessage } from "./stream";
 export type { GentThread } from "./stream";
 export type { DebateStreamEvent } from "./stream";
-export { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";
+export { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf, isNetworkError, OFFLINE } from "./errors";
 export { apiClient, getAccessToken, setAccessToken, takeTokenFromUrl } from "./session";
 export type * from "./types";

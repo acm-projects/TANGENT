@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
+import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, isNetworkError, OFFLINE, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectExhibits, selectIsLeaf, selectThreadPlan, type ThreadPlanItem, useTreeStore } from "@/store/treeStore";
 import { forkNode, isPending, redirectToCopy, refreshTree, splitNode, switchToFork } from "../mindmap/nodeActions";
@@ -295,7 +295,7 @@ export function useChat() {
       useTreeStore.getState().abortStream(nodeId);
       const copyId = forkedProjectIdOf(e);
       if (copyId) await toCopy(copyId);
-      else setError(e instanceof Error ? e.message : "The message could not be sent.");
+      else setError(isNetworkError(e) ? OFFLINE : e instanceof Error ? e.message : "The message could not be sent.");
       return false;
     }
     if (switched) return saved;
