@@ -76,3 +76,11 @@
   position: relative;
   height: 10rem;
 }
+
+.dev-library-torn-row { flex-wrap: wrap; }
+.dev-library-torn-a { width: 4rem; height: 4rem; }
+.dev-library-torn-b { width: 6rem; height: 4rem; }
+.dev-library-torn-c { width: 4rem; height: 7rem; }
+.dev-library-torn-d { width: 8rem; height: 5rem; }
+.dev-library-torn-e { width: 5rem; height: 5rem; }
+.dev-library-torn-f { width: 10rem; height: 3rem; }
