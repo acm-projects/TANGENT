@@ -111,7 +111,9 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
   const nodes: MindMapFlowNode[] = [];
   const edges: Edge[] = [];
 
-  for (const [id, position] of Object.entries(positions)) {
+  // in reading order, row by row and left to right: the board's cards are its Tab order (and a screen reader's)
+  const placed = Object.entries(positions).sort(([, a], [, b]) => a.y - b.y || a.x - b.x);
+  for (const [id, position] of placed) {
     const meta: NodeMeta | undefined = s.nodesById[id];
     if (!meta) continue;
     nodes.push({

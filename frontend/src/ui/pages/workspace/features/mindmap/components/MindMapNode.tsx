@@ -425,6 +425,25 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         inert={!(hovered || peeled || pinned || data.state === "selected")}
         role="group"
         aria-label={`Actions for ${data.title}`}
+        // Left and Right step along the tray's own buttons (not into an open fan's options, which Tab reaches);
+        // Up goes back to the card
+        onKeyDown={(e: ReactKeyboardEvent<HTMLElement>) => {
+          if (e.key === "Escape") return setMenu(null);
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            wrapRef.current?.querySelector<HTMLElement>(".mindmap-node")?.focus();
+            return;
+          }
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          const tray = e.currentTarget;
+          const buttons = [...tray.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")].filter(
+            (b) => !b.closest(".mindmap-node-more-list"),
+          );
+          const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+          if (at < 0) return;
+          e.preventDefault();
+          buttons[(at + (e.key === "ArrowRight" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+        }}
         onPointerEnter={() => {
           setPeeled(true);
           // fetch ahead of a Delete click, so an empty branch goes at once
@@ -441,7 +460,6 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           setPeeled(false);
           setMenu(null);
         }}
-        onKeyDown={(e) => e.key === "Escape" && setMenu(null)}
       >
         <Button
           size="l"
