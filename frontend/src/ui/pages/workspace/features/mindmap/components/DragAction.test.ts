@@ -18,4 +18,10 @@ describe("dragAction", () => {
     expect(dragAction(card, { x: 199, y: 130 }, { canDelete: true })).toBeNull();
     expect(dragAction(card, { x: 300, y: 130 }, all)).toBeNull();
   });
+  it("arms a side only past the arm distance", () => {
+    expect(dragAction(card, { x: 300, y: 99 }, all, 24)).toBeNull();
+    expect(dragAction(card, { x: 300, y: 75 }, all, 24)).toBe("delete");
+    expect(dragAction(card, { x: 300, y: 184 }, all, 24)).toBeNull();
+    expect(dragAction(card, { x: 300, y: 185 }, all, 24)).toBe("branch");
+  });
 });

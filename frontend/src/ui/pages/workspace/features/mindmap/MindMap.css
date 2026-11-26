@@ -785,6 +785,15 @@
   transition: stroke var(--motion-fast) var(--ease-out);
 }
 
+/* heading for a side that hasn't armed yet: the string and tip say what it will do, faded (DragAction ARM) */
+.drag-action[data-pending] :is(.drag-action-line, .drag-action-tip) {
+  opacity: 0.45;
+}
+
+.drag-action :is(.drag-action-line, .drag-action-tip) {
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
 .drag-action-line circle {
   fill: var(--drag-ink);
   transition: fill var(--motion-fast) var(--ease-out);

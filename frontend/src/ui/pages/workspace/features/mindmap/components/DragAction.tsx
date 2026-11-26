@@ -12,13 +12,20 @@ import { Icon, Panel, Text } from "@/ui/library";
  * Anywhere else cancels, as does Escape; back inside the card the string goes
  * away too. A press that barely moves is still a click.
  *
+ * Consistency rules: the zones are measured once, when the drag starts (the card is still settling from its hover
+ * lift, and un-lifts once the pointer leaves it). A side only arms ARM px past the card's edge: before that the tip
+ * shows what that side will do, faded, so a wobble never deletes or branches. Letting go does exactly what the tip
+ * says. The pointer is followed on the window, so a fast drag that leaves the card before the threshold still counts.
+ *
  * The string and tip are portalled to <body> in screen coordinates: the card
  * sits inside React Flow's transformed viewport, which the pointer isn't in.
  * The card needs the `nopan` class so the press doesn't pan the map instead.
  * Styles in ../MindMap.css. */
 
 /** How far (px) a press must move before it is a drag rather than a click. */
-const THRESHOLD = 6;
+const THRESHOLD = 8;
+/** How far (px) past the card's edge a side arms. Merging onto another card arms at once. */
+export const ARM = 24;
 
 /** From the card's edge to the middle of its dotted outline (MindMap.css: outline-offset 6px + half of 2px), in px at zoom 1. */
 const OUTLINE = 7;
@@ -50,12 +57,15 @@ const TIP = {
 /** What the card allows besides branching: up deletes, left compacts, right resolves or reopens (absent: nothing). */
 export type DragSides = { canDelete: boolean; canCompact?: boolean; right?: "resolve" | "reopen" };
 
-/** What letting go at `p` does, for a card spanning `card`: below and above win over the sides. */
-export function dragAction(card: { top: number; bottom: number; left: number; right: number }, p: { x: number; y: number }, sides: DragSides): DragAction {
-  if (p.y > card.bottom) return "branch";
-  if (p.y < card.top) return sides.canDelete ? "delete" : null;
-  if (p.x < card.left) return sides.canCompact ? "compact" : null;
-  if (p.x > card.right) return sides.right ?? null;
+type Edges = { top: number; bottom: number; left: number; right: number };
+
+/** What letting go at `p` does, for a card spanning `card`, once the pointer is more than `arm` px past an edge
+ * (closer: null). Below and above win over the sides. */
+export function dragAction(card: Edges, p: { x: number; y: number }, sides: DragSides, arm = 0): DragAction {
+  if (p.y > card.bottom + arm) return "branch";
+  if (p.y < card.top - arm) return sides.canDelete ? "delete" : null;
+  if (p.x < card.left - arm) return sides.canCompact ? "compact" : null;
+  if (p.x > card.right + arm) return sides.right ?? null;
   return null;
 }
 
@@ -75,6 +85,8 @@ type Drag = {
   side: Position;
   to: Point;
   action: DragAction;
+  /** what the side the pointer is heading for will do once it arms (shown faded until then) */
+  pending: DragAction;
   inside: boolean;
   /** Above a root with nothing to reset: still a cancel, but the tip says why. */
   root: boolean;
@@ -110,9 +122,12 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
 }) {
   const sides: DragSides = { canDelete: Boolean(onDelete), canCompact: Boolean(onCompact), right: onReopen ? "reopen" : onResolve ? "resolve" : undefined };
   const { getZoom } = useReactFlow();
-  const press = useRef<{ start: Point; card: HTMLElement } | null>(null);
+  // the press, with the card's zones measured when it became a drag (null until then)
+  const press = useRef<{ start: Point; card: HTMLElement; pointerId: number; box: DOMRect | null } | null>(null);
   const dragged = useRef(false);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // what the tip shows right now: exactly what letting go does
+  const shown = useRef<Drag | null>(null);
   // the card a merge would join, outlined straight on the DOM (MindMap.css [data-merge-target])
   const target = useRef<HTMLElement | null>(null);
   const mark = (card: HTMLElement | null) => {
@@ -121,12 +136,18 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
     card?.setAttribute("data-merge-target", "");
     target.current = card;
   };
+  // the window listeners for the press in progress
+  const unlisten = useRef<(() => void) | null>(null);
 
   const end = () => {
+    unlisten.current?.();
+    unlisten.current = null;
     press.current = null;
+    shown.current = null;
     mark(null);
     setDrag(null);
   };
+  useEffect(() => () => unlisten.current?.(), []); // a card removed mid-drag drops its listeners
 
   // Escape drops the drag; letting go afterwards does nothing (end() forgets the press).
   const dragging = drag !== null;
@@ -139,48 +160,64 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
     return () => window.removeEventListener("keydown", onKey);
   }, [dragging]);
 
+  function move(e: globalThis.PointerEvent) {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    if (!dragged.current) {
+      if (Math.hypot(e.clientX - p.start.x, e.clientY - p.start.y) < THRESHOLD) return;
+      dragged.current = true;
+      p.box = outlineBox(p.card, getZoom());
+      // captured, the release lands on the card, whose click is swallowed below (not a click on the board)
+      if (p.card.isConnected) p.card.setPointerCapture(e.pointerId);
+    }
+    const box = p.box!;
+    const to = { x: e.clientX, y: e.clientY };
+    const over = cardUnder(to, p.card);
+    mark(over?.card ?? null);
+    const next: Drag = {
+      ...anchor(box, to),
+      to,
+      inside: to.x >= box.left && to.x <= box.right && to.y >= box.top && to.y <= box.bottom,
+      action: over ? "merge" : dragAction(box, to, sides, ARM),
+      pending: over ? "merge" : dragAction(box, to, sides),
+      root: !over && !onDelete && e.clientY < box.top,
+    };
+    shown.current = next;
+    setDrag(next);
+  }
+
+  function up(e: globalThis.PointerEvent) {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    const was = dragged.current ? shown.current : null;
+    const over = was?.action === "merge" ? cardUnder({ x: e.clientX, y: e.clientY }, p.card) : null;
+    end();
+    switch (was?.action) {
+      case "merge": if (over) onMerge(over.id); break;
+      case "branch": onBranch(); break;
+      case "delete": onDelete?.(); break;
+      case "compact": onCompact?.(); break;
+      case "resolve": onResolve?.({ x: e.clientX, y: e.clientY }); break;
+      case "reopen": onReopen?.(); break;
+    }
+  }
+
   const handlers = {
     onPointerDown(e: PointerEvent<HTMLElement>) {
       if (e.button !== 0) return;
-      press.current = {
-        start: { x: e.clientX, y: e.clientY },
-        card: e.currentTarget,
-      };
-      dragged.current = false;
-    },
-    onPointerMove(e: PointerEvent<HTMLElement>) {
-      const p = press.current;
-      if (!p) return;
-      if (!dragged.current) {
-        if (Math.hypot(e.clientX - p.start.x, e.clientY - p.start.y) < THRESHOLD) return;
-        dragged.current = true;
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
-      const to = { x: e.clientX, y: e.clientY };
-      const box = outlineBox(p.card, getZoom());
-      const over = cardUnder(to, p.card);
-      mark(over?.card ?? null);
-      setDrag({
-        ...anchor(box, to),
-        to,
-        inside: to.x >= box.left && to.x <= box.right && to.y >= box.top && to.y <= box.bottom,
-        action: over ? "merge" : dragAction(box, to, sides),
-        root: !over && !onDelete && e.clientY < box.top,
-      });
-    },
-    onPointerUp(e: PointerEvent<HTMLElement>) {
-      const p = dragged.current ? press.current : null;
-      const over = p && cardUnder({ x: e.clientX, y: e.clientY }, p.card);
-      const action = over ? "merge" : p ? dragAction(outlineBox(p.card, getZoom()), { x: e.clientX, y: e.clientY }, sides) : null;
       end();
-      if (action === "merge") onMerge(over!.id);
-      if (action === "branch") onBranch();
-      if (action === "delete") onDelete?.();
-      if (action === "compact") onCompact?.();
-      if (action === "resolve") onResolve?.({ x: e.clientX, y: e.clientY });
-      if (action === "reopen") onReopen?.();
+      press.current = { start: { x: e.clientX, y: e.clientY }, card: e.currentTarget, pointerId: e.pointerId, box: null };
+      dragged.current = false;
+      const cancel = (ev: globalThis.PointerEvent) => ev.pointerId === press.current?.pointerId && end();
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", cancel);
+      unlisten.current = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", cancel);
+      };
     },
-    onPointerCancel: end,
     // The card's click bubbles to React Flow's onNodeClick (select); a drag isn't a click.
     onClickCapture(e: MouseEvent<HTMLElement>) {
       if (!dragged.current) return;
@@ -189,7 +226,9 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
     },
   };
 
-  const tipKey = drag?.action === "delete" && resets ? "reset" : drag?.action ?? (drag?.root ? "root" : "cancel");
+  // the tip names the side the pointer is heading for, faded until it arms
+  const tipAction = drag?.action ?? drag?.pending ?? null;
+  const tipKey = tipAction === "delete" && resets ? "reset" : tipAction ?? (drag?.root ? "root" : "cancel");
   const tip = TIP[tipKey];
   const overlay =
     drag &&
@@ -197,6 +236,7 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
       <div
         className="drag-action"
         data-action={drag.action ?? undefined}
+        data-pending={(!drag.action && drag.pending) || undefined}
         aria-hidden="true"
       >
         {!drag.inside && (
