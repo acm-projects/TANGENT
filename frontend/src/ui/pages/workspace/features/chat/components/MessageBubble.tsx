@@ -148,7 +148,7 @@ function EditSlip({ draft, saving, onChange, onCancel, onSave }: { draft: string
         className="message-edit-input"
       />
       <Frame direction="row" gap="2" align="center" justify="between" className="message-edit-bar">
-        <Text as="span" size="xs" hierarchy="tertiary" content="Asks it on a new branch; this one stays." />
+        <Text as="span" size="xs" hierarchy="tertiary" content="Asks it again on a new branch; the original stays." />
         <Frame direction="row" gap="1">
           <Button hierarchy="tertiary" size="s" label="Cancel" onClick={onCancel} />
           <Button hierarchy="primary" size="s" icon="call_split" showIcon label={saving ? "Branching…" : "Branch"} onClick={onSave} disabled={saving || !draft.trim()} />

@@ -35,8 +35,6 @@
 }
 
 /* a plain on/off preference (Show Gent's nudges): Gent's blue, since the nudges are his */
-.settings-check {
+.settings-switch {
   flex: none;
-  width: auto;
-  accent-color: var(--color-gent);
 }

@@ -114,7 +114,13 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
                 <Text
                   hierarchy="tertiary"
                   size="s"
-                  content={item.node.parent_id ? "A fresh branch. Ask something to continue from here." : "A fresh case. Ask the first question to start the board."}
+                  content={
+                    !item.node.parent_id
+                      ? "A fresh case. Ask the first question to start the board."
+                      : (item.node.merge_source_ids?.length ?? 0) > 0
+                        ? "A fresh merge: every joined branch is in its context. Ask something to weigh them together."
+                        : "A fresh branch. Ask something to continue from here."
+                  }
                 />
               </Frame>
             )}

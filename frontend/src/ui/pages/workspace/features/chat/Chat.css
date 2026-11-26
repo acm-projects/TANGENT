@@ -664,6 +664,8 @@
 /* rewording a question: the slip straightens and widens into a field */
 .message-user-editing {
   width: min(32rem, 100%);
+  /* the whole width of the thread: a field to write in, not a slip squeezed to the right */
+  max-width: 100%;
   rotate: 0deg;
 }
 
@@ -674,7 +676,18 @@
 }
 
 .message-edit-bar {
+  flex-wrap: wrap;
   padding-top: var(--space-2);
+}
+
+/* the note takes what the buttons leave, and drops onto its own line before it's squeezed into a column */
+.message-edit-bar > :first-child {
+  flex: 1 1 12rem;
+}
+
+/* Cancel and Branch stay at the right, on the note's line or under it */
+.message-edit-bar > :last-child {
+  margin-left: auto;
 }
 
 .message-meta {

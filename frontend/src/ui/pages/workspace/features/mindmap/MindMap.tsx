@@ -30,6 +30,9 @@ const OPEN_PADDING = { top: "14%", bottom: "18%", left: "10%", right: "6%" } as 
 /** The gap the camera keeps between a card and anything covering the board, and the room kept under it for Gent's dock. */
 const MARGIN = 48;
 const DOCK_ROOM = 96;
+/** A card's least size on the board, for one not measured yet, and the room its action tray takes under it. */
+const CARD_MIN = { width: 200, height: 72 };
+const TRAY_ROOM = 44;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -76,7 +79,14 @@ function Camera() {
       const clear = clearArea();
       if (!clear) return;
       const { x, y, zoom } = getViewport();
-      const b = getNodesBounds(ids);
+      const measured = getNodesBounds(ids);
+      // A card made a moment ago (a merge, a branch) may not be measured yet: its bounds are then a point, and
+      // it would "fit" anywhere. Give it at least a card's size, and a picked card the room its tray takes below.
+      const b = {
+        ...measured,
+        width: Math.max(measured.width, CARD_MIN.width),
+        height: Math.max(measured.height, CARD_MIN.height) + (active ? TRAY_ROOM : 0),
+      };
       // zoom out only for a set of hits that can't fit at this zoom, never past readable
       const z = active ? zoom : Math.max(0.5, Math.min(zoom, clear.width / b.width, clear.height / b.height));
       // a zoom change scales the board about the pane's corner; then it pans

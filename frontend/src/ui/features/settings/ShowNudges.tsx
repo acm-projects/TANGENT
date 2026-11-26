@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Frame, Text } from "@/ui/library";
+import { Button, Frame, Panel, Text } from "@/ui/library";
 import { readShowNudges, useGentStore, writeShowNudges } from "@/store/gentStore";
 import "./Settings.css";
 
@@ -13,10 +13,23 @@ export function ShowNudges() {
   return (
     <Frame direction="row" justify="between" align="center" gap="4" className="account-row">
       <Frame gap="0">
-        <Text as="label" htmlFor="show-gent-nudges" size="s" hierarchy="primary" content="Show Gent's nudges" />
+        <Text id="show-gent-nudges" size="s" hierarchy="primary" content="Show Gent's nudges" />
         <Text size="xs" hierarchy="tertiary" content="In Gent's work log, show when he was reminded to keep his notes, told how deep he'd gone, or sent back to finish properly." />
       </Frame>
-      <input id="show-gent-nudges" type="checkbox" className="settings-check" checked={on} onChange={(e) => writeShowNudges(e.target.checked)} />
+      {/* the same leather switch plate as Lighting, Off and On, so the page has one kind of switch */}
+      <Panel material="leather" stitch="none" role="group" aria-labelledby="show-gent-nudges" className="settings-lighting settings-switch">
+        {[false, true].map((value) => (
+          <Button
+            key={String(value)}
+            material="leather"
+            size="xs"
+            label={value ? "On" : "Off"}
+            pressed={on === value}
+            onClick={() => writeShowNudges(value)}
+            className="settings-lighting-option"
+          />
+        ))}
+      </Panel>
     </Frame>
   );
 }
