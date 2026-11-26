@@ -5,7 +5,7 @@
   padding: var(--space-8) var(--space-8) 14rem;
 }
 
-/* Settings: a paper tile in the top corner, like the workspace rail's; its gear turns under the pointer. */
+/* Settings: a small leather tab in the top corner (navigation is leather); its gear turns and sinks under the pointer. */
 .board-settings {
   position: fixed;
   top: var(--space-4);
@@ -15,23 +15,20 @@
   place-items: center;
   width: 3rem;
   height: 3rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--texture-grain), var(--color-surface);
-  box-shadow: var(--shadow-floating);
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-xxl);
+  background: var(--texture-leather), var(--color-leather);
+  box-shadow: var(--shadow-wear);
+  color: var(--color-text-on-leather);
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 5rem 0;
   transition:
     translate var(--motion-base) var(--ease-spring),
-    box-shadow var(--motion-base) var(--ease-out),
-    color var(--motion-base) var(--ease-out);
+    box-shadow var(--motion-base) var(--ease-out);
 }
 
 .board-settings:is(:hover, :focus-visible) {
   translate: 0 -2px;
-  box-shadow: var(--shadow-lift);
-  color: var(--color-text);
+  box-shadow: var(--shadow-wear), var(--shadow-lift);
 }
 
 .board-settings:focus-visible {
@@ -45,6 +42,7 @@
 
 .board-settings:is(:hover, :focus-visible) [data-ui="icon"] {
   rotate: 90deg;
+  text-shadow: 0 -1px 0 var(--color-deboss-shadow);
 }
 
 /* ── the title ─────────────────────────────────────────────── */
@@ -138,6 +136,11 @@
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-pin);
   box-shadow: var(--shadow-pin);
+}
+
+/* the case you were last in */
+.case-card-last .case-card-pin {
+  background: var(--texture-pin), var(--color-string);
 }
 
 .case-card-photo {
