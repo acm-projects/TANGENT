@@ -69,7 +69,7 @@ Done (by Claude, since everything else depends on it). Notes for the agents:
 
 ## 2. Primitives (`library/primitives/`)
 
-- [ ] **Panel**: gains **`material`**, one swappable surface per material, each with its own parameters. `hierarchy` and `elevation` keep their meaning.
+- [x] **Panel**: gains **`material`**, one swappable surface per material, each with its own parameters. `hierarchy` and `elevation` keep their meaning.
 
   | material | what | parameters |
   | --- | --- | --- |
@@ -79,40 +79,40 @@ Done (by Claude, since everything else depends on it). Notes for the agents:
   | `cork` | the board itself | `lamp`, `scraps`: none / app / marketing |
 
   No `clear` material: `hierarchy="tertiary"` already means no surface. Material applies only to `secondary` (spec: DESIGN.md §4 "Panel materials"). Built with data attributes, one CSS block per material in `Panel.css`; props are a discriminated union on `material`. Things that are a Panel today switch from hand-rolled backgrounds to a `material`.
-- [ ] Text (mono and stamp roles)
-- [ ] Icon (filled; emboss on leather)
-- [ ] Frame (layout only; likely no change)
-- [ ] Input, TextArea, Select
-- [ ] Divider
-- [ ] Image, Link (REPO-ONLY)
+- [x] Text (mono and stamp roles)
+- [x] Icon (filled; emboss on leather)
+- [x] Frame (layout only; likely no change)
+- [x] Input, TextArea, Select
+- [x] Divider
+- [x] Image, Link (REPO-ONLY)
 
 ## 3. Components (`library/components/`)
 
-- [ ] Button: on its Panel, so it inherits material (tertiary on leather in the rail)
-- [ ] DangerButton (oxblood, never string red)
-- [ ] Picker
-- [ ] Popup (paper, graphite pin, tilt-drop in)
-- [ ] Loading (breathing red pin)
-- [ ] InkText
-- [ ] InkPanel: colour tokens only
+- [x] Button: on its Panel, so it inherits material (tertiary on leather in the rail)
+- [x] DangerButton (oxblood, never string red)
+- [x] Picker
+- [x] Popup (paper, graphite pin, tilt-drop in)
+- [x] Loading (breathing red pin)
+- [x] InkText
+- [x] InkPanel: colour tokens only
 
 ## 4. Board / app surfaces (`pages/workspace/features/`)
 
-- [ ] Board: `Workspace.css`, `mindmap/MindMap.css`
-- [ ] Rail: `toolbar/Toolbar.*` (leather + stitch)
-- [ ] CaseBadge: already exists as the case-file plate in `mindmap/MindMap.tsx`. Retheme it to leather + stitch.
-- [ ] NodeCard: `mindmap/components/MindMapNode.tsx`
-- [ ] CaseString: `mindmap/components/StringEdge.tsx`
-- [ ] SearchDrawer: `toolbar/components/SearchPanel.tsx`
-- [ ] NotesSheet: `chat/Chat.*`
-- [ ] MessageBubble: `chat/components/MessageBubble.tsx`
-- [ ] Composer: `chat/components/MessageField.tsx` + `ModelSelect.tsx`
-- [ ] ContextMeter: already exists as the node/branch/context line in `chat/Chat.tsx` (~line 313). Retheme it to the DS bar.
-- [ ] GentDock: `agent/GentDock.*` + `agent/avatar/GentAvatar.tsx`, **40px pill** (30px socket, 22px avatar)
+- [x] Board: `Workspace.css`, `mindmap/MindMap.css`
+- [x] Rail: `toolbar/Toolbar.*` (leather + stitch)
+- [x] CaseBadge: already exists as the case-file plate in `mindmap/MindMap.tsx`. Retheme it to leather + stitch.
+- [x] NodeCard: `mindmap/components/MindMapNode.tsx`
+- [x] CaseString: `mindmap/components/StringEdge.tsx`
+- [x] SearchDrawer: `toolbar/components/SearchPanel.tsx`
+- [x] NotesSheet: `chat/Chat.*`
+- [x] MessageBubble: `chat/components/MessageBubble.tsx`
+- [x] Composer: `chat/components/MessageField.tsx` + `ModelSelect.tsx`
+- [x] ContextMeter: already exists as the node/branch/context line in `chat/Chat.tsx` (~line 313). Retheme it to the DS bar.
+- [x] GentDock: `agent/GentDock.*` + `agent/avatar/GentAvatar.tsx`, **40px pill** (30px socket, 22px avatar)
 
 ## 5. Brand / marketing
 
-- [ ] Wordmark: `features/auth/{Auth,InviteCard,OnboardingForm}` (plain, case badge and app-mark lockups)
+- [x] Wordmark: `features/auth/{Auth,InviteCard,OnboardingForm}` (plain, case badge and app-mark lockups)
 - [ ] Hero: **NEW**, build it; needs a landing page (`pages/landing/` is empty, `app/page.tsx` redirects). Scope it when we get there.
 - Slide: skipped (decks only)
 
