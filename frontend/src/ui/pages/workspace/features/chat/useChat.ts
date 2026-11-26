@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectExhibits, selectIsLeaf, selectThreadPlan, type ThreadPlanItem, useTreeStore } from "@/store/treeStore";
@@ -343,6 +343,21 @@ export function useChat() {
     if (id && !isPending(id) && id !== nodeId) await ask(id, text, false);
   }
 
+  // Stable handles for the history's actions: MessageBubble is memoised, and a new function every render (every
+  // streamed token re-renders this) would make every message re-parse its markdown and maths per token.
+  const latest = useRef({ branch, retry, edit });
+  useLayoutEffect(() => {
+    latest.current = { branch, retry, edit };
+  });
+  const actions = useMemo(
+    () => ({
+      branch: (nodeId: string, seq: number) => latest.current.branch(nodeId, seq),
+      retry: () => latest.current.retry(),
+      edit: (nodeId: string, seq: number, content: string) => latest.current.edit(nodeId, seq, content),
+    }),
+    [],
+  );
+
   return {
     activeNodeId,
     activeNode,
@@ -370,9 +385,7 @@ export function useChat() {
     send,
     stop,
     canRetry,
-    retry,
-    branch,
-    edit,
+    ...actions,
     /** A question card's last answer opened `nodeId`: the asking model continues its research there. */
     continueIn: (nodeId: string, prompt: string) => void ask(nodeId, prompt, false),
   };

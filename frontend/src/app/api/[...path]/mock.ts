@@ -186,6 +186,16 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
   }
 
   // nodes
+  if (route === "POST /nodes/merge") {
+    // the merge card goes under the two leaves' nearest shared ancestor, carrying both as its sources
+    const [x, y] = (body.source_leaf_ids as string[]).map((id) => nodes.get(id)!);
+    const up = (n: MockNode | undefined): string[] => (n ? [n.id, ...up(n.parent_id ? nodes.get(n.parent_id) : undefined)] : []);
+    const ys = new Set(up(y));
+    const lca = up(x).find((id) => ys.has(id))!;
+    const m = node(newId("n"), x!.project_id, lca, nextFork(lca), "Merged branches");
+    m.merge_source_ids = [x!.id, y!.id];
+    return json({ ...meta(m), fork: null });
+  }
   if (a === "nodes" && b) {
     const n = nodes.get(b);
     if (!n) return fail(404, "No such card.");

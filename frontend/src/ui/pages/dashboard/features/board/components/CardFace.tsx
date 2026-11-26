@@ -13,15 +13,21 @@ import { CaseSketch } from "./CaseSketch";
 
 const created = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
+/** The case's file number, as the workspace's case label shows it: the first four digits of its id. */
+const fileNumber = (id: string) => id.replace(/-/g, "").slice(0, 4).toUpperCase();
+
 export function CardFace({ project }: { project: ProjectSummary }) {
   const last = useIsLastCase(project.id);
   const pins = useTreePreview(project.id);
   const meta = pins ? `${pins.length} ${pins.length === 1 ? "card" : "cards"} · ${created(project.created_at)}` : created(project.created_at);
+  // a one-card case has no tree to sketch yet: its photo says so instead of showing a lone dot
+  const fresh = pins !== null && pins !== undefined && pins.length < 2;
   return (
     <Panel material="paper" stock={tiltOf(project.id) === 1 ? "card" : "card-alt"} edge="torn" elevation="floating" className={last ? "case-card case-card-last" : "case-card"}>
       <span className="case-card-pin" aria-hidden="true" />
-      <span className="case-card-photo">
-        {pins && <CaseSketch pins={pins} />}
+      <Text as="span" face="stamp" size="xxs" className="case-card-kicker" content={last ? `No. ${fileNumber(project.id)} · Last open` : `No. ${fileNumber(project.id)}`} />
+      <span className="case-card-photo" data-fresh={fresh || undefined}>
+        {fresh ? <Text as="span" face="stamp" size="xxs" className="case-card-fresh" content="A fresh case" /> : pins && <CaseSketch pins={pins} />}
       </span>
       <Text as="h3" face="heading" hierarchy="primary" className="case-card-name" content={project.project_name} />
       <Text size="xs" hierarchy="tertiary" className="case-card-meta" content={meta} />

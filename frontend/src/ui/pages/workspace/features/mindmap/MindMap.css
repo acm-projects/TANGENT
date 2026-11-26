@@ -151,7 +151,7 @@
   position: relative;
   padding: var(--space-3) var(--space-6) var(--space-2);
   min-height: 4.5rem;
-  /* one leaf column is 300px wide (layout.ts), so a card never reaches its neighbour */
+  /* one leaf column is 340px wide (layout.ts): a card keeps ~70px of board from its neighbour */
   max-width: 17rem;
   font: inherit;
   /* muted, not faint: an unselected title is still text someone reads (4.5:1) */

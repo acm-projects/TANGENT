@@ -24,7 +24,7 @@ import "./MindMap.css";
 
 // Where the tree starts on the board: with a card picked the chat sheet covers the right ~40%; with none, the
 // sheet is off the board and the tree centres in the whole of it (clear of the rail).
-const VIEW_PADDING = { top: "20%", bottom: "20%", left: "8%", right: "46%" } as const;
+const VIEW_PADDING = { top: "20%", bottom: "20%", left: "8%", right: "40%" } as const;
 const OPEN_PADDING = { top: "14%", bottom: "18%", left: "10%", right: "6%" } as const;
 /** The gap the camera keeps between a card and anything covering the board, and the room kept under it for Gent's dock. */
 const MARGIN = 48;

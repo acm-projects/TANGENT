@@ -260,7 +260,7 @@ plain paper with an empty dashed socket while he's out working.
 - **The map is the subject.** With no card picked, nothing else is on the board: the notes sheet
   waits off the right edge, Field Notes are a tile until there's something on them, and no decals
   sit on the workspace board. Picking a card slides the sheet in from the right (`sheet-width`, a
-  reading measure: 24–40rem, 40vw); closing it (×, Esc, or a click on the board) slides it back out
+  reading measure: 22–36rem, 34vw); closing it (×, Esc, or a click on the board) slides it back out
   the same way and puts the card back.
 - **The camera keeps what you're looking at in the clear.** The clear part of the board is right of
   the rail and any open tool panel, left of the sheet, above the dock. A picked card the sheet would
@@ -273,3 +273,13 @@ plain paper with an empty dashed socket while he's out working.
   only for navigation. A list of cases is a grid of cards; a form is a sheet of paper on the board.
 - **Landing page:** one column up to `content-max` (1200px), body text no wider than `measure`
   (40rem), sections `space-24` apart (`space-16` on phones).
+- **Tags say what a card is.** Eight colours, each named per case: Key finding, Supported, Contradicts,
+  Needs a source, Open question, and three left blank for the case's own. A tagged card shows the name
+  under its title; Tag sits on the card's action strip.
+- **A merge reads as a merge.** In the thread, joined branches are one block: a coloured lane per branch
+  (open it to read), drawn running together into the card the thread carries on in.
+- **The court is in the sheet.** The sheet's header has the court button (Debate, or Return to court while
+  one runs); the board's own court button shows only while the sheet is away.
+- **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).
+- **The board breathes.** Leaf columns are 340px apart and generations 240px, so neighbouring cards keep
+  about 70px of cork between them.

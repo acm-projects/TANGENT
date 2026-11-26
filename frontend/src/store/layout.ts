@@ -18,10 +18,10 @@ export interface Point {
   y: number;
 }
 
-/** Horizontal distance between neighbouring leaf columns, in flow units (px at zoom 1). */
-export const COLUMN_WIDTH = 300;
-/** Vertical distance between generations. Figma: ~220px from parent to child. */
-export const ROW_HEIGHT = 220;
+/** Horizontal distance between neighbouring leaf columns, in flow units (px at zoom 1): a 17rem card and ~70px of board between neighbours. */
+export const COLUMN_WIDTH = 340;
+/** Vertical distance between generations (Figma had ~220; more room for the strings to read as a tree). */
+export const ROW_HEIGHT = 240;
 
 /**
  * @param rootId           the tree's root, or null for an empty tree

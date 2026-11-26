@@ -21,7 +21,7 @@
 
   /* layout widths: the notes sheet, a landing page's column, a line of body text */
   /* the chat sheet beside the map: a reading measure, never half the board */
-  --sheet-width: clamp(24rem, 40vw, 40rem);
+  --sheet-width: clamp(22rem, 34vw, 36rem);
   --content-max: 1200px;
   --measure: 40rem;
 

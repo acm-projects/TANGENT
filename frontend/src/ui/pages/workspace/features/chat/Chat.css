@@ -126,6 +126,11 @@
   --pop-scale: 0.94;
 }
 
+/* the court button, beside full screen: a live debate's is filled, so it reads from across the board */
+.chat-court-button {
+  flex: none;
+}
+
 .chat-title-kicker {
   flex: 1;
   text-align: center;
@@ -167,6 +172,13 @@
   padding: var(--space-8);
   text-align: center;
   text-wrap: balance;
+}
+
+/* A long thread only lays out and paints what's near the screen; `auto` keeps each message's last real size, so
+ * scrolling and the pin-to-bottom stay steady. */
+.chat-history > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 6rem;
 }
 
 /* A short conversation sits at the bottom, like any chat. Done with a leading
@@ -230,33 +242,112 @@
   --pop-scale: 0.97;
 }
 
+/* A merge in the thread: one block, a coloured lane per joined branch (open one to read it), and the lanes drawn
+ * running together into the string that carries on below. Lane colours are the string's red and three inks. */
+.chat-merge {
+  --merge-lane-0: var(--color-string);
+  --merge-lane-1: var(--color-text-secondary);
+  --merge-lane-2: var(--color-border-emphasis);
+  --merge-lane-3: var(--color-text-muted);
+  margin-block: var(--space-4);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--texture-grain), var(--color-surface);
+}
+
+.chat-merge-head {
+  padding-inline: var(--space-1);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .chat-merge-branches,
 .chat-merge-history {
   list-style: none;
-  padding-inline-start: var(--space-3);
+  margin: 0;
+  padding: 0;
 }
 
 .chat-merge-branches {
-  margin-block: var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+  margin-block: var(--space-2);
 }
 
 .chat-merge-branch-heading {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
-  padding-block: var(--space-2);
-  color: var(--color-text-secondary);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  list-style: none;
+  transition: background-color var(--motion-fast) var(--ease-out);
 }
 
-.chat-merge-branch-heading > [data-ui="icon"] {
-  color: var(--color-string);
+.chat-merge-branch-heading::-webkit-details-marker {
+  display: none;
 }
 
+.chat-merge-branch-heading:is(:hover, :focus-visible) {
+  background: var(--color-track);
+}
+
+.chat-merge-branch-heading::after {
+  content: "expand_more";
+  margin-left: auto;
+  font-family: var(--font-symbols);
+  color: var(--color-text-muted);
+  transition: rotate var(--motion-spring) var(--ease-spring);
+}
+
+.chat-merge-lane > details[open] > .chat-merge-branch-heading::after {
+  rotate: 180deg;
+}
+
+.chat-merge-lane-dot {
+  flex: none;
+  align-self: center;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--lane);
+}
+
+.chat-merge-exhibit,
+.chat-merge-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-merge-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* an open lane: its thread, ruled down the side in the lane's colour */
 .chat-merge-history {
-  margin-top: 0;
-  padding-block: var(--space-2);
-  border-left: 1px solid var(--color-border);
+  margin: var(--space-1) 0 var(--space-2) calc(var(--space-2) + 0.3rem);
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  border-left: 2px solid var(--lane);
+}
+
+.chat-merge-join {
+  padding-inline: var(--space-1);
+}
+
+.chat-merge-join path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.chat-merge-join circle {
+  fill: var(--color-string);
 }
 
 .message-text {
@@ -1099,4 +1190,10 @@
 /* a compact card's summary: filed on manila stock (Panel, card-alt), like its card on the map */
 .message-compact-record {
   padding: var(--space-3) var(--space-4);
+}
+
+/* the open search's words, in the thread (searchHighlight.ts): the same marker as on the map's cards */
+::highlight(search-hit) {
+  background-color: var(--color-highlight);
+  color: inherit;
 }

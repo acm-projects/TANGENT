@@ -151,6 +151,32 @@
   background: var(--texture-pin), var(--color-string);
 }
 
+/* the file number over the photo, like the case label in the workspace; the case you were last in says so */
+.case-card-kicker {
+  padding-inline: 0.15em;
+  font-size: 0.62em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.case-card-last .case-card-kicker {
+  color: var(--color-string);
+}
+
+/* a case with one card: no tree to draw yet, just a word on the blank photo */
+.case-card-photo[data-fresh] {
+  background: repeating-linear-gradient(-45deg, transparent 0 0.5em, var(--color-track) 0.5em 0.56em), var(--color-surface-raised);
+}
+
+.case-card-fresh {
+  font-size: 0.62em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
 .case-card-photo {
   display: grid;
   place-items: center;
