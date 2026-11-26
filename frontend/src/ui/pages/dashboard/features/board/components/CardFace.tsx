@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
 import type { ProjectSummary } from "@/api/types";
 import { Panel, Text } from "@/ui/library";
+import { useIsLastCase } from "@/ui/features/last-case/lastCase";
 import { tiltOf } from "../sketch";
 import { useTreePreview } from "../useTreePreview";
 import { CaseSketch } from "./CaseSketch";
@@ -13,27 +13,8 @@ import { CaseSketch } from "./CaseSketch";
 
 const created = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-const LAST_CASE = "tangent-last-case";
-
-/** Remember the case just opened, so its pin turns red next visit. Storage can be blocked: then nothing is remembered. */
-export function rememberCase(id: string) {
-  try {
-    localStorage.setItem(LAST_CASE, id);
-  } catch {}
-}
-
-const noSubscribe = () => () => {};
-const readLast = () => {
-  try {
-    return localStorage.getItem(LAST_CASE);
-  } catch {
-    return null;
-  }
-};
-
 export function CardFace({ project }: { project: ProjectSummary }) {
-  // the server snapshot is false, so hydration agrees; the client then reads storage
-  const last = useSyncExternalStore(noSubscribe, () => readLast() === project.id, () => false);
+  const last = useIsLastCase(project.id);
   const pins = useTreePreview(project.id);
   const meta = pins ? `${pins.length} ${pins.length === 1 ? "card" : "cards"} · ${created(project.created_at)}` : created(project.created_at);
   return (

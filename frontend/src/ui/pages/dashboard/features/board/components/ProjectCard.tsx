@@ -5,7 +5,8 @@ import type { ProjectSummary } from "@/api/types";
 import { Link } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { leanOf, tiltOf } from "../sketch";
-import { CardFace, rememberCase } from "./CardFace";
+import { rememberCase } from "@/ui/features/last-case/lastCase";
+import { CardFace } from "./CardFace";
 import { ProjectSettings } from "./ProjectSettings";
 
 /* A project in the open folder's grid. It shares its layoutId with its copy in

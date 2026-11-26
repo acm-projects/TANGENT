@@ -1,4 +1,5 @@
 import { Decal, Panel } from "@/ui/library";
+import { RememberCase } from "@/ui/features/last-case/lastCase";
 import { GentLayer } from "./features/agent/GentLayer";
 import { Chat } from "./features/chat/Chat";
 import { Debate } from "./features/debate/Debate";
@@ -19,6 +20,7 @@ type WorkspaceProps = { slug: string; projectId: string };
 export function Workspace({ slug, projectId }: WorkspaceProps) {
   return (
     <Panel as="main" material="cork" className="workspace">
+      <RememberCase id={projectId} />
       {/* scraps pinned at the board's edges, never under the tree */}
       <Decal kind="scrap" className="workspace-scrap-a" />
       <Decal kind="scrap" className="workspace-scrap-b" />
