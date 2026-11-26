@@ -3,6 +3,7 @@ import { api, apiErrorMessage } from "@/api";
 import type { ProjectSearchResult } from "@/api/types";
 import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Input, Loading, Panel, Text } from "@/ui/library";
+import { splitMatches } from "../highlight";
 
 /* The Search panel: find the cards in this project whose title, summary or conversation mention some words.
  * It searches as you type (the same search Gent uses), and picking a result selects that card and flies the
@@ -20,6 +21,12 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
   const words = query.trim();
 
+  // the board hears the search only while the drawer is open and has words
+  useEffect(() => {
+    if (!words) useTreeStore.getState().setSearch(null);
+  }, [words]);
+  useEffect(() => () => useTreeStore.getState().setSearch(null), []);
+
   useEffect(() => {
     if (!words) return;
     let cancelled = false;
@@ -27,7 +34,12 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
       setBusy(true);
       api.projects
         .search(projectId, words)
-        .then((found) => !cancelled && (setResults(found), setError(null)))
+        .then((found) => {
+          if (cancelled) return;
+          setResults(found);
+          setError(null);
+          useTreeStore.getState().setSearch({ query: words, ids: found.map((r) => r.id) });
+        })
         .catch((e: unknown) => !cancelled && setError(apiErrorMessage(e, "Search failed.")))
         .finally(() => !cancelled && setBusy(false));
     }, DEBOUNCE_MS);
@@ -94,21 +106,9 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
 
 /** The snippet with each place the search words occur marked. */
 function Highlight({ text, words }: { text: string; words: string }) {
-  const at = text.toLowerCase().split(words.toLowerCase());
-  let i = 0;
   return (
     <>
-      {at.map((part, k) => {
-        const start = i;
-        i += part.length;
-        const match = k < at.length - 1 ? text.slice(i, (i += words.length)) : "";
-        return (
-          <span key={start}>
-            {text.slice(start, start + part.length)}
-            {match && <mark>{match}</mark>}
-          </span>
-        );
-      })}
+      {splitMatches(text, words).map((r, k) => (r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>))}
     </>
   );
 }

@@ -98,6 +98,20 @@
   filter: none;
 }
 
+/* Torn paper can't take a box-shadow (its mask clips it), so the lift is a drop-shadow filter: the
+ * --shadow-lift pair, from the string-shadow colour. Hover and the path grow it; the Panel's resting
+ * drop-shadow is the starting point. */
+.mindmap-node[data-edge="torn"] {
+  transition:
+    color var(--motion-fast) var(--ease-out),
+    filter var(--motion-base) var(--ease-out);
+}
+
+.mindmap-node[data-edge="torn"]:is(:hover, :focus-visible, [data-state="path"], [data-state="selected"]) {
+  filter: drop-shadow(0 2px 2px color-mix(in srgb, var(--color-string-shadow) 30%, transparent))
+    drop-shadow(0 14px 24px color-mix(in srgb, var(--color-string-shadow) 80%, transparent));
+}
+
 .mindmap[data-focused] .mindmap-edge:not(.mindmap-edge-path) {
   opacity: 0.6;
 }
@@ -107,6 +121,22 @@
 }
 
 /* ── the node ─────────────────────────────────────────────── */
+
+/* Search open: cards it didn't find fade, the ones it did keep the matched words marked. */
+.mindmap-node-wrap {
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+
+.mindmap-node-wrap[data-search="miss"] {
+  opacity: var(--opacity-search-dim);
+}
+
+.mindmap-node-title mark {
+  padding-inline: 0.1em;
+  border-radius: 2px;
+  background: var(--color-highlight);
+  color: inherit;
+}
 
 /* React Flow positions nodes absolutely, so they shrink-wrap to their narrowest
  * and a wrapping title would break at every word. Size to the unwrapped title
@@ -574,9 +604,10 @@
   padding: var(--space-3) var(--space-6);
   pointer-events: none;
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
-  --pop-from: 0 -2rem;
-  --pop-rotate: -8deg;
-  --pop-scale: 1.1;
+  /* starts below the board's top edge: the cork clips overflow, so a drop from above it showed the badge cut off */
+  --pop-from: 0 0.75rem;
+  --pop-rotate: -4deg;
+  --pop-scale: 0.9;
 }
 
 .mindmap-case-kicker {
