@@ -3,12 +3,13 @@ from typing import Annotated, List, Literal, Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, field_validator
 from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.auth import get_current_user
+from app.context.schemas import DEFAULT_TAG_LABELS, TAG_COLORS
 from app.database import get_db_session
 from app.models import Project, Share, Tree, User, Workspace
 from app.project_forking import get_user_copy
@@ -31,6 +32,8 @@ class ProjectSummary(BaseModel):
     workspace_slug: str
     forked_from_project_id: Optional[UUID] = None
     forked_project_id: Optional[UUID] = None
+    # what each tag colour means here: every colour, the case's own names over the defaults ("" is unnamed)
+    tag_labels: dict[str, str] = {}
 
 
 class ProjectDetail(ProjectSummary):
@@ -44,6 +47,23 @@ class ProjectCreate(BaseModel):
 
 class ProjectRename(BaseModel):
     project_name: ProjectName
+
+
+class TagLabelsIn(BaseModel):
+    """Names for some or all of the tag colours; a colour left out keeps its name, "" clears it."""
+    labels: dict[str, Annotated[str, StringConstraints(strip_whitespace=True, max_length=32)]]
+
+    @field_validator("labels")
+    @classmethod
+    def _known_colors(cls, v: dict[str, str]) -> dict[str, str]:
+        unknown = set(v) - set(TAG_COLORS)
+        if unknown:
+            raise ValueError(f"unknown tag colours: {', '.join(sorted(unknown))}")
+        return v
+
+
+def tag_labels_of(project: Project) -> dict[str, str]:
+    return {**DEFAULT_TAG_LABELS, **(project.tag_labels or {})}
 
 
 def _active_share_for(user_id: UUID):
@@ -68,6 +88,7 @@ def _summary(
         workspace_slug=workspace_slug,
         forked_from_project_id=project.forked_from_project_id,
         forked_project_id=forked_project_id,
+        tag_labels=tag_labels_of(project),
     )
 
 
@@ -243,6 +264,21 @@ async def rename_project(
     await db.refresh(project)
 
     return _summary(project, "owner", slug)
+
+
+@router.put("/{project_id}/tag-labels", response_model=ProjectSummary)
+async def set_tag_labels(
+    project_id: UUID,
+    body: TagLabelsIn,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Rename what tag colours mean in this case (the owner only); returns the project with every colour's name."""
+    project = await require_owner(db, project_id, current_user)
+    project.tag_labels = {**(project.tag_labels or {}), **body.labels}
+    await db.commit()
+    await db.refresh(project)
+    return _summary(project, "owner", await _workspace_slug(db, project.workspace_id))
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

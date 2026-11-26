@@ -551,7 +551,7 @@ async def reopen_node(node_id: UUID, db: AsyncSession = Depends(get_db_session),
 
 class TagIn(BaseModel):
     shape: Literal["flag", "pin"]  # schemas.TAG_SHAPES
-    color: Literal["ochre", "sage", "slate", "plum"]  # schemas.TAG_COLORS
+    color: Literal["ochre", "sage", "rust", "slate", "plum", "teal", "rose", "graphite"]  # schemas.TAG_COLORS
 
 
 @router.put("/{node_id}/tag", response_model=ResolveOut)

@@ -106,6 +106,7 @@ async def _copy_project(
         name=original.name,
         created_by_id=new_owner_id,
         forked_from_project_id=original.id,
+        tag_labels=original.tag_labels,  # a copy keeps what its tags mean
     )
     db.add(new_project)
     await db.flush()

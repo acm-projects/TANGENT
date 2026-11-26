@@ -9,7 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 ENDINGS = {"resolved": "Resolved", "dead_lead": "Dead lead", "off_topic": "Off topic"}
 
 # A card's coloured tag (`nodes.tag` = {shape, color}); the colours carry no fixed meaning.
-TAG_COLORS = ("ochre", "sage", "slate", "plum")
+TAG_COLORS = ("ochre", "sage", "rust", "slate", "plum", "teal", "rose", "graphite")
+# What each colour means unless the case renames it (projects.tag_labels): a research default, three left blank.
+DEFAULT_TAG_LABELS = {"ochre": "Key finding", "sage": "Supported", "rust": "Contradicts", "slate": "Needs a source",
+                      "plum": "Open question", "teal": "", "rose": "", "graphite": ""}
 TAG_SHAPES = ("flag", "pin")
 
 Role = Literal["user", "assistant"]

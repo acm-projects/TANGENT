@@ -156,6 +156,8 @@ class Project(Base):
     forked_from_project_id = Column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
+    # what each tag colour means in this case, {color: label} (schemas.TAG_COLORS); None: the defaults
+    tag_labels = Column(JSONB, nullable=True)
 
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"))
 

@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { ProjectDetail, ProjectSearchResult, ProjectSummary } from "../types";
+import type { ProjectDetail, ProjectSearchResult, ProjectSummary, TagColor } from "../types";
 
 /** /projects/ -- every project the user owns or has been shared. */
 export function createProjectsApi({ http }: ApiClient) {
@@ -12,6 +12,9 @@ export function createProjectsApi({ http }: ApiClient) {
         .post<ProjectSummary>("/projects/", { workspace_id: workspaceId, project_name: projectName })
         .then((r) => r.data),
     /** Owner only; 409 if the name is taken in its workspace. */
+    /** Rename what tag colours mean in this case (owner only); returns the project with every colour's name. */
+    setTagLabels: (projectId: string, labels: Partial<Record<TagColor, string>>) =>
+      http.put<ProjectSummary>(`/projects/${projectId}/tag-labels`, { labels }).then((r) => r.data),
     rename: (projectId: string, projectName: string) =>
       http.patch<ProjectSummary>(`/projects/${projectId}`, { project_name: projectName }).then((r) => r.data),
     /** Owner only. */

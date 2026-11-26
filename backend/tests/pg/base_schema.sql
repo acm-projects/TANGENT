@@ -7,7 +7,8 @@ CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL DEFAULT 'p',
     created_by_id UUID NOT NULL REFERENCES users(id),
-    forked_from_project_id UUID REFERENCES projects(id)
+    forked_from_project_id UUID REFERENCES projects(id),
+    tag_labels JSONB
 );
 CREATE TABLE shares (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

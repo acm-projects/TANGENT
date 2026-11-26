@@ -433,54 +433,110 @@
   right: 4.2rem;
 }
 
-/* The "Tag this card" popup: shape tiles and colour swatches, the picked one ringed. */
-.tag-picker-heading {
-  color: var(--color-text-secondary);
+/* The "Tag this card" popup: a list of what each colour means, the picked one ringed; two small shape tiles below. */
+.tag-picker {
+  min-width: 18rem;
 }
 
-.tag-picker-shape,
-.tag-picker-swatch {
+.tag-picker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.tag-picker-option {
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+
+.tag-picker-option:is(:hover, :focus-visible) {
+  background: var(--color-track);
+}
+
+.tag-picker-option[aria-pressed="true"] {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.tag-picker-option:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.tag-picker-dot {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--radius-full);
+  background: var(--swatch);
+  box-shadow: 0 0 0 2px var(--color-surface), 0 1px 2px 2px var(--color-string-shadow);
+}
+
+.tag-picker-name {
+  flex: 1;
+}
+
+.tag-picker-error {
+  color: var(--color-danger);
+}
+
+.tag-picker-shape {
   display: grid;
-  justify-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  place-items: center;
+  padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
 .tag-picker-shape svg {
-  width: 2rem;
-  height: 2rem;
-}
-
-.tag-picker-swatch {
-  border-color: transparent;
-}
-
-.tag-picker-swatch span[aria-hidden] {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  background: var(--swatch);
-  border: 2px solid var(--color-surface);
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .tag-picker-shape[aria-pressed="true"] {
   border: 2px solid var(--color-text);
-  color: var(--color-text);
 }
 
-.tag-picker-swatch[aria-pressed="true"] {
-  color: var(--color-text);
+/* a tagged card says what its tag means, on a line under its title: the tag's dot, then its name */
+.mindmap-node-taglabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 
-.tag-picker-swatch[aria-pressed="true"] span[aria-hidden] {
-  outline: 1.5px solid var(--color-text);
-  outline-offset: 2px;
+.mindmap-node-taglabel::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--swatch);
 }
+
+.mindmap-node-taglabel > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 /* A resolved card: a rubber stamp pressed across its foot, in the hand that resolved it (the user's red, Gent's blue). */
 .mindmap-node-resolved {

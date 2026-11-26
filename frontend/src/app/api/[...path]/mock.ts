@@ -154,6 +154,7 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
     if (!c && method === "GET") return json({ ...p, tree_count: 1 });
     if (!c && method === "PATCH") return json(Object.assign(p, { project_name: body.project_name }));
     if (!c && method === "DELETE") return projects.splice(projects.indexOf(p), 1), json({});
+    if (c === "tag-labels" && method === "PUT") return json(Object.assign(p, { tag_labels: { ...p.tag_labels, ...body.labels } }));
     if (c === "tree") return json(treeOf(b));
     if (c === "sources" && method === "GET") return json(sources);
     if (c === "search") {

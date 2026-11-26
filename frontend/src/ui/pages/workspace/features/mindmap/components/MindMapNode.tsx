@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from "react";
 import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
-import { ENDING_LABELS } from "@/api/types";
+import { ENDING_LABELS, TAG_HEX, tagLabels } from "@/api/types";
 import type { Ending, NodeTag } from "@/api/types";
 import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
@@ -73,6 +73,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const [sharing, setSharing] = useState(false);
   const [debating, setDebating] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const tagName = useTreeStore((s) => (data.tag ? tagLabels(s.project)[data.tag.color] : ""));
   const release = () => {
     setPinned(false);
     setPeeled(false);
@@ -219,7 +220,6 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       ? { icon: "restart_alt", label: "Reset project", disabled: blankRoot, onClick: requestDelete }
       : { icon: "delete", label: "Delete", onClick: requestDelete },
     { icon: "ios_share", label: "Share branch", disabled: !project, onClick: openShare },
-    { icon: "flag", label: "Tag", disabled: busy, onClick: openTag },
   ];
   // How the branch ended. In the tray's fan they're listed bottom-up: Resolved nearest the button.
   const endingOptions = (["resolved", "dead_lead", "off_topic"] as const).map((kind) => ({
@@ -323,7 +323,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             )}
           </AnimatePresence>
           {(!data.hasParent || data.debate) && <span className="mindmap-node-rule" aria-hidden="true" />}
-          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged ${data.tag.color}`} />}
+          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged: ${tagName || data.tag.color}`} />}
           {!data.hasParent && <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="The case" />}
           {data.compact && (
             <>
@@ -373,6 +373,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           </Frame>
           {data.subtitle && (
             <Text as="span" size="xxs" className="mindmap-node-subtitle" content={data.subtitle} />
+          )}
+          {/* what the tag means in this case, under the title (an unnamed colour shows only its flag) */}
+          {data.tag && tagName && (
+            <span className="mindmap-node-taglabel" style={{ "--swatch": TAG_HEX[data.tag.color] } as React.CSSProperties}>
+              <Text as="span" size="xs" content={tagName} />
+            </span>
           )}
           {asking && <QuestionPrompt node={asking} />}
           <Text
@@ -464,6 +470,18 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             release();
             setDebating(true);
           }}
+        />
+        {/* tagging is on the strip, not under More: a tag says what the card is (a key finding, a contradiction…) */}
+        <Button
+          size="l"
+          title="Tag"
+          elevation="floating"
+          showIcon
+          showLabel={false}
+          icon="flag"
+          label="Tag"
+          disabled={busy}
+          onClick={openTag}
         />
         {data.resolvedBy ? (
           <Button

@@ -93,14 +93,22 @@ export interface NodeMeta {
   tag?: NodeTag | null;
 }
 
-export type TagColor = "ochre" | "sage" | "slate" | "plum";
+export type TagColor = "ochre" | "sage" | "rust" | "slate" | "plum" | "teal" | "rose" | "graphite";
 export type TagShape = "flag" | "pin";
 export interface NodeTag {
   shape: TagShape;
   color: TagColor;
 }
 /** Mid-tones that hold ~3:1 on paper and on the dark board; graphics only, never text colour. */
-export const TAG_HEX: Record<TagColor, string> = { ochre: "#d19a2a", sage: "#6f9a78", slate: "#5f86b3", plum: "#9a6a94" };
+export const TAG_HEX: Record<TagColor, string> = {
+  ochre: "#d19a2a", sage: "#6f9a78", rust: "#c0623b", slate: "#5f86b3",
+  plum: "#9a6a94", teal: "#3f9a96", rose: "#c97a8c", graphite: "#6b6862",
+};
+/** What each colour means unless the case renames it (backend DEFAULT_TAG_LABELS): a research default, three blank. */
+export const DEFAULT_TAG_LABELS: Record<TagColor, string> = {
+  ochre: "Key finding", sage: "Supported", rust: "Contradicts", slate: "Needs a source",
+  plum: "Open question", teal: "", rose: "", graphite: "",
+};
 
 /** How a branch can end (backend ENDINGS): only "resolved" found something. */
 export type Ending = "resolved" | "dead_lead" | "off_topic";
@@ -264,7 +272,15 @@ export interface ProjectSummary {
   workspace_slug: string;
   forked_from_project_id: string | null;
   forked_project_id: string | null;
+  /** what each tag colour means in this case ("" unnamed); older servers send none, so read it through tagLabels() */
+  tag_labels?: Partial<Record<TagColor, string>>;
 }
+
+/** Every colour's name in a case: its own names over the defaults. */
+export const tagLabels = (project: { tag_labels?: Partial<Record<TagColor, string>> } | null | undefined): Record<TagColor, string> => ({
+  ...DEFAULT_TAG_LABELS,
+  ...project?.tag_labels,
+});
 
 /** GET /projects/:id */
 export type ProjectDetail = ProjectSummary & { tree_count: number };
