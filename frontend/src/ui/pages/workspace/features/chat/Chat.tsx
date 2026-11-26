@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { VerdictCard } from "../debate/components/VerdictCard";
@@ -148,6 +148,8 @@ export function Chat({ className }: ChatProps) {
   // 88px: the toolbar column stays visible, as in full screen (--toolbar-room in Chat.css).
   const resizeTo = (px: number) => setWidth(Math.round(Math.min(Math.max(px, MIN_WIDTH), window.innerWidth - 88)));
   const currentWidth = () => sheetRef.current?.getBoundingClientRect().width ?? MIN_WIDTH;
+  // the cards above the picked one on its thread, for the breadcrumb
+  const path = chat.history.flatMap((item) => (item.kind === "node" && item.node.id !== chat.activeNodeId ? [item.node.title ?? "Untitled card"] : []));
   const classes = ["chat", className].filter(Boolean).join(" ");
   const contextUsagePercentage =
     chat.usage && chat.usageContextLength
@@ -194,6 +196,10 @@ export function Chat({ className }: ChatProps) {
       data-resizing={resizing || undefined}
       style={layout === "docked" && width ? { width } : undefined}
       aria-label="Chat"
+      material="paper"
+      edge="torn"
+      holes
+      elevation="floating"
     >
       {layout === "docked" && (
         <div
@@ -234,17 +240,14 @@ export function Chat({ className }: ChatProps) {
           />
           {activeNode && (
             // keyed, so picking another card swaps the heading in
-            <Frame key={activeNode.id} gap="0" align="center" className="chat-title">
-              <Text
-                as="span"
-                size="xxs"
-                className="chat-title-kicker"
-                content={(activeNode.merge_source_ids?.length ?? 0) > 0
-                  ? `Case notes · Joint exhibit ${chat.activeExhibit}`
-                  : `Case notes · Exhibit ${chat.activeExhibit}`}
-              />
-              <Text as="h2" size="m" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
-            </Frame>
+            <Text
+              key={activeNode.id}
+              as="span"
+              face="stamp"
+              size="xxs"
+              className="chat-title-kicker"
+              content={`Case notes · ${(activeNode.merge_source_ids?.length ?? 0) > 0 ? "Joint node" : "Node"} ${chat.activeExhibit}`}
+            />
           )}
           <Button
             hierarchy="tertiary"
@@ -257,16 +260,26 @@ export function Chat({ className }: ChatProps) {
           />
         </Frame>
 
+        {activeNode && (
+          <Frame key={activeNode.id} gap="1" className="chat-title">
+            <Text as="h2" size="xl" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
+            {path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />}
+          </Frame>
+        )}
+
         <Frame ref={scrollRef} gap="0" className="chat-scroll">
 
           {chat.history.length === 0 ? (
             // an empty evidence card, its string reaching out across to the board
             <Frame justify="center" align="center" className="chat-empty">
-              <Frame gap="2" align="center" className="chat-empty-card">
-                <Text as="span" size="xxs" className="chat-title-kicker" content="Exhibit —" />
+              <Panel stock="card" edge="torn" elevation="floating" className="chat-empty-card">
+                {/* the pin and the string reaching out to the board */}
+                <span className="chat-empty-pin" aria-hidden="true" />
+                <span className="chat-empty-string" aria-hidden="true" />
+                <Text as="span" face="stamp" size="xxs" className="chat-title-kicker" content="Exhibit —" />
                 <Text as="h2" size="xl" hierarchy="primary" className="chat-empty-title" content="Pick a card off the board" />
                 <Text hierarchy="tertiary" content="Select a node on the map to read its thread here." />
-              </Frame>
+              </Panel>
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
@@ -323,6 +336,20 @@ export function Chat({ className }: ChatProps) {
                   contextUsagePercentage !== null && `${contextUsagePercentage.toFixed(0)}% context`,
                 ].filter(Boolean).join(" · ")}
               />
+              {chat.usageContextLength !== null && (
+                <>
+                  {/* this card solid, the rest of the branch faded, over the empty track */}
+                  <span
+                    className="chat-meter"
+                    aria-hidden="true"
+                    style={{
+                      "--meter-node": `${Math.min(100, (chat.nodeTokens / chat.usageContextLength) * 100)}%`,
+                      "--meter-branch": `${Math.min(100, (chat.branchTokens / chat.usageContextLength) * 100)}%`,
+                    } as CSSProperties}
+                  />
+                  <Text as="span" size="xs" content={`of ${compact.format(chat.usageContextLength)}`} />
+                </>
+              )}
             </summary>
             <Frame gap="1" className="chat-token-details" role="status" aria-label="Token usage">
               <Text size="xs" content={`This node: ${chat.nodeTokens.toLocaleString()} tokens`} />

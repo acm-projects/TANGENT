@@ -75,9 +75,12 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
   }
 
   return (
-    // Opaque paper, so messages scroll out of sight under it; drawn as a ruled line (Chat.css).
+    // Opaque index card, so messages scroll out of sight under it (Chat.css).
     <Panel
       as="footer"
+      stock="composer"
+      ruled="lines"
+      elevation="floating"
       className={["message-field", className].filter(Boolean).join(" ")}
       data-disabled={disabled || undefined}
       data-sent={sent || undefined}
@@ -88,7 +91,7 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
         {files.length > 0 && (
           <Frame as="ol" direction="row" gap="2" className="message-field-files" aria-label="Attachments">
             {files.map((f, i) => (
-              <Panel as="li" key={`${f.name}-${i}`} className="message-field-file">
+              <Panel as="li" stock="card" key={`${f.name}-${i}`} className="message-field-file">
                 <Frame direction="row" gap="1" align="center">
                   <Icon icon={f.type.startsWith("image/") ? "image" : "draft"} size="s" />
                   <Text as="span" size="xs" content={f.name} />

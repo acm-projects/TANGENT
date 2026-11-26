@@ -58,7 +58,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
       // the user's answers to a card's questions: an answer sheet, each question with the answer they ticked
       <Frame as="li" gap="2" align="end" className="message message-user">
         <MetaLine icon="fact_check" text="Answered the questions" />
-        <Panel hierarchy="tertiary" className="message-user-bubble message-answers">
+        <Panel stock="slip" ruled="margin" elevation="floating" className="message-user-bubble message-answers">
           <Frame as="ol" gap="2" className="message-answers-list">
             {answers.map(({ q, a }) => (
               <Frame as="li" gap="0" key={q}>
@@ -85,8 +85,8 @@ function UserMessage({ message }: { message: ChatMessage }) {
           </InkPanel>
         ) : (
           // the user's own question: a slip with their red margin and tack
-          <Panel hierarchy="tertiary" className="message-user-bubble">
-            <Text content={message.content} className="message-text" />
+          <Panel stock="slip" ruled="margin" elevation="floating" className="message-user-bubble">
+            <Text face="heading" size="m" content={message.content} className="message-text" />
           </Panel>
         ))}
     </Frame>
@@ -116,7 +116,7 @@ function AssistantMessage({ message, nodeId, onBranch, onRetry, streaming, markd
     return (
       <Frame as="li" gap="2" className="message message-compact">
         <MetaLine icon="compress" text={`Compacted${message.compacted_from ? ` · ${message.compacted_from} card${message.compacted_from === 1 ? "" : "s"}` : ""}`} />
-        <Panel hierarchy="tertiary" className="message-compact-record">
+        <Panel stock="card-alt" className="message-compact-record">
           <div className="message-text message-markdown">
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}>
               {message.content}
