@@ -33,6 +33,8 @@ const DOCK_ROOM = 96;
 /** A card's least size on the board, for one not measured yet, and the room its action tray takes under it. */
 const CARD_MIN = { width: 200, height: 72 };
 const TRAY_ROOM = 44;
+/** The camera zooms out to bring search hits into the clear, but never past this: below it a card can't be read. */
+const MIN_READABLE = 0.5;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -72,13 +74,23 @@ function Camera() {
 
   // a picked card, or the search's hits: moved into the clear only if they're out of it
   useEffect(() => {
-    const ids = active ? [active] : (hits ?? []);
-    if (!ids.length) return;
+    if (!active && !hits?.length) return;
     // a frame later: the sheet and panels have their final widths (they're only sliding)
     const raf = requestAnimationFrame(() => {
       const clear = clearArea();
       if (!clear) return;
       const { x, y, zoom } = getViewport();
+      // An open card and the search's hits: all of them in the clear if they fit at a readable zoom (the board
+      // zooms out for them, as for hits alone), else the card alone at this zoom
+      let ids = active ? [active] : (hits ?? []);
+      let fitAll = !active;
+      if (active && hits?.length) {
+        const both = getNodesBounds([active, ...hits]);
+        if (Math.min(clear.width / both.width, (clear.height - TRAY_ROOM) / both.height) >= MIN_READABLE) {
+          ids = [active, ...hits];
+          fitAll = true;
+        }
+      }
       const measured = getNodesBounds(ids);
       // A card made a moment ago (a merge, a branch) may not be measured yet: its bounds are then a point, and
       // it would "fit" anywhere. Give it at least a card's size, and a picked card the room its tray takes below.
@@ -88,7 +100,7 @@ function Camera() {
         height: Math.max(measured.height, CARD_MIN.height) + (active ? TRAY_ROOM : 0),
       };
       // zoom out only for a set of hits that can't fit at this zoom, never past readable
-      const z = active ? zoom : Math.max(0.5, Math.min(zoom, clear.width / b.width, clear.height / b.height));
+      const z = fitAll ? Math.max(MIN_READABLE, Math.min(zoom, clear.width / b.width, clear.height / b.height)) : zoom;
       // a zoom change scales the board about the pane's corner; then it pans
       const ox = x * (z / zoom);
       const oy = y * (z / zoom);

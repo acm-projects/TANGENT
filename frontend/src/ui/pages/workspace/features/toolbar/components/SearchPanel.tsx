@@ -88,7 +88,7 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
               <li key={r.id}>
                 <button type="button" className="search-result" aria-current={r.id === activeNodeId || undefined} onClick={() => open(r.id)}>
                   <span className="search-result-head">
-                    <span className="search-result-address">{r.address ?? "—"}</span>
+                    {r.address && <span className="search-result-address">{r.address}</span>}
                     <span className="search-result-title">{r.title}</span>
                   </span>
                   <span className="search-result-snippet">
