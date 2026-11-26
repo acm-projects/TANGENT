@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useState } from "react";
+import { memo, useDeferredValue, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -28,7 +28,7 @@ type MessageBubbleProps = {
   onRetry?: () => void;
   /** Edit this question (`seq` of `nodeId`): asked again, reworded, on a new branch beside this one. Omitted while
    * streaming, and on questions that can't be (the case's first, Gent's, answer sheets). */
-  onEdit?: (nodeId: string, seq: number, content: string) => void;
+  onEdit?: (nodeId: string, seq: number, content: string) => Promise<boolean>;
   /** true for the reply that is still arriving */
   streaming?: boolean;
   /** how a reply's markdown elements render (Gent's report links the cards it names); keep it a stable object */
@@ -54,9 +54,16 @@ function answersIn(content: string) {
   return pairs.length ? pairs : null;
 }
 
-function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (content: string) => void }) {
+function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (content: string) => Promise<boolean> }) {
   const answers = answersIn(message.content);
   const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // focus goes back to Edit when the field closes without a new branch (with one, the new card's field takes it)
+  const editButton = useRef<HTMLButtonElement>(null);
+  const close = () => {
+    setDraft(null);
+    requestAnimationFrame(() => editButton.current?.focus());
+  };
   if (answers) {
     return (
       // the user's answers to a card's questions: an answer sheet, each question with the answer they ticked
@@ -92,11 +99,16 @@ function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (cont
           <EditSlip
             draft={draft}
             onChange={setDraft}
-            onCancel={() => setDraft(null)}
-            onSave={() => {
+            saving={saving}
+            onCancel={close}
+            onSave={async () => {
               const text = draft.trim();
-              setDraft(null);
-              if (text && text !== message.content.trim()) onEdit?.(text);
+              if (!text || text === message.content.trim()) return close();
+              // the reworded text stays in the field until its branch exists: a refusal or failure keeps it
+              setSaving(true);
+              const made = (await onEdit?.(text)) ?? false;
+              setSaving(false);
+              if (made) setDraft(null);
             }}
           />
         ) : (
@@ -107,7 +119,7 @@ function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (cont
         ))}
       {onEdit && draft === null && message.author !== "gent" && (
         <Frame direction="row" gap="1" className="message-actions message-user-actions">
-          <Button hierarchy="tertiary" size="s" icon="edit" showIcon label="Edit" onClick={() => setDraft(message.content)} />
+          <Button ref={editButton} hierarchy="tertiary" size="s" icon="edit" showIcon label="Edit" onClick={() => setDraft(message.content)} />
         </Frame>
       )}
     </Frame>
@@ -115,7 +127,7 @@ function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (cont
 }
 
 /** The question being reworded: Enter (or Branch) saves, Esc cancels, Shift+Enter is a new line. */
-function EditSlip({ draft, onChange, onCancel, onSave }: { draft: string; onChange(v: string): void; onCancel(): void; onSave(): void }) {
+function EditSlip({ draft, saving, onChange, onCancel, onSave }: { draft: string; saving: boolean; onChange(v: string): void; onCancel(): void; onSave(): void }) {
   return (
     <Panel stock="slip" ruled="margin" elevation="floating" className="message-user-bubble message-user-editing">
       <TextArea
@@ -128,7 +140,7 @@ function EditSlip({ draft, onChange, onCancel, onSave }: { draft: string; onChan
           if (e.key === "Escape") {
             e.preventDefault();
             onCancel();
-          } else if (e.key === "Enter" && !e.shiftKey) {
+          } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             onSave();
           }
@@ -139,7 +151,7 @@ function EditSlip({ draft, onChange, onCancel, onSave }: { draft: string; onChan
         <Text as="span" size="xs" hierarchy="tertiary" content="Asks it on a new branch; this one stays." />
         <Frame direction="row" gap="1">
           <Button hierarchy="tertiary" size="s" label="Cancel" onClick={onCancel} />
-          <Button hierarchy="primary" size="s" icon="call_split" showIcon label="Branch" onClick={onSave} disabled={!draft.trim()} />
+          <Button hierarchy="primary" size="s" icon="call_split" showIcon label={saving ? "Branching…" : "Branch"} onClick={onSave} disabled={saving || !draft.trim()} />
         </Frame>
       </Frame>
     </Panel>

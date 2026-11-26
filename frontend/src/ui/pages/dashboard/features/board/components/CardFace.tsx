@@ -1,6 +1,7 @@
 import type { ProjectSummary } from "@/api/types";
 import { Panel, Text } from "@/ui/library";
 import { useIsLastCase } from "@/ui/features/last-case/lastCase";
+import { fileNumber } from "@/ui/features/case-file/fileNumber";
 import { tiltOf } from "../sketch";
 import { useTreePreview } from "../useTreePreview";
 import { CaseSketch } from "./CaseSketch";
@@ -12,9 +13,6 @@ import { CaseSketch } from "./CaseSketch";
  * between them is a clean zoom. */
 
 const created = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-
-/** The case's file number, as the workspace's case label shows it: the first four digits of its id. */
-const fileNumber = (id: string) => id.replace(/-/g, "").slice(0, 4).toUpperCase();
 
 export function CardFace({ project }: { project: ProjectSummary }) {
   const last = useIsLastCase(project.id);

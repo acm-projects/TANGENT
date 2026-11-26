@@ -320,27 +320,31 @@ export function useChat() {
   /** Edit the question `seq` of `nodeId`: the original stays, and the edited question is asked on a new branch
    * beside it (the conversation up to that question, then the new wording). A node's first question branches from
    * its parent; anywhere later, the node is cut just before the question. The case's own first question can't be. */
-  async function edit(nodeId: string, seq: number, content: string) {
+  // Resolves whether the new branch was made (the caller keeps the reworded text until it was). Refused only while
+  // this card's own reply streams: the server can't cut a card mid-reply, and that's when the Edit button hides too.
+  async function edit(nodeId: string, seq: number, content: string): Promise<boolean> {
     const text = content.trim();
     const store = useTreeStore.getState();
     const chats = store.chatsByNode[nodeId] ?? [];
     const at = chats.findIndex((m) => m.seq === seq && m.role === "user");
-    if (!text || at < 0 || Object.keys(store.streaming).length) return;
+    if (!text || at < 0 || nodeId in store.streaming) return false;
     setError(null);
     try {
       if (at > 0) await splitNode(nodeId, at - 1);
       else {
         const parent = store.nodesById[nodeId]?.parent_id;
-        if (!parent) return;
+        if (!parent) return false;
         await forkNode(parent);
       }
     } catch (e: unknown) {
       setError(apiErrorMessage(e, "Could not make the new branch."));
-      return;
+      return false;
     }
     // the new branch is selected once the server has made it (a placeholder id means it hasn't, or it moved to a copy)
     const id = useTreeStore.getState().activeNodeId;
-    if (id && !isPending(id) && id !== nodeId) await ask(id, text, false);
+    if (!id || isPending(id) || id === nodeId) return false;
+    void ask(id, text, false);
+    return true;
   }
 
   // Stable handles for the history's actions: MessageBubble is memoised, and a new function every render (every
@@ -353,7 +357,7 @@ export function useChat() {
     () => ({
       branch: (nodeId: string, seq: number) => latest.current.branch(nodeId, seq),
       retry: () => latest.current.retry(),
-      edit: (nodeId: string, seq: number, content: string) => latest.current.edit(nodeId, seq, content),
+      edit: (nodeId: string, seq: number, content: string): Promise<boolean> => latest.current.edit(nodeId, seq, content),
     }),
     [],
   );

@@ -2,10 +2,10 @@
 
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
-import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
 import { useDebateStore } from "@/store/debateStore";
 import { StartDebate } from "../debate/components/StartDebate";
+import { putCardBack } from "../mindmap/nodeActions";
 import { useSearchHighlight } from "./searchHighlight";
 import { MergeChoices, MergeStack, mergeKey } from "./components/MergeStack";
 import { VerdictCard } from "../debate/components/VerdictCard";
@@ -35,17 +35,20 @@ const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumF
 
 /** Narrowest the docked sheet drags to, and how far an arrow key moves it (px). */
 const MIN_WIDTH = 360;
+/** The toolbar column a dragged sheet leaves clear, px: Chat.css --toolbar-room (5rem + space-2) at the 16px root. */
+const TOOLBAR_ROOM = 88;
 const KEY_STEP = 32;
 type ChatProps = { className?: string };
 
 type HistoryListProps = {
   items: HistoryItem[];
   activeNodeId: string | null;
-  streaming: string | null;
+  /** a reply is arriving on the picked card (a boolean, not the text: the list mustn't re-render per token) */
+  streaming: boolean;
   canRetry: boolean;
   branch: (nodeId: string, seq: number) => void;
   retry: () => Promise<void>;
-  edit: (nodeId: string, seq: number, content: string) => void;
+  edit: (nodeId: string, seq: number, content: string) => Promise<boolean>;
 };
 
 function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, edit }: HistoryListProps) {
@@ -80,7 +83,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
             )}
             {/* a question card: what was asked, and the answer that led on down this thread */}
             {item.node.node_type === "question" && item.node.question && (
-              <QuestionRecord node={item.node} next={(() => { const n = items[i + 1]; return n?.kind === "node" ? n.node.id : undefined; })()} />
+              <QuestionRecord node={item.node} next={nextNodeId(items, i)} />
             )}
             {item.messages === undefined && (
               <Frame as="li">
@@ -94,15 +97,15 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
                 nodeId={item.node.id}
                 projectId={item.node.project_id}
                 // a node can't be cut while its reply is still arriving
-                onBranch={streaming !== null && isActive ? undefined : branch}
+                onBranch={streaming && isActive ? undefined : branch}
                 // only the newest reply on the card being written on can be asked again
                 onRetry={canRetry && isActive && j === all.length - 1 ? retry : undefined}
                 // any question but the case's very first can be reworded onto a new branch (not mid-reply)
-                onEdit={streaming === null && (item.node.parent_id || j > 0) ? edit : undefined}
+                onEdit={!streaming && (item.node.parent_id || j > 0) ? edit : undefined}
               />
             ))}
             {/* only the card being written on needs the hint; an empty card above it is just its divider */}
-            {item.messages?.length === 0 && streaming === null && isActive && item.node.node_type !== "question" && (
+            {item.messages?.length === 0 && !streaming && isActive && item.node.node_type !== "question" && (
               <Frame as="li" className="chat-hint">
                 <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
               </Frame>
@@ -134,8 +137,18 @@ export function Chat({ className }: ChatProps) {
   const sheetRef = useRef<HTMLElement>(null);
 
   // The sheet sits on the right, so its width is how far the left edge is from its right edge.
-  // 88px: the toolbar column stays visible, as in full screen (--toolbar-room in Chat.css).
-  const resizeTo = (px: number) => setWidth(Math.round(Math.min(Math.max(px, MIN_WIDTH), window.innerWidth - 88)));
+  // The widest it may go: the toolbar column stays visible, as in full screen.
+  const maxWidth = () => window.innerWidth - TOOLBAR_ROOM;
+  const resizeTo = (px: number) => setWidth(Math.round(Math.min(Math.max(px, MIN_WIDTH), maxWidth())));
+  // the handle's current value and range, for assistive tech: measured, since the default width is CSS
+  const [measured, setMeasured] = useState<{ now: number; max: number } | null>(null);
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    const watch = new ResizeObserver(() => setMeasured({ now: Math.round(el.offsetWidth), max: Math.round(maxWidth()) }));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
   const currentWidth = () => sheetRef.current?.getBoundingClientRect().width ?? MIN_WIDTH;
   // the cards above the picked one on its thread, for the breadcrumb
   const path = chat.history.flatMap((item) => (item.kind === "node" && item.node.id !== chat.activeNodeId ? [item.node.title ?? "Untitled card"] : []));
@@ -161,7 +174,7 @@ export function Chat({ className }: ChatProps) {
   );
   // an open search marks its words in the thread too, and brings the picked card's first one into view
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  useSearchHighlight(scroller, chat.activeNodeId, `${chat.activeNodeId}:${loaded}`);
+  useSearchHighlight(scroller, chat.activeNodeId, `${chat.activeNodeId}:${loaded}:${JSON.stringify(fronts)}`);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -181,6 +194,11 @@ export function Chat({ className }: ChatProps) {
       el.removeEventListener("scroll", onScroll);
     };
   }, [scrollKey]);
+
+  // Leaving the card leaves full screen too (Esc, ×): a full-screen sheet with nothing on it would be a dead end.
+  useEffect(() => {
+    if (!activeNode && layout === "expanded") setLayout("docked");
+  }, [activeNode, layout, setLayout]);
 
   // No card picked: the sheet waits off the board's right edge. Still mounted (and inert), so a half-written
   // draft survives, and it comes back along the same path it left by.
@@ -208,7 +226,8 @@ export function Chat({ className }: ChatProps) {
           aria-orientation="vertical"
           aria-label="Resize chat"
           aria-valuemin={MIN_WIDTH}
-          aria-valuenow={width ?? undefined}
+          aria-valuenow={measured?.now}
+          aria-valuemax={measured?.max}
           tabIndex={0}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -259,10 +278,7 @@ export function Chat({ className }: ChatProps) {
             icon="close"
             showIcon
             showLabel={false}
-            onClick={() => {
-              if (layout === "expanded") setLayout("docked");
-              useTreeStore.getState().setActive(null);
-            }}
+            onClick={putCardBack}
           />
         </Frame>
 
@@ -289,7 +305,7 @@ export function Chat({ className }: ChatProps) {
               <Text size="s" hierarchy="tertiary" content="Ask below to start its thread." />
             </Frame>
           ) : (
-            <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
+            <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-busy={chat.streaming !== null} aria-label="Conversation">
               {folded > 0 && (
                 <Frame as="li" align="center" className="chat-earlier">
                   <Button
@@ -305,7 +321,7 @@ export function Chat({ className }: ChatProps) {
               <HistoryList
                 items={folded ? chat.history.slice(folded) : chat.history}
                 activeNodeId={chat.activeNodeId}
-                streaming={chat.streaming}
+                streaming={chat.streaming !== null}
                 canRetry={chat.canRetry}
                 branch={chat.branch}
                 retry={chat.retry}
@@ -431,4 +447,10 @@ function CourtButton({ nodeId, projectId }: { nodeId: string; projectId: string 
       </Popup>
     </>
   );
+}
+
+/** The card right after `i` in the thread, if the next item is a card (not a merge). */
+function nextNodeId(items: HistoryItem[], i: number): string | undefined {
+  const n = items[i + 1];
+  return n?.kind === "node" ? n.node.id : undefined;
 }

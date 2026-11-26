@@ -15,3 +15,10 @@ export const spring = {
    * you hand a time-defined spring. ~1.7 swings a second, damping ratio ~0.4. */
   swing: { type: "spring", stiffness: 120, damping: 9, mass: 1 },
 } as const;
+
+/** True when the user asked for less motion: JS-driven motion must check it itself (motion.css covers CSS). */
+export const prefersReducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** How long a camera glide on the map takes (ms): moving the board to keep a card in view. 0 with reduced motion,
+ * so the board just cuts there. */
+export const glideMs = (scale = 1) => (prefersReducedMotion() ? 0 : 450 * scale);

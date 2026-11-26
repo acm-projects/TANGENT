@@ -1,6 +1,6 @@
 import { api, apiClient, followMessage, getAccessToken } from "@/api";
 import { useTreeStore } from "@/store/treeStore";
-import { refreshTree } from "../mindmap/nodeActions";
+import { loadChats, refreshTree } from "../mindmap/nodeActions";
 
 /** After a reload, pick back up every reply of the user's still being written in `projectId`: each streams into
  * the store as if it had never stopped (the question, what was sent so far, then the rest), and the node is
@@ -16,6 +16,9 @@ export async function followLiveReplies(projectId: string, signal: AbortSignal):
 async function follow(nodeId: string, signal: AbortSignal): Promise<void> {
   const s = () => useTreeStore.getState();
   const projectId = () => s().nodesById[nodeId]?.project_id;
+  // the card's saved messages first: the reply goes on after them, and a history fetched later can't overwrite it
+  await loadChats(nodeId);
+  if (signal.aborted) return;
   const followed = await followMessage({
     baseURL: "/api",
     nodeId,

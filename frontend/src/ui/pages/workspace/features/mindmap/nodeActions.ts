@@ -486,3 +486,12 @@ export async function reopenNode(nodeId: string) {
     throw e;
   }
 }
+
+/** Put the picked card back on the board (the sheet slides away with it), with keyboard focus going to that card
+ * rather than falling to the page, since the sheet it was in turns inert. */
+export function putCardBack() {
+  const id = useTreeStore.getState().activeNodeId;
+  useTreeStore.getState().setActive(null);
+  if (!id) return;
+  requestAnimationFrame(() => document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"] .mindmap-node`)?.focus({ preventScroll: true }));
+}

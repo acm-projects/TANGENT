@@ -23,9 +23,11 @@ export function IdBadge({ account }: { account: Account }) {
   const still = useReducedMotion();
 
   useEffect(() => {
+    // with reduced motion it just hangs there, no swing in
+    if (still) return void rotate.set(REST);
     const hang = animate(rotate, REST, spring.pin);
     return () => hang.stop();
-  }, [rotate]);
+  }, [rotate, still]);
 
   function knock(e: PointerEvent<HTMLDivElement>) {
     if (still) return;

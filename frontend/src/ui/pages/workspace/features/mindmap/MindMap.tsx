@@ -8,9 +8,10 @@ import { apiErrorMessage } from "@/api";
 import { useShallow } from "zustand/react/shallow";
 import { selectThread, useTreeStore } from "@/store/treeStore";
 import { Frame, Loading, Panel, Text } from "@/ui/library";
-import { spring } from "@/ui/library/tokens/motion";
+import { glideMs, spring } from "@/ui/library/tokens/motion";
 import { MapProject, Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
-import { mergeNodes } from "./nodeActions";
+import { mergeNodes, putCardBack } from "./nodeActions";
+import { fileNumber } from "@/ui/features/case-file/fileNumber";
 import { StringEdge } from "./components/StringEdge";
 import { toFlow } from "./toFlow";
 import { useMindMap } from "./useMindMap";
@@ -29,7 +30,6 @@ const OPEN_PADDING = { top: "14%", bottom: "18%", left: "10%", right: "6%" } as 
 /** The gap the camera keeps between a card and anything covering the board, and the room kept under it for Gent's dock. */
 const MARGIN = 48;
 const DOCK_ROOM = 96;
-const GLIDE_MS = 450;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -64,7 +64,7 @@ function Camera() {
     if (active || !pushed.current) return;
     const { from, to } = pushed.current;
     pushed.current = null;
-    if (same(getViewport(), to)) void setViewport(from, { duration: GLIDE_MS });
+    if (same(getViewport(), to)) void setViewport(from, { duration: glideMs() });
   }, [active, getViewport, setViewport]);
 
   // a picked card, or the search's hits: moved into the clear only if they're out of it
@@ -95,7 +95,7 @@ function Camera() {
         const run = pushed.current && same({ x, y, zoom }, pushed.current.to) ? pushed.current.from : { x, y, zoom };
         pushed.current = { from: run, to };
       }
-      void setViewport(to, { duration: GLIDE_MS });
+      void setViewport(to, { duration: glideMs() });
     });
     return () => cancelAnimationFrame(raf);
   }, [active, hits, getNodesBounds, getViewport, setViewport]);
@@ -111,7 +111,7 @@ function Camera() {
       const z = Math.min(1, Math.max(getViewport().zoom, 0.8));
       const cx = node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2;
       const cy = node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2;
-      void setViewport({ x: clear.x + clear.width / 2 - cx * z, y: clear.y + clear.height / 2 - cy * z, zoom: z }, { duration: GLIDE_MS * 1.3 });
+      void setViewport({ x: clear.x + clear.width / 2 - cx * z, y: clear.y + clear.height / 2 - cy * z, zoom: z }, { duration: glideMs(1.3) });
     });
     return () => cancelAnimationFrame(raf);
   }, [flyTo, getInternalNode, getViewport, setViewport]);
@@ -151,7 +151,7 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
   const setActive = useTreeStore((s) => s.setActive);
   const projectName = useTreeStore((s) => s.project?.project_name);
   // the plate's number: the first four digits of the project's id, upper-cased, stable per case
-  const caseNumber = useTreeStore((s) => (s.project?.id ?? "").replace(/-/g, "").slice(0, 4).toUpperCase());
+  const caseNumber = useTreeStore((s) => fileNumber(s.project?.id ?? ""));
   const cardCount = Object.keys(structure.nodesById).length;
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
   const [stagger, setStagger] = useState(true);
@@ -180,11 +180,11 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
       const t = e.target as HTMLElement | null;
       if (t?.closest("input, textarea, select, [contenteditable], dialog[open], [role='dialog'], [role='menu']")) return;
       if (document.querySelector("dialog[open]")) return;
-      setActive(null);
+      putCardBack();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [picked, mergeFrom, setActive]);
+  }, [picked, mergeFrom]);
   const merge = useMemo(
     () => ({
       from: mergeFrom,

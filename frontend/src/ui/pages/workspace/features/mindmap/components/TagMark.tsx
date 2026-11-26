@@ -1,6 +1,6 @@
 import { TAG_HEX, type TagColor, type TagShape } from "@/api/types";
 
-/* A coloured tag: a flag or a pin (Material "flag" and "push_pin" outlines), filled in one of the four tag colours with
+/* A coloured tag: a flag or a pin (Material "flag" and "push_pin" outlines), filled in one of the eight tag colours with
  * a paper edge so it holds on the card and on the board. Graphics only: the colour never touches text. On the map it
  * is pinned over a card's top-right corner; the picker uses it as the shape preview (and sets aria-hidden). Styles in
  * ../MindMap.css. */

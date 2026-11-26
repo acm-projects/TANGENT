@@ -34,11 +34,14 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
 
   useEffect(() => {
     if (!open) return;
+    // on document, ahead of the map's window listener: Escape closes the panel and nothing else
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(null);
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      setOpen(null);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   return (

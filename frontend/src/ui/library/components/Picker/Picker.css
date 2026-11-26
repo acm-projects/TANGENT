@@ -64,10 +64,12 @@
   .picker-list {
     /* the chosen option's pin: the user's red; a consumer's list can make it someone else's (Gent's blue) */
     --picker-mark: var(--color-string);
+    /* the room on the side it opens to; Picker.tsx sets it from where the list is placed */
+    --picker-room: 100vh;
     position: fixed;
     z-index: 60;
     max-width: min(24rem, calc(100vw - 1rem));
-    max-height: min(22rem, 60vh, var(--picker-room, 100vh));
+    max-height: min(22rem, 60vh, var(--picker-room));
     overflow-y: auto;
     overscroll-behavior: contain;
     margin: 0;

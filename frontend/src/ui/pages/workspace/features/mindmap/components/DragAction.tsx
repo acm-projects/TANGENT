@@ -32,7 +32,7 @@ const OUTLINE = 7;
 
 /** The card's box grown out to its dotted outline, in screen px: the string starts on the outline, and the zones are measured from it.
  * Built from the card's own size around its centre, not its bounding rect: the card tilts on hover, and a tilted card's bounding
- * rect is a few px taller than the card. Read fresh on every move, as the card is still settling from its hover lift. */
+ * rect is a few px taller than the card. Measured once, as the press becomes a drag (see the header). */
 function outlineBox(card: HTMLElement, zoom: number): DOMRect {
   const r = card.getBoundingClientRect();
   const w = (card.offsetWidth + 2 * OUTLINE) * zoom;
@@ -147,17 +147,27 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
     mark(null);
     setDrag(null);
   };
-  useEffect(() => () => unlisten.current?.(), []); // a card removed mid-drag drops its listeners
+  // a card removed mid-drag drops its listeners, and the merge outline it put on another card
+  useEffect(
+    () => () => {
+      unlisten.current?.();
+      target.current?.removeAttribute("data-merge-target");
+    },
+    [],
+  );
 
   // Escape drops the drag; letting go afterwards does nothing (end() forgets the press).
   const dragging = drag !== null;
   useEffect(() => {
     if (!dragging) return;
+    // on document, which hears it before the map's window listener; preventDefault tells the map it's handled
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") end();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      end();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [dragging]);
 
   function move(e: globalThis.PointerEvent) {

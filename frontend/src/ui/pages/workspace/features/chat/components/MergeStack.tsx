@@ -7,8 +7,8 @@ import { spring } from "@/ui/library/tokens/motion";
 import type { HistoryItem } from "../useChat";
 
 /* A merge in the thread, as paper: the joined branches are pages clipped together, one in front (its thread shown
- * in full), the others behind with their tabs peeking out over the top. Pick a tab (or a choice in the sheet's path
- * bar) and the front page slides down behind the stack while the picked one comes forward. A branch that holds a
+ * in full), the others behind with their tabs peeking out over the top. Pick a tab and the front page slides down
+ * behind the stack while the picked one comes forward. A branch that holds a
  * merge of its own shows its own stack inside its page, so merges nest the same way at any depth.
  *
  * Which page is in front is only what's being read: the merged card's context always holds every branch, so flipping

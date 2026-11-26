@@ -82,7 +82,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   useEffect(() => {
     if (!pinned) return;
     const away = (e: PointerEvent) => wrapRef.current?.contains(e.target as Node) || release();
-    const escape = (e: KeyboardEvent) => e.key === "Escape" && release();
+    // handled here, so the map doesn't also put the picked card back (MindMap's Escape skips defaultPrevented)
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      release();
+    };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", escape);
     return () => {

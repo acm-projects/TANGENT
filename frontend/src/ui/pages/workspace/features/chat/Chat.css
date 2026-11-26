@@ -83,14 +83,6 @@
   outline: none;
 }
 
-/* the sheet slides in from the right when the panel opens */
-@starting-style {
-  .chat {
-    translate: 2rem 0;
-    opacity: 0;
-  }
-}
-
 .chat[data-layout="expanded"] {
   /* full screen, leaving the toolbar column visible */
   --chat-width: calc(100% - var(--toolbar-room));

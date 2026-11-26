@@ -161,8 +161,20 @@
   color: var(--color-text-muted);
 }
 
+/* the case you were last in: full-strength text (the red alone is too faint on card at night) behind a red dot */
 .case-card-last .case-card-kicker {
-  color: var(--color-string);
+  color: var(--color-text);
+}
+
+.case-card-last .case-card-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-right: 0.4em;
+  border-radius: var(--radius-full);
+  background: var(--color-string);
+  vertical-align: 0.05em;
 }
 
 /* a case with one card: no tree to draw yet, just a word on the blank photo */
