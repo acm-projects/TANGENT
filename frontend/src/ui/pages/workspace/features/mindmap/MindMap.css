@@ -616,8 +616,9 @@
   position: relative;
 }
 
-/* More's options stack upward from the button, centred over it (the motion
- * is in MindMapNode.tsx). More sits above them, so they slide out from behind it. */
+/* More's options stack upward from the button, their right edges on its right edge, so their labels run left
+ * over the card they act on, not off past the tray (the motion is in MindMapNode.tsx). More sits above them,
+ * so they slide out from behind it. */
 .mindmap-node-more > [data-component="button"] {
   position: relative;
   z-index: 1;
@@ -625,18 +626,24 @@
 
 .mindmap-node-more-list {
   position: absolute;
-  left: 50%;
+  right: 0;
   bottom: 100%;
-  translate: -50% 0;
   display: flex;
   flex-direction: column-reverse;
-  align-items: center;
+  /* one width for the stack (its widest label), each option's icon and label starting at the same edge */
+  align-items: stretch;
   gap: var(--space-2);
   padding-bottom: var(--space-2);
 }
 
 /* The list sits over the card, so a disabled option keeps its paper opaque
  * and dims only its icon. */
+.mindmap-node-more-list [data-component="button"] {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
 .mindmap-node-more-list :disabled {
   opacity: 1;
 

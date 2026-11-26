@@ -10,7 +10,9 @@
    * chat would widen the page past the screen and push the right-aligned sheet out of view */
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   height: 100dvh;
-  overflow: hidden;
+  /* clip, not hidden: a hidden box can still be scrolled by focus() or scrollIntoView on something off its edge,
+   * which slid the whole board, toolbar and all, half a screen sideways */
+  overflow: clip;
   /* the page's lighting over the cork Panel: dark corners, the lamp's pool, then the cork and board colour */
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }

@@ -578,7 +578,8 @@ const ENDING_ICONS: Record<Ending, string> = {
 type FanOption = { icon: string; label: string; disabled?: boolean; onClick: (e: MouseEvent) => void };
 
 /** A tray button that fans its options up out from behind it, one after another, and tucks them back in when it
- * closes. Options are listed bottom-up: the first sits just above the button. */
+ * closes. Options are listed bottom-up: the first sits just above the button. Each says what it does: an icon
+ * alone (a no-entry sign, a pin with a cross) leaves the reader guessing. */
 function Fan({ open, onToggle, icon, label, options }: {
   open: boolean;
   onToggle: () => void;
@@ -588,7 +589,7 @@ function Fan({ open, onToggle, icon, label, options }: {
 }) {
   return (
     <Frame gap="0" align="center" className="mindmap-node-more">
-      <Frame gap="2" align="center" className="mindmap-node-more-list" role="group" aria-label={`${label} options`}>
+      <Frame gap="2" className="mindmap-node-more-list" role="group" aria-label={`${label} options`}>
         <AnimatePresence>
           {open &&
             options.map((option, i) => {
@@ -602,10 +603,8 @@ function Fan({ open, onToggle, icon, label, options }: {
                 >
                   <Button
                     size="l"
-                    title={option.label}
                     elevation="floating"
                     showIcon
-                    showLabel={false}
                     icon={option.icon}
                     label={option.label}
                     disabled={option.disabled}
