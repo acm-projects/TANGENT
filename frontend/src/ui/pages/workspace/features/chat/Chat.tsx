@@ -408,6 +408,7 @@ export function Chat({ className }: ChatProps) {
 
         <MessageField
           blocker={chat.blocker}
+          branching={chat.branchesOnSend}
           onStop={chat.stop}
           models={chat.models}
           selectedModel={chat.selectedModel}

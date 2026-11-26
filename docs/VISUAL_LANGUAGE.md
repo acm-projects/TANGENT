@@ -287,3 +287,5 @@ plain paper with an empty dashed socket while he's out working.
 - **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).
 - **The board breathes.** Leaf columns are 340px apart and generations 240px, so neighbouring cards keep
   about 70px of cork between them.
+- **You can always ask.** A card with branches takes no more messages of its own, so its field says "Sends on a
+  new branch from this card" (in red, before you write) and sending makes that branch from its last reply.

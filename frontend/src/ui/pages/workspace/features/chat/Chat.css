@@ -911,6 +911,12 @@
   scale: 1 1;
 }
 
+/* on a card with branches: where the message will go, always shown, in the user's red (it's their new branch) */
+.message-field-branching {
+  margin-left: auto;
+  color: var(--color-string);
+}
+
 /* the keys, shown only while writing */
 .message-field-hint {
   opacity: 0;

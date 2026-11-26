@@ -13,7 +13,6 @@ import type { SendBlocker } from "../useChat";
 const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   ready: "Message…",
   "no-selection": "Select a node on the map to write here.",
-  "not-leaf": "This node has branches. Use Branch on a reply to continue from it.",
   question: "Answer the question on its card to go on.",
   streaming: "Waiting for the reply…",
   pending: "Message…",
@@ -21,6 +20,8 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
 
 type MessageFieldProps = {
   blocker: SendBlocker;
+  /** this card has branches: a message sent here starts a new branch from its last reply */
+  branching?: boolean;
   models: AvailableModel[];
   selectedModel: string;
   modelLocked: boolean;
@@ -34,7 +35,7 @@ type MessageFieldProps = {
   onStop(): void;
 };
 
-export function MessageField({ blocker, models, selectedModel, modelLocked, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
+export function MessageField({ blocker, branching = false, models, selectedModel, modelLocked, modelsLoading, onModelChange, onSend, onStop, className, about }: MessageFieldProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   // true for the moment the card is stamped down as a message leaves it (Chat.css)
@@ -135,14 +136,24 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
               onClick={() => fileInput.current?.click()}
             />
           </Frame>
-          <Text as="span" size="xxs" hierarchy="tertiary" className="message-field-hint" content="Enter to send · Shift+Enter for a new line" />
+          {/* said up front, not after: this card already has branches, so the message starts another */}
+          {branching ? (
+            <Frame direction="row" gap="1" align="center" className="message-field-branching">
+              <Icon icon="call_split" size="xs" />
+              <Text as="span" size="xxs" content="Sends on a new branch from this card" />
+            </Frame>
+          ) : (
+            <Text as="span" size="xxs" hierarchy="tertiary" className="message-field-hint" content="Enter to send · Shift+Enter for a new line" />
+          )}
         </Frame>
 
         <Frame direction="row" gap="3" align="end" className="message-field-body">
           <TextArea
             ref={input}
             aria-label="Message"
-            placeholder={(blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]}
+            placeholder={
+              branching ? "Ask a follow-up…" : (blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]
+            }
             value={text}
             disabled={disabled}
             onChange={(e) => setText(e.target.value)}

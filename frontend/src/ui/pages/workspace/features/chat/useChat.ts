@@ -59,7 +59,7 @@ function buildHistory(
 }
 
 /** Why the message box is disabled, or null when the user can send. */
-export type SendBlocker = "no-selection" | "not-leaf" | "question" | "streaming" | "pending" | null;
+export type SendBlocker = "no-selection" | "question" | "streaming" | "pending" | null;
 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
@@ -149,19 +149,32 @@ export function useChat() {
       ? "pending"
       : streaming !== null
       ? "streaming"
-      : // A UI hint only. The server is what actually enforces it (ARCHITECTURE.md §8).
-        !isLeaf
-        ? "not-leaf"
-        : // a question card is answered on its card, not written on
-          nodesById[activeNodeId]?.node_type === "question"
-          ? "question"
-          : null;
+      : // a question card is answered on its card, not written on
+        nodesById[activeNodeId]?.node_type === "question"
+        ? "question"
+        : null;
+  // A card with branches takes no more messages of its own (the server enforces it, ARCHITECTURE.md §8): a message
+  // sent there goes on a new branch from its last reply instead, so the user can always just ask.
+  const branchesOnSend = blocker === null && !isLeaf;
 
-  /** Send a prompt to the selected leaf and stream the reply into the store. */
+  /** Send a prompt to the selected card and stream the reply into the store. On a card with branches, a new branch is
+   * made from its last reply first, and the prompt goes there. */
   async function send(content: string, files: File[] = []) {
-    const nodeId = useTreeStore.getState().activeNodeId;
+    let nodeId = useTreeStore.getState().activeNodeId;
     const text = content.trim();
     if (!nodeId || blocker || nodeId in useTreeStore.getState().streaming || !text) return;
+    if (branchesOnSend) {
+      try {
+        await forkNode(nodeId);
+      } catch (e: unknown) {
+        setError(apiErrorMessage(e, "Could not start a new branch; nothing was sent."));
+        return;
+      }
+      // the new branch is picked once the server has made it (still a placeholder: it moved to a copy, or failed)
+      const made = useTreeStore.getState().activeNodeId;
+      if (!made || isPending(made) || made === nodeId) return;
+      nodeId = made;
+    }
     if (files.length > 0) {
       const projectId = useTreeStore.getState().nodesById[nodeId]?.project_id;
       if (!projectId) return;
@@ -177,7 +190,7 @@ export function useChat() {
 
   /** The selected leaf's last reply can be regenerated (it ends in a question and its answer). */
   const lastChats = activeNodeId ? chatsByNode[activeNodeId] : undefined;
-  const canRetry = blocker === null && lastChats !== undefined && lastChats.length >= 2 && lastChats.at(-1)!.role === "assistant" && lastChats.at(-2)!.role === "user";
+  const canRetry = blocker === null && isLeaf && lastChats !== undefined && lastChats.length >= 2 && lastChats.at(-1)!.role === "assistant" && lastChats.at(-2)!.role === "user";
 
   /** Regenerate the selected leaf's last reply. Optimistic: the old reply goes at once and the question is asked
    * again; if nothing new is saved (an error, or stopped before a token) the old exchange is put back. */
@@ -364,6 +377,8 @@ export function useChat() {
 
   return {
     activeNodeId,
+    /** sending from this card goes on a new branch (it has branches of its own) */
+    branchesOnSend,
     activeNode,
     activeExhibit: activeNodeId ? exhibits[activeNodeId] : undefined,
     historyIds,
