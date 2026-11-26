@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { apiErrorMessage } from "@/api";
 import { useShallow } from "zustand/react/shallow";
 import { selectThread, useTreeStore } from "@/store/treeStore";
-import { Frame, Loading, Panel, Text } from "@/ui/library";
+import { Frame, Link, Loading, Panel, Text } from "@/ui/library";
 import { glideMs, spring } from "@/ui/library/tokens/motion";
 import { MapProject, Merge, MindMapNode, ReportMapError, StaggerPinIn } from "./components/MindMapNode";
 import { mergeNodes, putCardBack } from "./nodeActions";
@@ -214,7 +214,16 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
       aria-label="Conversation map"
     >
       {load.status === "loading" && <Loading size="base" label="Loading map…" className="mindmap-status" />}
-      {load.status === "error" && <Text role="alert" className="mindmap-status" content={load.message} />}
+      {load.status === "error" && (
+        // a case that's gone (deleted, or a wrong link): say so and offer the way back
+        <Frame gap="3" align="center" className="mindmap-status mindmap-missing">
+          <Text role="alert" face="heading" size="l" content={load.message} />
+          <Text size="s" hierarchy="tertiary" content="It may have been deleted, or the link is wrong." />
+          <Link href={`/${slug}/dashboard`} className="mindmap-missing-back">
+            <Text as="span" size="s" content="Back to your cases" />
+          </Link>
+        </Frame>
+      )}
       <AnimatePresence>
         {actionError && (
           <motion.div
@@ -257,6 +266,10 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
           nodeOrigin={[0.5, 0]}
           nodesDraggable={false}
           nodesConnectable={false}
+          // strings aren't stops for the keyboard: Tab goes card to card
+          edgesFocusable={false}
+          // the card itself takes focus (MindMapNode); React Flow's wrapper round it would be a second stop
+          nodesFocusable={false}
           elementsSelectable={false}
           // Selection lives in the tree store, not in React Flow. Having a node
           // handler also matters mechanically: without one React Flow turns

@@ -15,6 +15,10 @@
   margin: auto;
 }
 
+.mindmap-missing {
+  text-align: center;
+}
+
 /* the docked chat covers the right half, so status sits where the tree will (fitViewOptions in MindMap.tsx) */
 @media (min-width: 48rem) {
   .mindmap-status {

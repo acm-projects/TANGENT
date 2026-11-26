@@ -123,6 +123,11 @@
   outline-offset: 2px;
 }
 
+.auth-error {
+  color: var(--color-danger);
+  text-align: center;
+}
+
 .auth-legal,
 .auth-switch {
   text-align: center;

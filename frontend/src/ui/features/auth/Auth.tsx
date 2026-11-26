@@ -47,6 +47,7 @@ export function Auth({ mode, next }: AuthProps) {
   const copy = COPY[mode];
   // Google's page can take a second to come up: hold the press until it does.
   const [leaving, setLeaving] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   // Back from Google, the browser may restore this page as it was left: let go of the press.
   useEffect(() => {
     const reset = () => setLeaving(false);
@@ -75,7 +76,14 @@ export function Auth({ mode, next }: AuthProps) {
           onClick={() => {
             setLeaving(true);
             // Absolute URL to the backend (see .env.example), not an internal Next page.
-            window.location.assign(googleLoginUrl(process.env.NEXT_PUBLIC_API_BASE_URL!, next));
+            const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+            // no backend address configured (a demo or local build): say so on the card, not a 404 page
+            if (!base) {
+              setLeaving(false);
+              setUnavailable(true);
+              return;
+            }
+            window.location.assign(googleLoginUrl(base, next));
           }}
         >
           <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20">
@@ -86,6 +94,8 @@ export function Auth({ mode, next }: AuthProps) {
           </svg>
           <Text as="span" size="s" content={leaving ? "Opening Google…" : "Continue with Google"} />
         </Panel>
+
+        {unavailable && <Text role="alert" size="s" className="auth-error" content="Sign-in isn't set up on this server (no backend address configured)." />}
 
         <Link href={copy.switchTo(next)} className="auth-switch">
           <Text size="s" hierarchy="tertiary" content={copy.switchText} />

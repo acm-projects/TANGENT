@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTreeStore } from "@/store/treeStore";
 import { apiErrorMessage } from "@/api";
 import type { DebateModels } from "@/api/types";
 import { Button, Frame, Loading, Panel, Select, Text, TextArea } from "@/ui/library";
@@ -23,6 +24,8 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
   const [rounds, setRounds] = useState(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // the example motion is about this card, not a stock one from another field
+  const cardTitle = useTreeStore((s) => s.nodesById[nodeId]?.title ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +74,7 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
       <Panel className="debate-start-topic">
         <TextArea
           aria-label="The motion before the court"
-          placeholder="The motion before the court, e.g. Microservices are the right start for a new product"
+          placeholder={cardTitle ? `The motion before the court, e.g. a claim about "${cardTitle}"` : "The motion before the court: a claim one side argues for and the other against"}
           value={topic}
           maxLength={2000}
           onChange={(e) => setTopic(e.target.value)}

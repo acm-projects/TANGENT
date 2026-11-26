@@ -160,8 +160,15 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
     if (c === "search") {
       const q = new URL(request.url).searchParams.get("q")?.toLowerCase() ?? "";
       const results = [...nodes.values()]
-        .filter((n) => n.project_id === b && (n.title ?? "").toLowerCase().includes(q))
-        .map((n) => ({ address: null, id: n.id, title: n.title ?? "", snippet: n.title ?? "" }));
+        .filter((n) => n.project_id === b)
+        .flatMap((n) => {
+          // the title, else the first message that has the words, as the snippet
+          if ((n.title ?? "").toLowerCase().includes(q)) return [{ address: null, id: n.id, title: n.title ?? "", snippet: n.title ?? "" }];
+          const hit = n.chats.find((m) => m.content.toLowerCase().includes(q));
+          if (!hit) return [];
+          const at = hit.content.toLowerCase().indexOf(q);
+          return [{ address: null, id: n.id, title: n.title ?? "", snippet: hit.content.slice(Math.max(0, at - 40), at + 80) }];
+        });
       return json({ results });
     }
     if (c === "gent") {

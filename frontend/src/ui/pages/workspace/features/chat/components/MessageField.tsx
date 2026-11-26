@@ -40,7 +40,6 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
   // true for the moment the card is stamped down as a message leaves it (Chat.css)
   const [sent, setSent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const imageInput = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
   // A branch or merge made a card to write on (treeStore requestCompose): be ready for typing.
@@ -135,15 +134,6 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
               disabled={disabled}
               onClick={() => fileInput.current?.click()}
             />
-            <Button
-              hierarchy="tertiary"
-              label="Attach image (not available yet)"
-              icon="image"
-              showIcon
-              showLabel={false}
-              disabled // images have no upload path: sources take PDFs only
-              onClick={() => imageInput.current?.click()}
-            />
           </Frame>
           <Text as="span" size="xxs" hierarchy="tertiary" className="message-field-hint" content="Enter to send · Shift+Enter for a new line" />
         </Frame>
@@ -194,17 +184,6 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
         ref={fileInput}
         type="file"
         accept="application/pdf"
-        multiple
-        hidden
-        onChange={(e) => {
-          addFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
-      <Input
-        ref={imageInput}
-        type="file"
-        accept="image/*"
         multiple
         hidden
         onChange={(e) => {

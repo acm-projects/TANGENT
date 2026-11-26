@@ -355,11 +355,14 @@
   color: var(--color-text-muted);
 }
 
+/* up to two lines: a paper's title needs its author and year and most of its name to be told apart */
 .source-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-family: var(--font-heading);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .source-card:hover .source-name {

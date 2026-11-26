@@ -2,10 +2,12 @@
 
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
+import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
 import { useDebateStore } from "@/store/debateStore";
 import { StartDebate } from "../debate/components/StartDebate";
 import { putCardBack } from "../mindmap/nodeActions";
+import { UNTITLED, UNTITLED_MERGE } from "../mindmap/toFlow";
 import { useSearchHighlight } from "./searchHighlight";
 import { MergeChoices, MergeStack, mergeKey } from "./components/MergeStack";
 import { VerdictCard } from "../debate/components/VerdictCard";
@@ -52,6 +54,8 @@ type HistoryListProps = {
 };
 
 function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, edit }: HistoryListProps) {
+  // "ask something" only where something can be asked: a card with branches takes no messages
+  const writable = useTreeStore((s) => (activeNodeId ? selectIsLeaf(s, activeNodeId) : false));
   return (
     <>
       {items.map((item, i) => {
@@ -105,7 +109,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
               />
             ))}
             {/* only the card being written on needs the hint; an empty card above it is just its divider */}
-            {item.messages?.length === 0 && !streaming && isActive && item.node.node_type !== "question" && (
+            {item.messages?.length === 0 && !streaming && isActive && writable && item.node.node_type !== "question" && (
               <Frame as="li" className="chat-hint">
                 <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
               </Frame>
@@ -151,7 +155,7 @@ export function Chat({ className }: ChatProps) {
   }, []);
   const currentWidth = () => sheetRef.current?.getBoundingClientRect().width ?? MIN_WIDTH;
   // the cards above the picked one on its thread, for the breadcrumb
-  const path = chat.history.flatMap((item) => (item.kind === "node" && item.node.id !== chat.activeNodeId ? [item.node.title ?? "Untitled card"] : []));
+  const path = chat.history.flatMap((item) => (item.kind === "node" && item.node.id !== chat.activeNodeId ? [item.node.title ?? untitled(item.node)] : []));
   const classes = ["chat", className].filter(Boolean).join(" ");
   const contextUsagePercentage =
     chat.usage && chat.usageContextLength
@@ -284,7 +288,7 @@ export function Chat({ className }: ChatProps) {
 
         {activeNode && (
           <Frame key={activeNode.id} gap="1" className="chat-title">
-            <Text as="h2" size="xl" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
+            <Text as="h2" size="xl" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? untitled(activeNode)} />
             {path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />}
           </Frame>
         )}
@@ -454,3 +458,6 @@ function nextNodeId(items: HistoryItem[], i: number): string | undefined {
   const n = items[i + 1];
   return n?.kind === "node" ? n.node.id : undefined;
 }
+
+/** A card with no title yet goes by the name the map gives it (toFlow), so the sheet and the board agree. */
+const untitled = (node: { merge_source_ids?: string[] }) => ((node.merge_source_ids?.length ?? 0) > 0 ? UNTITLED_MERGE : UNTITLED);
