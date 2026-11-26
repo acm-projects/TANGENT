@@ -279,8 +279,10 @@ plain paper with an empty dashed socket while he's out working.
 - **A merge is pages clipped together.** In the thread, the joined branches are a paperclipped stack: one
   page in front with its thread, the others behind with tabs peeking over the top. Picking a tab slides the
   front page down behind the stack and brings the picked one forward. A branch that holds a merge has its
-  own stack inside its page, so merges nest. The path bar under the sheet's title shows each merge as a
-  small stack of choices (nested ones in brackets); choosing one brings that page forward and scrolls to it.
+  own stack inside its page, so merges nest. Under the sheet's title, a path map draws the thread as the board
+  does: a pin per card on a string from the case, splitting into a lane per branch at each merge and running
+  back together. Red is the branch being read, dashed graphite the ones behind; the card being read is ringed.
+  Clicking a graphite lane (or a pin on it) brings that page forward; a red pin scrolls the thread to its card.
 - **The court is in the sheet.** The sheet's header has the court button (Debate, or Return to court while
   one runs); the board's own court button shows only while the sheet is away.
 - **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).

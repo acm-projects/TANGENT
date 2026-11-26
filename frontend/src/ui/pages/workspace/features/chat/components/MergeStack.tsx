@@ -82,70 +82,130 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
   );
 }
 
-/** The thread's path, under the sheet's title: a crumb per card, and at each merge a choice of which page is in
- * front (nested in brackets when the chosen branch holds a merge of its own). A crumb scrolls the thread to its
- * card; a choice also brings its page forward. */
+/* The thread's path, under the sheet's title, drawn as the board draws it: a pin per card on a string, left to
+ * right from the case. At a merge the string splits into a lane per branch and runs back together into the merged
+ * card; the branch being read is red string, the rest graphite. A lane (or a pin on it) brings that branch's page to
+ * the front of its stack; a pin on the red path scrolls the thread to that card. Merges nest inside their lanes. */
+
+const STEP = 48; // px between pins along the string
+const LANE = 28; // px between lanes
+const PAD = 14;
+
+type Pin = { x: number; y: number; id: string; exhibit: string; title: string; on: boolean; current: boolean; choose?: () => void };
+type Line = { d: string; on: boolean; choose?: () => void; key: string };
+type Pt = { x: number; y: number };
+
+/** How many pins wide and lanes tall a stretch of thread is. */
+function measure(items: HistoryItem[]): { w: number; h: number } {
+  let w = 0;
+  let h = 1;
+  for (const it of items) {
+    if (it.kind === "node") w += 1;
+    else {
+      const m = it.branches.map((b) => measure(b.items));
+      w += Math.max(...m.map((x) => x.w));
+      h = Math.max(h, m.reduce((t, x) => t + x.h, 0));
+    }
+  }
+  return { w, h };
+}
+
+const curve = (a: Pt, b: Pt) => (a.y === b.y ? `M${a.x} ${a.y} L${b.x} ${b.y}` : `M${a.x} ${a.y} C${(a.x + b.x) / 2} ${a.y} ${(a.x + b.x) / 2} ${b.y} ${b.x} ${b.y}`);
+
 export function PathBar({ items, activeNodeId }: { items: HistoryItem[]; activeNodeId: string | null }) {
+  const { front, choose } = useContext(MergeChoices);
+  const pins: Pin[] = [];
+  const lines: Line[] = [];
+
+  /** Lay `list` out from `from` (the points its first card's string comes from) along the lane centred on `y`.
+   * Returns the points the next card's string should come from. */
+  function draw(list: HistoryItem[], from: Pt[], x: number, y: number, on: boolean, pick?: () => void): { ends: Pt[]; x: number } {
+    let ends = from;
+    for (const it of list) {
+      if (it.kind === "node") {
+        const at = { x: x + STEP, y };
+        ends.forEach((e, k) => lines.push({ d: curve(e, at), on, choose: pick, key: `${it.node.id}-${k}` }));
+        pins.push({ ...at, id: it.node.id, exhibit: it.exhibit, title: it.node.title ?? "Untitled card", on, current: it.node.id === activeNodeId, choose: pick });
+        ends = [at];
+        x = at.x;
+        continue;
+      }
+      const key = mergeKey(it);
+      const at = Math.min(front(key), it.branches.length - 1);
+      const sizes = it.branches.map((b) => measure(b.items));
+      const total = sizes.reduce((t, m) => t + m.h, 0);
+      let top = y - (total * LANE) / 2;
+      const joined: Pt[] = [];
+      let far = x;
+      it.branches.forEach((b, lane) => {
+        const ly = top + (sizes[lane]!.h * LANE) / 2;
+        top += sizes[lane]!.h * LANE;
+        const laneOn = on && lane === at;
+        // an unchosen lane is picked by clicking it (and, inside an unchosen lane, that also picks the lane it's in)
+        const pickThis = () => {
+          pick?.();
+          choose(key, lane);
+          scrollTo(`[data-merge-key="${key}"]`);
+        };
+        const out = draw(b.items, ends, x, ly, laneOn, laneOn ? pick : pickThis);
+        joined.push(...out.ends);
+        far = Math.max(far, out.x);
+      });
+      ends = joined;
+      x = far;
+    }
+    return { ends, x };
+  }
+
+  const size = measure(items);
+  const height = size.h * LANE + PAD * 2 + 16;
+  const midY = PAD + (size.h * LANE) / 2;
+  const out = draw(items, [], PAD - STEP, midY, true);
+  const width = out.x + PAD;
+
   return (
     <nav aria-label="Path to this card" className="path-bar">
-      <ol className="path-bar-list">
-        <Crumbs items={items} activeNodeId={activeNodeId} />
-      </ol>
+      <svg className="path-map" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group">
+        {lines.map((l) => (
+          <g key={l.key} className="path-map-lane" data-on={l.on || undefined} onClick={l.on ? undefined : l.choose}>
+            {/* a wide invisible stroke to click, then the string itself */}
+            {!l.on && <path d={l.d} className="path-map-hit" />}
+            <path d={l.d} className="path-map-string" />
+          </g>
+        ))}
+        {pins.map((p) => (
+          <g
+            key={p.id}
+            className="path-map-pin"
+            data-on={p.on || undefined}
+            data-current={p.current || undefined}
+            role="button"
+            tabIndex={0}
+            aria-label={`${p.exhibit} ${p.title}${p.on ? "" : " (show this branch)"}`}
+            onClick={() => (p.on ? scrollTo(`[data-node-divider="${p.id}"]`) : p.choose?.())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                (e.currentTarget as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+              }
+            }}
+          >
+            <title>{`${p.exhibit} · ${p.title}`}</title>
+            <circle cx={p.x} cy={p.y} r={13} className="path-map-target" />
+            {p.current && <circle cx={p.x} cy={p.y} r={9} className="path-map-ring" />}
+            <circle cx={p.x} cy={p.y} r={p.current ? 5.5 : 4.5} className="path-map-head" />
+            {(p.on || p.current) && (
+              <text x={p.x} y={p.y + 19} className="path-map-label">
+                {p.exhibit}
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
     </nav>
   );
 }
 
 function scrollTo(selector: string) {
   document.querySelector(`.chat-scroll ${selector}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function Crumbs({ items, activeNodeId }: { items: HistoryItem[]; activeNodeId: string | null }) {
-  const { front, choose } = useContext(MergeChoices);
-  return (
-    <>
-      {items.map((item) => {
-        if (item.kind === "node") {
-          const here = item.node.id === activeNodeId;
-          return (
-            <li key={item.node.id} className="path-bar-crumb">
-              <button type="button" aria-current={here ? "location" : undefined} onClick={() => scrollTo(`[data-node-divider="${item.node.id}"]`)}>
-                <Text as="span" size="xs" className="path-bar-exhibit" content={item.exhibit} />
-                {here && <Text as="span" size="xs" content={item.node.title ?? "This card"} />}
-              </button>
-            </li>
-          );
-        }
-        const key = mergeKey(item);
-        const at = Math.min(front(key), item.branches.length - 1);
-        const nested = item.branches[at]!.items.filter((it): it is MergeItem => it.kind === "merge");
-        return (
-          <li key={key} className="path-bar-merge">
-            {/* a little stack: one choice per page, the front one raised */}
-            <span className="path-bar-choices" role="group" aria-label="Which branch to read">
-              {item.branches.map((b, lane) => (
-                <button
-                  key={b.from}
-                  type="button"
-                  className="path-bar-choice"
-                  aria-pressed={lane === at}
-                  title={b.title ?? "Untitled branch"}
-                  onClick={() => {
-                    choose(key, lane);
-                    scrollTo(`[data-merge-key="${key}"]`);
-                  }}
-                >
-                  {b.exhibit}
-                </button>
-              ))}
-            </span>
-            {nested.length > 0 && (
-              <ol className="path-bar-nested" aria-label="Inside this branch">
-                <Crumbs items={nested} activeNodeId={activeNodeId} />
-              </ol>
-            )}
-          </li>
-        );
-      })}
-    </>
-  );
 }
