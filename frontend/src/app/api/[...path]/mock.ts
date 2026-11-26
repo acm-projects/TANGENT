@@ -196,11 +196,24 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
       if (!d && method === "GET") return sse([["thread", { events: [], notes: [], live: false }]], 0);
       if (!d && method === "POST") {
         const reply = "I'm the mock backend, so I can't research anything. In the real app I'd open leads on the board here.";
+        // he acts out a short visit, so his travel and his ink on the cards can be seen: out to a card, reads it,
+        // on to another, then home to answer
+        const visit = [...nodes.values()].filter((n) => n.project_id === b && n.parent_id).slice(0, 2);
+        const ref = (n: MockNode) => ({ address: null, id: n.id, title: n.title ?? "" });
+        const trip: [string, unknown][] = visit.flatMap((n, i) => [
+          ["tool", { turn: 1, id: `cd-${i}`, name: "cd", args: { to: n.title } }],
+          ["cwd", ref(n)],
+          ["result", { turn: 1, id: `cd-${i}`, name: "cd", ok: true, brief: `Moved to ${n.title}`, result: {} }],
+          ["tool", { turn: 1, id: `read-${i}`, name: "read", args: {} }],
+          ["result", { turn: 1, id: `read-${i}`, name: "read", ok: true, brief: "Read the card", result: {} }],
+        ] as [string, unknown][]);
         return sse([
+          ["cwd", { address: null, id: `${b}-root`, title: "" }],
           ["note", { turn: 1, text: "Reading the board." }],
+          ...trip,
           ["reply", { turn: 1, text: reply }],
           ["done", { cwd: `${b}-root`, notes: body.notes ?? [], stopped: false }],
-        ], 400);
+        ], 1600);
       }
       if (d === "notes") return json({ notes: body.notes ?? [] });
       return json({});

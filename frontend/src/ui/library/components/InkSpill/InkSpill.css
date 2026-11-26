@@ -1,0 +1,13 @@
+/* InkSpill: the pool of Gent's ink over a host's paper and under its content (InkSpill.tsx). The ink's canvas
+ * spills past this box for its bleed; the clip that shapes the spreading pool comes off once it covers the host. */
+
+@layer ui {
+  [data-ui="ink-spill"] {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    isolation: isolate;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+}

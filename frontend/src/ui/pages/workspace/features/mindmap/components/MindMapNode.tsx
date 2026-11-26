@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from "react";
-import { Button, Decal, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
+import { Button, Decal, Frame, DangerButton, Icon, InkSpill, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
 import { ENDING_LABELS, tagColor, tagLabels, tagMark } from "@/api/types";
 import type { Ending, NodeTag } from "@/api/types";
@@ -9,6 +9,7 @@ import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
+import { usePresence } from "../../agent/travel/traveller";
 import { splitMatches } from "../../toolbar/highlight";
 import { StartDebate } from "../../debate/components/StartDebate";
 import { SharePanel } from "../../toolbar/components/SharePanel";
@@ -181,6 +182,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   });
   // a question Gent asked is in his ink, not on paper
   const gentAsked = useTreeStore((s) => s.nodesById[id]?.question?.asker.by === "gent");
+  // Gent standing on this card: his ink spills over it from where he landed (its top edge) and the card is his while
+  // he works there; it draws back when he moves on. A card he asked is his ink already.
+  const gentHere = usePresence((s) => s.at === nodeStation(id) && s.phase === "here") && !gentAsked;
+  const [inked, setInked] = useState(false);
   // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
   // while the search drawer is open: this card is a hit or a miss, and which words to mark
   const searchHit = useTreeStore((s) => (s.search ? (s.search.ids.includes(id) ? "hit" : "miss") : undefined));
@@ -316,6 +321,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           data-dragging={drag.dragging || undefined}
           data-drag-action={drag.action ?? undefined}
           data-merge-from={merge.from === id || undefined}
+          data-gent-ink={inked || undefined}
           ref={gentStation}
           {...drag.handlers}
           onKeyDownCapture={(e: ReactKeyboardEvent<HTMLElement>) => {
@@ -328,6 +334,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           // the native tooltip would pop up over a drag in progress
           title={drag.dragging ? undefined : data.title}
         >
+          <InkSpill on={gentHere} seed={parseInt(id.replace(/\W/g, "").slice(0, 6), 36) || 7} from={{ x: 50, y: 0 }} onCovered={setInked} />
           <AnimatePresence>
             {unread && (
               // slapped on like a stamp when the reply lands; peeled off when the card is picked

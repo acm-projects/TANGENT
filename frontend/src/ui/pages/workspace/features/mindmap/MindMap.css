@@ -1019,3 +1019,18 @@
 .mindmap-node[data-material="ink"] .question-branch[data-author="gent"] {
   color: inherit;
 }
+
+/* Gent working on a card: his ink has spilled over it (InkSpill), so its writing turns to the pale on-ink colours, as
+ * on any ink panel, fading across as the pool runs under it. */
+.mindmap-node {
+  transition: color var(--motion-base) var(--ease-out);
+}
+
+.mindmap-node[data-gent-ink] {
+  color: var(--color-text-on-gent);
+  --color-text: var(--color-text-on-gent);
+  --color-text-secondary: var(--color-text-on-gent);
+  --color-text-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+  --color-border: color-mix(in srgb, var(--color-text-on-gent) 30%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--color-text-on-gent) 55%, transparent);
+}

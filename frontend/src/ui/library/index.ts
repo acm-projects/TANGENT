@@ -28,6 +28,7 @@ export type { PickerOption } from "./components/Picker/Picker";
 export { DangerButton } from "./components/DangerButton/DangerButton";
 export { Loading } from "./components/Loading/Loading";
 export { InkPanel } from "./components/Ink/InkPanel";
+export { InkSpill } from "./components/InkSpill/InkSpill";
 export { jolt } from "./tokens/jolt";
 
 export type { TextSize, Hierarchy, Elevation } from "./types/Types";
