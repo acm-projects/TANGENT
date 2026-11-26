@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Button, Decal, Divider, Frame, Icon, Image, InkPanel, Input, Link, Panel, Select, Text, TextArea } from "@/ui/library";
+import { Button, DangerButton, Decal, Divider, Frame, Icon, Image, InkPanel, InkText, Input, Link, Loading, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { Hierarchy, TextSize } from "@/ui/library";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
+import { PickerSpecimen, PopupSpecimen } from "./PopupSpecimen";
 import "./DevLibrary.css";
 
 /* The /dev/library gallery: every library primitive and Panel material, built from the real components,
@@ -165,6 +166,15 @@ export function DevLibrary() {
           <Specimen caption='edge="torn", tall (~20rem)'>
             <Panel stock="paper" edge="torn" className="dev-library-tall"><Text content="Tall sheet" /></Panel>
           </Specimen>
+          <Specimen caption='edge="torn" corners compared, six sizes'>
+            <Frame direction="row" gap="3" align="start" className="dev-library-torn-row">
+              {["a", "b", "c", "d", "e", "f"].map((k) => (
+                <Panel key={k} stock="card" edge="torn" elevation="floating" className={`dev-library-torn-${k}`}>
+                  <Text content="1.2.1" size="xs" />
+                </Panel>
+              ))}
+            </Frame>
+          </Specimen>
           <Specimen caption='edge="torn", wide'>
             <Panel stock="paper" edge="torn" className="dev-library-wide"><Text content="Wide sheet" /></Panel>
           </Specimen>
@@ -295,6 +305,72 @@ export function DevLibrary() {
           </Specimen>
           <Specimen caption="Select, three options">
             <Select aria-label="Source" options={OPTIONS} />
+          </Specimen>
+        </Section>
+
+        <Section title="Components" description="Button, DangerButton, Loading, InkText, Picker and Popup.">
+          {(["primary", "secondary", "tertiary"] as const).flatMap((hierarchy) =>
+            (["flat", "floating"] as const).map((elevation) => (
+              <Specimen key={hierarchy + elevation} caption={`Button hierarchy="${hierarchy}" elevation="${elevation}"`}>
+                <Button label="Open case" hierarchy={hierarchy} elevation={elevation} />
+              </Specimen>
+            )),
+          )}
+          <Specimen caption='Button size="s", "base", "l"'>
+            <Frame direction="row" gap="2" align="center">
+              {(["s", "base", "l"] as const).map((size) => (
+                <Button key={size} label="Open case" size={size} />
+              ))}
+            </Frame>
+          </Specimen>
+          <Specimen caption="Button icon-only (showIcon, showLabel={false})">
+            <Button label="Search" showIcon showLabel={false} icon="search" />
+          </Specimen>
+          <Specimen caption="Button with icon and label">
+            <Button label="Branch" showIcon icon="call_split" />
+          </Specimen>
+          <Specimen caption="Button pressed={false} and pressed">
+            <Frame direction="row" gap="2">
+              <Button label="Notes" pressed={false} />
+              <Button label="Notes" pressed />
+            </Frame>
+          </Specimen>
+          <Specimen caption="Button disabled">
+            <Button label="Open case" disabled />
+          </Specimen>
+          <Specimen caption='tertiary Buttons on material="cork"'>
+            <Panel material="cork">
+              <Frame direction="row" gap="2">
+                <Button label="Cases" hierarchy="tertiary" />
+                <Button label="Search" hierarchy="tertiary" showIcon icon="search" />
+              </Frame>
+            </Panel>
+          </Specimen>
+          <Specimen caption='tertiary Buttons inside material="ink"'>
+            <Panel material="ink">
+              <Frame direction="row" gap="2">
+                <Button label="Cases" hierarchy="tertiary" />
+                <Button label="Search" hierarchy="tertiary" showIcon icon="search" />
+              </Frame>
+            </Panel>
+          </Specimen>
+          <Specimen caption="DangerButton at rest">
+            <DangerButton label="Delete case" showIcon icon="delete" onHold={() => {}} />
+          </Specimen>
+          <Specimen caption="DangerButton disabled">
+            <DangerButton label="Delete case" showIcon icon="delete" disabled onHold={() => {}} />
+          </Specimen>
+          <Specimen caption='Loading label="Reading pollen cores…"'>
+            <Loading label="Reading pollen cores…" />
+          </Specimen>
+          <Specimen caption="InkText, not streaming">
+            <InkText content="The pollen cores from the Sea of Galilee line up with the drought records, which suggests the settlement gap followed the dry decades." />
+          </Specimen>
+          <Specimen caption="Picker, three options with icons and descriptions">
+            <PickerSpecimen />
+          </Specimen>
+          <Specimen caption="Popup: title, a sentence, two actions (one data-primary)">
+            <PopupSpecimen />
           </Specimen>
         </Section>
 
