@@ -23,8 +23,8 @@
   --pop-rotate: 0deg;
   --pop-scale: 0.7;
 }
+
 /* his work-log rows (chat/components/ToolRow) in the dock's colours; on the row itself, which sets its own defaults */
-/* his work-log rows (chat/components/ToolRow) in the dock's colours */
 .gent-dock .tool-row {
   --tool-fg: var(--dock-fg);
   --tool-alert: var(--dock-alert);
