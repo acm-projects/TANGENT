@@ -4,7 +4,8 @@ import "./Frame.css";
 /* Lays children out in a row or column with a token gap: the layout wrapper
  * pages and features use instead of a <div> (DESIGN.md Rule 2). */
 
-type FrameTag = "div" | "main" | "section" | "header" | "footer" | "nav" | "aside" | "ol" | "li" | "form";
+/** span: an inline group (a seal holding an icon, a title made of marked runs); give it display: inline if it wraps text. */
+type FrameTag = "div" | "span" | "main" | "section" | "header" | "footer" | "nav" | "aside" | "ol" | "li" | "form";
 
 type FrameProps<T extends FrameTag> = ComponentProps<T> & {
   as?: T;

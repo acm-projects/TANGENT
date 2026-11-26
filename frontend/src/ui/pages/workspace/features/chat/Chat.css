@@ -346,24 +346,13 @@
   list-style: none;
 }
 
-/* the paperclip over the stack's top-left corner, holding every page */
+/* the paperclip (a Decal) over the stack's top-left corner, holding every page: placed here, drawn by the Decal */
 .merge-stack-clip {
   position: absolute;
   top: -1.9rem;
   left: var(--space-2);
   z-index: 3;
-  width: 1.1rem;
-  height: 2.6rem;
   rotate: -8deg;
-  filter: drop-shadow(1px 2px 1px var(--color-string-shadow));
-  pointer-events: none;
-}
-
-.merge-stack-clip path {
-  fill: none;
-  stroke: var(--color-text-muted);
-  stroke-width: 2.2;
-  stroke-linecap: round;
 }
 
 .merge-stack-foot {

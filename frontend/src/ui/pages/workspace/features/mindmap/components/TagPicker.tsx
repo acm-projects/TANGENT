@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, apiErrorMessage } from "@/api";
-import { Button, Frame, Input, Text } from "@/ui/library";
+import { Button, Decal, Frame, Input, Panel, Text } from "@/ui/library";
 import { TAG_COLORS, tagColor, tagLabels, tagMark, type NodeTag, type TagColor, type TagShape } from "@/api/types";
 import { useTreeStore } from "@/store/treeStore";
 import { TagMark } from "./TagMark";
@@ -53,7 +53,7 @@ export function TagPicker({ tag, onTag, onClose }: {
         <Frame as="ol" gap="2" className="tag-picker-list">
           {COLORS.map((color) => (
             <Frame as="li" direction="row" gap="3" align="center" key={color} className="tag-picker-row">
-              <span className="tag-picker-dot" aria-hidden="true" style={{ "--swatch": tagColor(color) } as React.CSSProperties} />
+              <Decal kind="shape" className="tag-picker-dot" style={{ "--swatch": tagColor(color) } as React.CSSProperties} />
               <Input
                 aria-label={`Name for ${color}`}
                 value={naming[color]}
@@ -78,26 +78,38 @@ export function TagPicker({ tag, onTag, onClose }: {
     <Frame gap="4" className="tag-picker">
       <Frame as="ol" gap="1" className="tag-picker-list" aria-label="Tags">
         {COLORS.map((color) => (
-          <li key={color}>
-            <button
+          <Frame as="li" gap="0" key={color}>
+            <Panel
+              as="button"
               type="button"
+              hierarchy="tertiary"
               className="tag-picker-row tag-picker-option"
               aria-pressed={tag?.color === color}
               style={{ "--swatch": tagColor(color) } as React.CSSProperties}
               onClick={() => onTag({ shape, color })}
             >
-              <span className="tag-picker-dot" aria-hidden="true" />
+              <Decal kind="shape" className="tag-picker-dot" />
               <Text as="span" size="s" hierarchy={labels[color] ? "primary" : "tertiary"} content={labels[color] || "Unnamed"} />
-            </button>
-          </li>
+            </Panel>
+          </Frame>
         ))}
       </Frame>
       <Frame direction="row" gap="2" align="center" justify="between">
         <Frame direction="row" gap="1" role="group" aria-label="Shape">
           {SHAPES.map((option) => (
-            <button key={option.shape} type="button" className="tag-picker-shape" aria-pressed={shape === option.shape} aria-label={option.label} title={option.label} onClick={() => pick(option.shape)}>
+            <Panel
+              as="button"
+              type="button"
+              hierarchy="tertiary"
+              key={option.shape}
+              className="tag-picker-shape"
+              aria-pressed={shape === option.shape}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => pick(option.shape)}
+            >
               <TagMark shape={option.shape} color={tag?.color ?? "ochre"} mark={tagMark(tag?.color ?? "ochre", labels[tag?.color ?? "ochre"])} aria-hidden="true" />
-            </button>
+            </Panel>
           ))}
         </Frame>
         {owner && <Button hierarchy="tertiary" size="s" icon="edit" showIcon label="Name the colours" onClick={() => setNaming(labels)} />}

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
-import { Frame, Icon, Text } from "@/ui/library";
+import { Decal, Frame, Icon, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import type { HistoryItem } from "../useChat";
 
@@ -30,14 +30,16 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
   const page = merge.branches[at]!;
   return (
     <MotionConfig reducedMotion="user">
-      <li className="merge-stack" style={{ "--pages": lanes } as CSSProperties}>
+      <Frame as="li" gap="0" className="merge-stack" style={{ "--pages": lanes } as CSSProperties}>
         {/* the tabs over the top edge: the front page's tab joins its page, the others sit behind */}
         {/* reading order only: every page is in the merged card's context, whichever is in front */}
-        <ol className="merge-stack-tabs" aria-label="Joined branches: pick one to read (all are in the card's context)">
+        <Frame as="ol" direction="row" gap="1" className="merge-stack-tabs" aria-label="Joined branches: pick one to read (all are in the card's context)">
           {merge.branches.map((b, lane) => (
-            <motion.li layout transition={spring.lift} key={b.from} className="merge-stack-tab-slot">
-              <button
+            <Frame as="li" gap="0" key={b.from} className="merge-stack-tab-slot">
+              <Panel
+                as="button"
                 type="button"
+                hierarchy="tertiary"
                 className="merge-stack-tab"
                 aria-pressed={lane === at}
                 onClick={() => choose(key, lane)}
@@ -45,18 +47,16 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
               >
                 <Text as="span" size="xs" className="merge-stack-exhibit" content={b.exhibit} />
                 <Text as="span" size="xs" className="merge-stack-tab-title" content={b.title ?? "Untitled branch"} />
-              </button>
-            </motion.li>
+              </Panel>
+            </Frame>
           ))}
-        </ol>
-        <div className="merge-stack-pages">
+        </Frame>
+        <Frame gap="0" className="merge-stack-pages">
           {/* the pages behind: edges showing under and beside the front one, a little askew */}
           {Array.from({ length: Math.min(lanes - 1, 3) }, (_, k) => (
-            <span key={k} className="merge-stack-under" aria-hidden="true" style={{ "--depth": k + 1 } as CSSProperties} />
+            <Decal key={k} kind="shape" className="merge-stack-under" style={{ "--depth": k + 1 } as CSSProperties} />
           ))}
-          <svg className="merge-stack-clip" viewBox="0 0 24 56" aria-hidden="true">
-            <path d="M8 46 V12 a5 5 0 0 1 10 0 V44 a8 8 0 0 1 -16 0 V16" />
-          </svg>
+          <Decal kind="paperclip" className="merge-stack-clip" />
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={page.from}
@@ -71,15 +71,17 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
                 <Icon icon="merge" size="s" />
                 <Text as="span" face="stamp" size="xxs" content={`Branch ${page.exhibit} · page ${at + 1} of ${lanes}`} />
               </Frame>
-              <ol className="chat-history merge-stack-history">{render(page.items)}</ol>
+              <Frame as="ol" gap="2" className="chat-history merge-stack-history">
+                {render(page.items)}
+              </Frame>
             </motion.div>
           </AnimatePresence>
-        </div>
+        </Frame>
         <Frame direction="row" gap="2" align="center" className="merge-stack-foot">
           <Icon icon="south" size="s" />
           <Text as="span" size="xs" hierarchy="tertiary" content={`All ${lanes} branches are in this card's context · flip the pages to read each`} />
         </Frame>
-      </li>
+      </Frame>
     </MotionConfig>
   );
 }

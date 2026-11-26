@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from "react";
-import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
+import { Button, Decal, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
 import { ENDING_LABELS, tagColor, tagLabels, tagMark } from "@/api/types";
 import type { Ending, NodeTag } from "@/api/types";
@@ -341,46 +341,45 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
               </motion.span>
             )}
           </AnimatePresence>
-          {(!data.hasParent || data.debate) && <span className="mindmap-node-rule" aria-hidden="true" />}
+          {(!data.hasParent || data.debate) && <Decal kind="shape" className="mindmap-node-rule" />}
           {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} mark={tagMark(data.tag.color, tagName)} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged: ${tagName || data.tag.color}`} />}
           {!data.hasParent && <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="The case" />}
           {data.compact && (
             <>
               <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Compacted" />
               {/* the thread above, pressed into one summary: the conversation starts afresh from here */}
-              <span className="mindmap-node-seal" aria-label="A compacted thread" role="img">
+              <Frame as="span" gap="0" className="mindmap-node-seal" aria-label="A compacted thread" role="img">
                 <Icon icon="compress" size="m" />
-              </span>
+              </Frame>
             </>
           )}
           {data.debate && (
             <>
               <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Judgment" />
               {/* the court's seal pressed into the corner: this card is a debate's verdict */}
-              <span className="mindmap-node-seal" aria-label="A debate's verdict" role="img">
+              <Frame as="span" gap="0" className="mindmap-node-seal" aria-label="A debate's verdict" role="img">
                 <Icon icon="gavel" size="m" />
-              </span>
+              </Frame>
             </>
           )}
           {data.question && (
             <>
               <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Question for you" />
               {/* a question an AI asked: answer it on the slip below, and each answer branches from here */}
-              <span className="mindmap-node-seal" aria-label="A question for you" role="img">
+              <Frame as="span" gap="0" className="mindmap-node-seal" aria-label="A question for you" role="img">
                 <Icon icon="question_mark" size="m" />
-              </span>
+              </Frame>
             </>
           )}
           <Frame direction="row" gap="2" align="center">
             <Text as="span" face="heading" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
             {searchHit === "hit" && searchWords ? (
               // Text takes one string, so the marked title is a run of Texts
-              <span className="mindmap-node-title">
-                {splitMatches(data.title, searchWords).map((r, k) => {
-                  const part = <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={r.text} />;
-                  return r.hit ? <mark key={k}>{part}</mark> : <span key={k}>{part}</span>;
-                })}
-              </span>
+              <Frame as="span" gap="0" className="mindmap-node-title mindmap-node-title-runs">
+                {splitMatches(data.title, searchWords).map((r, k) => (
+                  <Text key={k} as={r.hit ? "mark" : "span"} face="heading" size={data.hasParent ? "m" : "xl"} content={r.text} />
+                ))}
+              </Frame>
             ) : (
               <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
             )}
@@ -395,9 +394,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           )}
           {/* what the tag means in this case, under the title (an unnamed colour shows only its flag) */}
           {data.tag && tagName && (
-            <span className="mindmap-node-taglabel" style={{ "--swatch": tagColor(data.tag.color) } as React.CSSProperties}>
+            <Frame as="span" direction="row" gap="1" align="center" className="mindmap-node-taglabel" style={{ "--swatch": tagColor(data.tag.color) } as React.CSSProperties}>
               <Text as="span" size="xs" content={tagName} />
-            </span>
+            </Frame>
           )}
           {asking && <QuestionPrompt node={asking} />}
           <AnimatePresence>

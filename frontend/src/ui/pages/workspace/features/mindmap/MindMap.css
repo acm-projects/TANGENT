@@ -135,6 +135,11 @@
   opacity: var(--opacity-search-dim);
 }
 
+/* a title marked by the search is a run of Texts in an inline Frame: it wraps like the plain title */
+.mindmap-node-title-runs {
+  display: inline;
+}
+
 .mindmap-node-title mark {
   padding-inline: 0.1em;
   border-radius: 2px;

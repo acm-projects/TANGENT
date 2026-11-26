@@ -220,7 +220,8 @@ export function Chat({ className }: ChatProps) {
       elevation="floating"
     >
       {layout === "docked" && (
-        <div
+        <Frame
+          gap="0"
           className="chat-resize"
           role="separator"
           aria-orientation="vertical"
@@ -414,7 +415,8 @@ function ContextBar({ used, of }: { used: number; of: number }) {
   const share = Math.min(1, used / of);
   const text = `Context ${Math.round(share * 100)}% used · ${compact.format(used)} of ${compact.format(of)} tokens`;
   return (
-    <div
+    <Frame
+      gap="0"
       className="chat-context"
       role="meter"
       aria-label="Context used"
