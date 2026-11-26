@@ -79,7 +79,7 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
         </Frame>
         <Frame direction="row" gap="2" align="center" className="merge-stack-foot">
           <Icon icon="south" size="s" />
-          <Text as="span" size="xs" hierarchy="tertiary" content={`All ${lanes} branches are in this card's context · flip the pages to read each`} />
+          <Text as="span" size="xs" hierarchy="tertiary" content={`${lanes === 2 ? "Both" : `All ${lanes}`} branches are in this card's context · flip the pages to read each`} />
         </Frame>
       </Frame>
     </MotionConfig>

@@ -340,7 +340,8 @@
 }
 
 .merge-stack-head {
-  padding-left: var(--space-6);
+  /* on the same left edge as the page's thread (the clip sits above the page, clear of it) */
+  padding-left: 0;
   color: var(--color-text-secondary);
   letter-spacing: 0.12em;
   text-transform: uppercase;
