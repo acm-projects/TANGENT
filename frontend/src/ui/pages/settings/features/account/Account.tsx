@@ -59,7 +59,7 @@ export function Account() {
           <Frame gap="6" className="account-sections">
             {actionError && <Panel stock="card" role="alert" className="account-error"><Text size="s" content={actionError} /></Panel>}
 
-            <Section id="profile" number={1} title="Profile" note="How you appear to people you share a case with.">
+            <Section id="profile" title="Profile" note="How you appear to people you share a case with.">
               <NameForm name={state.account.name} onSave={renameSelf} />
               <Frame gap="1">
                 <Text as="span" size="xs" hierarchy="tertiary" content="Email" />
@@ -68,7 +68,7 @@ export function Account() {
               <Text size="xs" hierarchy="tertiary" content="Your photo and email come from your Google account." />
             </Section>
 
-            <Section id="workspaces" number={2} title="Workspaces" note="Each workspace is a folder of cases on your dashboard.">
+            <Section id="workspaces" title="Workspaces" note="Each workspace is a folder of cases on your dashboard.">
               <Frame as="ol" gap="2" className="workspace-list">
                 {state.workspaces.map((w) => (
                   <WorkspaceRow
@@ -84,7 +84,7 @@ export function Account() {
               </Frame>
             </Section>
 
-            <Section id="appearance" number={3} title="Appearance" note="Light the board your way. Kept in this browser.">
+            <Section id="appearance" title="Appearance" note="Light the board your way. Kept in this browser.">
               <Frame gap="2" className="account-lighting">
                 <Text as="h3" id="account-lighting" size="xs" face="stamp" className="settings-heading" content="Lighting" />
                 <LightingPicker labelledBy="account-lighting" />
@@ -92,11 +92,11 @@ export function Account() {
               <ShowNudges />
             </Section>
 
-            <Section id="guide" number={4} title="Field guide" note="The moves the board doesn't spell out.">
+            <Section id="guide" title="Field guide" note="The moves the board doesn't spell out.">
               <FieldGuide />
             </Section>
 
-            <Section id="account" number={5} title="Account">
+            <Section id="account" title="Account">
               <Frame direction="row" justify="between" align="center" gap="4" className="account-row">
                 <Frame gap="0">
                   <Text size="s" hierarchy="primary" content="Sign out" />
@@ -154,13 +154,12 @@ function useReading(ready: boolean) {
   return { id, pick };
 }
 
-/* One section of the file: a torn sheet on the board, its number stamped across its head. */
-function Section({ id, number, title, note, children }: { id: string; number: number; title: string; note?: string; children: ReactNode }) {
+/* One section of the file: a torn sheet on the board. */
+function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
     <Panel as="section" id={id} stock="paper" edge="torn" elevation="floating" className="account-section" aria-labelledby={`${id}-heading`}>
       <Frame gap="4">
         <Frame as="header" gap="1" className="account-section-head">
-                    <Text as="span" size="xxs" face="stamp" className="account-section-tab" content={`Section ${number}`} />
           <Text as="h2" id={`${id}-heading`} size="xl" hierarchy="primary" content={title} />
           {note && <Text size="xs" hierarchy="secondary" content={note} />}
         </Frame>
