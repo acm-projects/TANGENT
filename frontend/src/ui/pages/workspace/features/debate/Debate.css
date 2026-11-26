@@ -567,6 +567,15 @@
   padding: var(--space-2) var(--space-3);
 }
 
+/* each setting sits in the same kind of box as the motion above it */
+.debate-start-field {
+  padding: 0;
+}
+
+.debate-start-field select {
+  width: 100%;
+}
+
 .debate-other input,
 .debate-start-topic textarea {
   width: 100%;
