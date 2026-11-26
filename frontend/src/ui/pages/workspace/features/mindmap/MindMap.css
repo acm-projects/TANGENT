@@ -241,7 +241,8 @@
 
 .mindmap-node-subtitle {
   display: block;
-  padding-left: var(--space-3);
+  /* on the card's left edge, like the tag label: the merge's sources read as a note under the title, not centred */
+  text-align: start;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -542,7 +543,7 @@
 .mindmap-node-resolved {
   position: absolute;
   bottom: -0.7rem;
-  left: var(--space-4);
+  right: var(--space-4);
   z-index: 1;
   --stamp-ink: var(--color-string);
   padding: 0.1em 0.6em;
@@ -552,6 +553,11 @@
   box-shadow: 1px 2px 2px var(--color-string-shadow);
   color: var(--stamp-ink);
   pointer-events: none;
+}
+
+/* an ended card keeps a strip clear along its foot for the stamp, so it never lands on the title */
+.mindmap-node[data-ending] {
+  padding-bottom: var(--space-6);
 }
 
 .mindmap-node-resolved[data-by="gent"] {
