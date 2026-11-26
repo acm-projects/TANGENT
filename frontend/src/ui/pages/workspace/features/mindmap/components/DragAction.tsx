@@ -43,7 +43,7 @@ function outlineBox(card: HTMLElement, zoom: number): DOMRect {
 export type DragAction = "branch" | "delete" | "merge" | "compact" | "resolve" | "reopen" | null;
 
 const TIP = {
-  branch: { icon: "call_split", label: "New tangent" },
+  branch: { icon: "call_split", label: "New branch" },
   delete: { icon: "delete", label: "Delete" },
   merge: { icon: "merge", label: "Merge" },
   compact: { icon: "compress", label: "Compact" },
@@ -51,7 +51,7 @@ const TIP = {
   reopen: { icon: "undo", label: "Reopen" },
   cancel: { icon: "close", label: "Cancel" },
   root: { icon: "block", label: "Nothing to reset" },
-  reset: { icon: "restart_alt", label: "Reset project" },
+  reset: { icon: "restart_alt", label: "Reset case" },
 };
 
 /** What the card allows besides branching: up deletes, left compacts, right resolves or reopens (absent: nothing). */

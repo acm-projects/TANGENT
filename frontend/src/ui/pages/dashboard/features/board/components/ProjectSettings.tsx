@@ -66,7 +66,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
     void run(async () => {
       await onRename(trimmed);
       setOpen(false);
-    }, "Could not rename the project.");
+    }, "Could not rename the case.");
   }
 
   return (
@@ -113,7 +113,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
                     <Frame direction="row" gap="1" align="center">
                       <Panel className="case-settings-field">
                         <Input
-                          aria-label="Project name"
+                          aria-label="Case name"
                           value={name}
                           maxLength={100}
                           disabled={!owner || busy}
@@ -145,7 +145,7 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
                     showIcon
                     disabled={!owner || busy}
                     className="case-settings-delete"
-                    onHold={() => void run(onDelete, "Could not delete the project.")}
+                    onHold={() => void run(onDelete, "Could not delete the case.")}
                   />
                 </motion.div>
                 {!owner && (

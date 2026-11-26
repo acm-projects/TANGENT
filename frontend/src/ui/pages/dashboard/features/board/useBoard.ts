@@ -92,7 +92,7 @@ export function useBoard(initialSlug: string) {
       setProjectName(id, name, old),
       // the server may tidy the name
       () => api.projects.rename(id, name).then((r) => update(setProjectName(id, name, r.project_name))),
-      "Could not rename the project.",
+      "Could not rename the case.",
     );
   }
 
@@ -103,7 +103,7 @@ export function useBoard(initialSlug: string) {
       (s) => ({ projects: s.projects.filter((p) => p.id !== id) }),
       (s) => ({ projects: [gone, ...s.projects] }),
       () => api.projects.delete(id),
-      "Could not delete the project.",
+      "Could not delete the case.",
     );
   }
 

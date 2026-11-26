@@ -269,10 +269,10 @@ describe("mergeNodes", () => {
     expect(s.activeNodeId).toBe("t");
   });
 
-  it("won't take a branch back in when other tangents branch from the card", async () => {
+  it("won't take a branch back in when other branches grow from the card", async () => {
     join.mockClear();
     useTreeStore.getState().addNode(node("o", "a", 2));
-    await expect(mergeNodes("a", "t")).rejects.toThrow(/other tangents/i);
+    await expect(mergeNodes("a", "t")).rejects.toThrow(/other branches/i);
     expect(join).not.toHaveBeenCalled();
   });
 

@@ -27,7 +27,7 @@ describe("Gent's status and avatar", () => {
 
   it("reads cleanly when a tool's arguments are missing", () => {
     expect(doing("search", { query: "recurrence" }, "1")).toBe("Searching for “recurrence”…");
-    expect(doing("search", {}, "1")).toBe("Searching the tree…");
+    expect(doing("search", {}, "1")).toBe("Searching the case…");
     expect(doing("cd", {}, "1")).toBe("Moving…");
     expect(doing("rm", {}, "1")).toBe("Deleting a card…");
     expect(doing("mystery_tool", {}, "1")).toBe("mystery_tool…");

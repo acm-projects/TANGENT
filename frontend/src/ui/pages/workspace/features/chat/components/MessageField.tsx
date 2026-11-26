@@ -12,7 +12,7 @@ import type { SendBlocker } from "../useChat";
 
 const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   ready: "Message…",
-  "no-selection": "Select a node on the map to write here.",
+  "no-selection": "Pick a card on the board to write here.",
   question: "Answer the question on its card to go on.",
   streaming: "Waiting for the reply…",
   pending: "Message…",
@@ -124,7 +124,7 @@ export function MessageField({ blocker, branching = false, models, selectedModel
             />
             {/* a reply here continues this card's model, so it can't change: a lock says so without a sentence */}
             {modelLocked && (
-              <Icon icon="lock" size="xs" hierarchy="tertiary" role="img" aria-hidden={false} aria-label="Model locked for this node" title="Model locked for this node" />
+              <Icon icon="lock" size="xs" hierarchy="tertiary" role="img" aria-hidden={false} aria-label="Model locked for this card" title="Model locked for this card" />
             )}
             <Button
               hierarchy="tertiary"

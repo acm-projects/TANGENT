@@ -192,6 +192,10 @@ little crooked on their pin (±0.4–1.6°); the picked card straightens and lif
 
 ### Voice
 
+One word per thing in anything a person reads: a **case** (never project or tree), a **card** (never node or
+joint node), a **branch** (never tangent) for a new path off a card, a **merge** for a card joining branches
+(numbered J1, J2). Code keeps its own names (project, node).
+
 Speak case, lightly: questions are *the case*, follow-ups are *leads*, cards are numbered
 like *exhibits* (1, 1.2, 1.2.1). Use the words as labels, not role-play. Short sentences,
 no exclamation marks. "Branch from here", not "Create new conversation branch"; "Search the

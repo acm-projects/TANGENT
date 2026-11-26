@@ -118,10 +118,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   };
   const fork = act(() => forkNode(id), "Could not create a branch.");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const remove = act(() => deleteNode(id), "Could not delete the node.");
+  const remove = act(() => deleteNode(id), "Could not delete the card.");
   // the root can't be deleted; its delete starts the project over (every other card goes, it goes blank)
   const isRoot = !data.hasParent;
-  const reset = act(() => resetProject(id), "Could not reset the project.");
+  const reset = act(() => resetProject(id), "Could not reset the case.");
   const others = useTreeStore((s) => (isRoot ? Object.keys(s.nodesById).length - 1 : 0));
   // the first message titles a card, and its chats may not be loaded yet: either says there is something to reset
   const rootHasChats = useTreeStore((s) => (s.chatsByNode[id]?.length ?? 0) > 0 || Boolean(s.nodesById[id]?.title));
@@ -226,7 +226,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // Listed bottom-up. Merging has its own button in the tray.
   const moreOptions = [
     isRoot
-      ? { icon: "restart_alt", label: "Reset project", disabled: blankRoot, onClick: requestDelete }
+      ? { icon: "restart_alt", label: "Reset case", disabled: blankRoot, onClick: requestDelete }
       : { icon: "delete", label: "Delete", onClick: requestDelete },
     { icon: "ios_share", label: "Share branch", disabled: !project, onClick: openShare },
   ];
@@ -446,12 +446,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       >
         <Button
           size="l"
-          title="New tangent"
+          title="New branch"
           elevation="floating"
           showIcon
           showLabel={false}
           icon="call_split"
-          label="New tangent"
+          label="New branch"
           disabled={busy}
           onClick={fork}
         />
@@ -542,7 +542,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         {/* Mounted only while open, so the form starts fresh each time. */}
         {debating && project && <StartDebate projectId={project.projectId} nodeId={id} onClose={() => setDebating(false)} />}
       </Popup>
-      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title={isRoot ? "Reset this project?" : "Delete this branch?"}>
+      <Popup open={confirmingDelete} onClose={() => setConfirmingDelete(false)} title={isRoot ? "Reset this case?" : "Delete this branch?"}>
         <Text
           content={
             isRoot

@@ -267,7 +267,7 @@ export function Chat({ className }: ChatProps) {
               face="stamp"
               size="xxs"
               className="chat-title-kicker"
-              content={`Case notes · ${(activeNode.merge_source_ids?.length ?? 0) > 0 ? "Joint node" : "Node"} ${chat.activeExhibit}`}
+              content={`Case notes · ${(activeNode.merge_source_ids?.length ?? 0) > 0 ? "Merge" : "Card"} ${chat.activeExhibit}`}
             />
           )}
           {/* Put the card back: the sheet slides off the way it came, as with Esc or a click on the board. */}

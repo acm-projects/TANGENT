@@ -104,7 +104,7 @@ function Folder({ workspace, projects, open, onOpen }: FolderProps) {
         type="button"
         className="folder-hit"
         aria-current={open ? "page" : undefined}
-        aria-label={`${workspace.workspace_name}, ${count} ${count === 1 ? "project" : "projects"}`}
+        aria-label={`${workspace.workspace_name}, ${count} ${count === 1 ? "case" : "cases"}`}
       />
     </motion.li>
   );

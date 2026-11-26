@@ -50,7 +50,7 @@ export function Board({ slug }: BoardProps) {
             {board.state.status === "loading" && <Loading size="base" />}
             {board.state.status === "error" && <Text role="alert" content={board.state.message} />}
             {ready && (
-              <Frame as="ol" className="board-grid" aria-label={`Projects in ${title}`}>
+              <Frame as="ol" className="board-grid" aria-label={`Cases in ${title}`}>
                 {landed &&
                   projects.map((p, i) => (
                     <motion.li key={p.id} layout="position" transition={spring.fly}>
@@ -148,7 +148,7 @@ function BoardTitle({ title, count, canRename, onRename }: BoardTitleProps) {
         </Frame>
       )}
       {error && <Text role="alert" size="s" content={error} />}
-      <Text size="s" hierarchy="tertiary" content={count === 0 ? "Nothing pinned yet. Start a tree with your first question." : `${count} ${count === 1 ? "tree" : "trees"} on the board`} />
+      <Text size="s" hierarchy="tertiary" content={count === 0 ? "Nothing pinned yet. Start a case with your first question." : `${count} ${count === 1 ? "case" : "cases"} on the board`} />
     </Frame>
   );
 }

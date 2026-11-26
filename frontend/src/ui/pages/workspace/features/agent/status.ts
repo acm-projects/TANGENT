@@ -12,9 +12,9 @@ const DOING: Record<string, (args: Record<string, unknown>, here: string) => str
   // a tool's arguments can be missing (a malformed call): the line still reads, without empty quotes or "……"
   cd: (a) => (a.to ? `Moving to ${String(a.to)}` : "Moving"),
   ls: (_, here) => `Looking around ${here}`,
-  tree: (a) => (a.under && a.under !== "/" ? `Looking over the branch at ${String(a.under)}` : "Looking over the whole tree"),
+  tree: (a) => (a.under && a.under !== "/" ? `Looking over the branch at ${String(a.under)}` : "Looking over the whole case"),
   cat: (_, here) => `Reading ${here}`,
-  search: (a) => (a.query ? `Searching for “${String(a.query)}”` : "Searching the tree"),
+  search: (a) => (a.query ? `Searching for “${String(a.query)}”` : "Searching the case"),
   ask: (a, here) => `Asking ${String(a.card && a.card !== "." ? a.card : here)}`,
   bulk_ask: (a) =>
     `Asking ${Array.isArray(a.questions) ? a.questions.length : "several"} new branches${a.under && a.under !== "." ? ` under ${String(a.under)}` : ""}`,
@@ -60,7 +60,7 @@ export function statusLine(s: Pick<GentState, "busy" | "turns" | "cwd">): string
   // between moves (writing his note, reading an answer that came in) he is thinking
   if (step.kind !== "tool" || step.ok !== undefined) return "Thinking…";
   if (step.name === "wait" && turn?.role === "gent") return waitingOn(turn.steps, step.args ?? {});
-  return doing(step.name, step.args ?? {}, s.cwd?.address ?? "the tree");
+  return doing(step.name, step.args ?? {}, s.cwd?.address ?? "the case");
 }
 
 /** What a wait() is waiting on, by name: the cards he asked that haven't answered yet ("Waiting on 1.2, 1.4…"), a

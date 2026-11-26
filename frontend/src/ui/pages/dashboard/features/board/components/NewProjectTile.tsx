@@ -34,7 +34,7 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
           hierarchy="tertiary"
           size={names.length === 0 ? "xl" : "display"}
           icon="add"
-          label={names.length === 0 ? "Pin your first case" : "New project"}
+          label={names.length === 0 ? "Pin your first case" : "New case"}
           showIcon
           // alone on the board, the tile says what it does
           showLabel={names.length === 0}
@@ -58,7 +58,7 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
       onCreated((await onCreate(name)).id);
     } catch (err: unknown) {
       // keep the name, so a retry needs no retyping
-      setError(apiErrorMessage(err, "Could not create the project."));
+      setError(apiErrorMessage(err, "Could not create the case."));
       setBusy(false);
     }
   }
@@ -70,7 +70,7 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
       transition={spring.pin}
       onSubmit={submit}
       onKeyDown={(e) => e.key === "Escape" && !busy && setDraft(null)}
-      aria-label="New project"
+      aria-label="New case"
       aria-busy={busy}
     >
       <Panel material="paper" stock="card" edge="torn" elevation="floating" className="case-card case-draft">
@@ -80,7 +80,7 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
         </span>
         <Panel className="case-draft-field">
           <Input
-            aria-label="Project name"
+            aria-label="Case name"
             value={draft}
             maxLength={100}
             disabled={busy}

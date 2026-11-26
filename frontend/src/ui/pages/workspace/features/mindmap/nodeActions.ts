@@ -237,7 +237,7 @@ export async function mergeNodes(a: string, b: string) {
     throw new Error("A card that feeds a merge can't take its child back in.");
   }
   if ((store.childrenByParent[parent.id] ?? []).length > 1) {
-    throw new Error("Other tangents branch from that card, so it can't take this one back in.");
+    throw new Error("Other branches grow from that card, so it can't take this one back in.");
   }
   if (isPending(a) || isPending(b)) throw new Error("That card is still being made. Try again in a moment.");
   if (parent.id in store.streaming || child.id in store.streaming) throw new Error("Wait for the reply to finish first.");

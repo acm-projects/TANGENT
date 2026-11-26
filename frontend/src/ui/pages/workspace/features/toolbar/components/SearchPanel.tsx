@@ -70,7 +70,7 @@ export function SearchPanel({ projectId, onClose }: SearchPanelProps) {
           <Input
           autoFocus
           type="search"
-          aria-label="Search this project's cards"
+          aria-label="Search this case's cards"
           placeholder="Words in a card's title or conversation…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

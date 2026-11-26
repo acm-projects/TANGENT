@@ -55,7 +55,7 @@ function SourceList({
                 title={s.name}
               />
               {s.node_id && nodeLabels?.[s.node_id] && (
-                <Text size="xs" hierarchy="tertiary" content={`Node ${nodeLabels[s.node_id]}`} />
+                <Text size="xs" hierarchy="tertiary" content={`Card ${nodeLabels[s.node_id]}`} />
               )}
               <Frame direction="row" gap="2" align="center" className="source-usage">
                 <Icon icon={s.kind === "pdf" ? "picture_as_pdf" : s.kind === "link" ? "link" : "image"} size="s" />
@@ -115,7 +115,7 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
 
         {error && <Text role="alert" size="s" content={error} />}
         {sources === null && !error && <Loading />}
-        {sources?.length === 0 && <Text hierarchy="tertiary" size="s" className="sources-empty" content="Nothing filed yet. Add a PDF, or ask a chat to find papers, and any chat in this project can cite it." />}
+        {sources?.length === 0 && <Text hierarchy="tertiary" size="s" className="sources-empty" content="Nothing filed yet. Add a PDF, or ask a chat to find papers, and any card in this case can cite it." />}
 
         {globalReadable.length > 0 && (
           <Frame as="section" gap="2" aria-labelledby="sources-project-heading">
@@ -132,7 +132,7 @@ export function SourcesPanel({ projectId, onClose }: SourcesPanelProps) {
         )}
         {nodeLevel.length > 0 && (
           <Frame as="section" gap="2" aria-labelledby="sources-node-heading">
-            <Text as="h3" face="stamp" id="sources-node-heading" size="xxs" className="toolbar-panel-kicker" content="Node-level sources" />
+            <Text as="h3" face="stamp" id="sources-node-heading" size="xxs" className="toolbar-panel-kicker" content="Card sources" />
             <SourceList sources={nodeLevel} onOpen={open} nodeLabels={nodeLabels} />
           </Frame>
         )}

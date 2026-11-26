@@ -45,8 +45,8 @@ describe("sketchTree", () => {
 
 describe("nextProjectName", () => {
   it("takes the smallest free number", () => {
-    expect(nextProjectName([])).toBe("Project (1)");
-    expect(nextProjectName(["Project (1)", "Project (3)", "Gym"])).toBe("Project (2)");
+    expect(nextProjectName([])).toBe("Case (1)");
+    expect(nextProjectName(["Case (1)", "Case (3)", "Gym"])).toBe("Case (2)");
   });
 });
 

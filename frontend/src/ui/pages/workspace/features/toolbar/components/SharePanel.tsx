@@ -71,7 +71,7 @@ export function SharePanel({ slug, projectId, branchNodeId, onClose }: SharePane
         {role !== "shared" && state.status === "loading" && <Loading />}
         {state.status === "error" && <Text role="alert" size="s" content={state.message} />}
         {state.status === "forbidden" && (
-          <Text role="status" size="s" hierarchy="tertiary" content="Only the project owner can manage sharing." />
+          <Text role="status" size="s" hierarchy="tertiary" content="Only the case's owner can manage sharing." />
         )}
 
         {role !== "shared" && state.status === "ready" && (

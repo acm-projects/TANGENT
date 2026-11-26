@@ -329,7 +329,7 @@ function Conversation({ turns, busy, open }: { turns: GentTurn[]; busy: boolean;
     <ol ref={listRef} className="gent-chat-history chat-history" aria-live="polite" aria-label="Conversation with Gent" onScroll={onScroll}>
       {turns.length === 0 && (
         <li className="gent-hint">
-          <Text size="s" content="Give me a research task. I work in the tree: I plan in the Field Notes, branch, ask the cards, and tell you where the answers are." />
+          <Text size="s" content="Give me a research task. I work on the case: I plan in the Field Notes, branch, ask the cards, and tell you where the answers are." />
         </li>
       )}
       {turns.map((t, i) =>
@@ -462,7 +462,7 @@ const NUDGE_LABEL: Record<string, string> = {
  * tool's input and output. */
 function Step({ step }: { step: GentStep }) {
   const exhibits = useTreeStore(useShallow((s) => selectExhibits(s)));
-  const here = useGentStore((s) => s.cwd?.address ?? "the tree");
+  const here = useGentStore((s) => s.cwd?.address ?? "the case");
   let label: string;
   let body: ReactNode;
   // a card's answer is what he sent for: it arrives as a scrap of the card's paper, its first lines in view
