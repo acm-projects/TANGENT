@@ -293,7 +293,7 @@
 /* ── workspaces ───────────────────────────────────────────── */
 
 /* each workspace is an index card laid on the sheet */
-.workspace-row {
+.account-workspace {
   position: relative;
   display: flex;
   align-items: center;
@@ -306,12 +306,12 @@
   --pop-rotate: 0deg;
 }
 
-.workspace-row:is(:hover, :focus-within) {
+.account-workspace:is(:hover, :focus-within) {
   border-color: var(--color-border-strong);
 }
 
 /* a little folder, with the workspace's initial written on its front */
-.workspace-row-tab {
+.account-workspace-tab {
   position: relative;
   display: grid;
   place-items: center;
@@ -326,7 +326,7 @@
   transition: rotate var(--motion-base) var(--ease-spring);
 }
 
-.workspace-row-tab::before {
+.account-workspace-tab::before {
   content: "";
   position: absolute;
   bottom: 100%;
@@ -339,66 +339,66 @@
   background: var(--color-card-alt);
 }
 
-.workspace-row:hover .workspace-row-tab {
+.account-workspace:hover .account-workspace-tab {
   rotate: -6deg;
 }
 
 /* the folder you point at gets a red marker tab */
-.workspace-row-tab::before {
+.account-workspace-tab::before {
   transition: background-color var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
 
-.workspace-row:is(:hover, :focus-within) .workspace-row-tab::before {
+.account-workspace:is(:hover, :focus-within) .account-workspace-tab::before {
   border-color: var(--color-string);
   background: var(--color-string);
 }
 
-.workspace-row-body {
+.account-workspace-body {
   flex: 1;
   min-width: 0;
 }
 
 /* the name's link covers the whole row, so anywhere on it opens the workspace */
-.workspace-row-link {
+.account-workspace-link {
   min-width: 0;
   border-radius: var(--radius-sm);
 }
 
-.workspace-row-link::after {
+.account-workspace-link::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: var(--radius-lg);
 }
 
-.workspace-row-link:focus-visible {
+.account-workspace-link:focus-visible {
   outline: none;
 }
 
-.workspace-row:has(.workspace-row-link:focus-visible) {
+.account-workspace:has(.account-workspace-link:focus-visible) {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
-.workspace-row:has(.workspace-row-link:hover) .workspace-row-name {
+.account-workspace:has(.account-workspace-link:hover) .account-workspace-name {
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
 /* the row's buttons stay clickable above the stretched link */
-.workspace-row-actions {
+.account-workspace-actions {
   position: relative;
   z-index: 1;
 }
 
-.workspace-row-name {
+.account-workspace-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* stamped on the folder this page was opened from */
-.workspace-row-here {
+.account-workspace-here {
   flex: none;
   padding: 0.1em 0.5em;
   rotate: -3deg;
@@ -409,12 +409,12 @@
 
 /* With a mouse, a row's actions wait for it to be pointed at; on touch they always show. */
 @media (hover: hover) {
-  .workspace-row-actions {
+  .account-workspace-actions {
     opacity: 0;
     transition: opacity var(--motion-base) var(--ease-out);
   }
 
-  .workspace-row:is(:hover, :focus-within) .workspace-row-actions {
+  .account-workspace:is(:hover, :focus-within) .account-workspace-actions {
     opacity: 1;
   }
 }

@@ -33,17 +33,17 @@ export function WorkspaceRow({ workspace, projects, current, canDelete, onRename
   }
 
   return (
-    <Panel as="li" stock="card" className="workspace-row">
-      <Panel as="div" stock="card-alt" className="workspace-row-tab" aria-hidden="true">
+    <Panel as="li" stock="card" className="account-workspace">
+      <Panel as="div" stock="card-alt" className="account-workspace-tab" aria-hidden="true">
         <Text as="span" size="s" face="heading" content={title.charAt(0).toUpperCase()} />
       </Panel>
-      <Frame gap="0" className="workspace-row-body">
+      <Frame gap="0" className="account-workspace-body">
         {name === null ? (
           <Frame direction="row" gap="2" align="center">
-            <Link href={`/${encodeURIComponent(workspace.workspace_slug)}/dashboard`} className="workspace-row-link">
-              <Text as="span" size="m" hierarchy="primary" className="workspace-row-name" content={title} />
+            <Link href={`/${encodeURIComponent(workspace.workspace_slug)}/dashboard`} className="account-workspace-link">
+              <Text as="span" size="m" hierarchy="primary" className="account-workspace-name" content={title} />
             </Link>
-            {current && <Text as="span" size="xxs" face="stamp" className="workspace-row-here" content="Current" />}
+            {current && <Text as="span" size="xxs" face="stamp" className="account-workspace-here" content="Current" />}
           </Frame>
         ) : (
           <Frame as="form" gap="0" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && setName(null)}>
@@ -62,7 +62,7 @@ export function WorkspaceRow({ workspace, projects, current, canDelete, onRename
         )}
         <Text as="span" size="xs" hierarchy="tertiary" content={projects === 0 ? "Empty" : `${projects} ${projects === 1 ? "case" : "cases"}`} />
       </Frame>
-      <Frame direction="row" gap="1" align="center" className="workspace-row-actions">
+      <Frame direction="row" gap="1" align="center" className="account-workspace-actions">
         <Button hierarchy="tertiary" size="s" icon="edit" label={`Rename ${title}`} showIcon showLabel={false} title="Rename" onClick={() => setName(title)} />
         <Button
           hierarchy="tertiary"
