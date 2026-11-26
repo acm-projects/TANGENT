@@ -237,6 +237,8 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
     m.merge_source_ids = [x!.id, y!.id];
     return json({ ...meta(m), fork: null });
   }
+  // before the per-node routes, which would take "live" for a card id
+  if (route === "GET /nodes/live") return json({ node_ids: [] });
   if (a === "nodes" && b) {
     const n = nodes.get(b);
     if (!n) return fail(404, "No such card.");
@@ -292,7 +294,6 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
   if (a === "shares" && d === "shares") return json({ shares: [] });
   if (a === "shares" && d === "share") return json({ message: "Invite sent (mock: nothing was emailed)." });
   if (a === "shares" && b && !c && method === "GET") return json({ project_name: projects[0].project_name, inviter_name: "Alex Kim", email: account.email });
-  if (route === "GET /nodes/live") return json({ node_ids: [] });
   if (route === "GET /debates/models") return json({ models: models.map((m) => ({ id: m.id, label: m.name })), default: models[0].id, rounds: { default: 3, max: 5 } });
 
   return fail(501, `The mock backend doesn't handle ${route}.`);

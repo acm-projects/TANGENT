@@ -774,7 +774,8 @@
 
 .branch-divider {
   gap: 0;
-  padding-block: var(--space-6) var(--space-4);
+  /* the message above already ends in its own space-6: the rule sits evenly between the reply and the next question */
+  padding-block: 0 var(--space-6);
   color: var(--color-text-muted);
 }
 

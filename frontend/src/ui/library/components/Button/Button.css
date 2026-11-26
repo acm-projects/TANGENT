@@ -118,4 +118,14 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  /* A primary button that can't be pressed yet is a stamp not yet inked: its outline pencilled on the paper, not a
+   * half-faded black slab (which reads as a muddy grey block). It inks in when it can be pressed. */
+  [data-ui="panel"][data-component="button"][data-hierarchy="primary"]:disabled {
+    opacity: 1;
+    background: transparent;
+    border: 1px dashed var(--color-border-strong);
+    box-shadow: none;
+    color: var(--color-text-muted);
+  }
 }
