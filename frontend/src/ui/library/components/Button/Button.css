@@ -57,9 +57,14 @@
     padding: var(--space-2);
   }
 
-  /* hover — flat: secondary and tertiary share one, primary has its own */
-  [data-ui="panel"][data-component="button"]:hover:not(:disabled) {
+  /* hover — flat: secondary lifts to paper, primary has its own */
+  [data-ui="panel"][data-component="button"][data-hierarchy="secondary"]:hover:not(:disabled) {
     background: var(--color-surface-raised);
+  }
+
+  /* tertiary tints from its own text colour, so it reads on paper, cork and ink alike */
+  [data-ui="panel"][data-component="button"][data-hierarchy="tertiary"]:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 10%, transparent);
   }
 
   [data-ui="panel"][data-component="button"][data-hierarchy="primary"]:hover:not(:disabled) {

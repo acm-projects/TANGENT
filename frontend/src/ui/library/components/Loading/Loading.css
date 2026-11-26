@@ -17,6 +17,7 @@
     background:
       var(--texture-pin),
       var(--color-string);
+    box-shadow: var(--shadow-pin);
   }
 
   @media (prefers-reduced-motion: no-preference) {
