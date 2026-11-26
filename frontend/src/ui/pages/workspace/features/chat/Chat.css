@@ -1049,7 +1049,7 @@
  * it: the top edge fades in once there is anything above. */
 @supports (animation-timeline: scroll()) {
   .chat-scroll {
-    mask-image: linear-gradient(transparent, #000 var(--chat-scroll-fade, 0px));
+    mask-image: linear-gradient(transparent, #000 var(--chat-scroll-fade));
     animation: scroll-fade linear both;
     animation-timeline: scroll(self);
     animation-range: 0 3rem;

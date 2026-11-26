@@ -285,7 +285,7 @@
   border-radius: var(--radius-full);
   background: var(--color-gent-fill);
   color: var(--color-text-on-gent);
-  font-size: var(--font-size-xxs, 0.65rem);
+  font-size: var(--font-size-xxs);
   line-height: 1.15rem;
   text-align: center;
   pointer-events: none;

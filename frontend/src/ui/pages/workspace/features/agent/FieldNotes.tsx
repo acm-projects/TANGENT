@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { GentNote } from "@/api/types";
 import { Button, Frame, Input, Panel, Text, TextArea } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
@@ -28,14 +28,20 @@ function readOpen() {
   }
 }
 
+// read after hydration (the server renders it open); `mem` keeps a toggle alive when storage is blocked
+let mem: boolean | null = null;
+const subs = new Set<() => void>();
+const subscribe = (fn: () => void) => (subs.add(fn), () => void subs.delete(fn));
+const getOpen = () => (mem ??= readOpen());
+
 export function FieldNotes({ className }: { className?: string }) {
   // what Gent has written in so far: his changes arrive one at a time as he writes them (notesQueue.ts)
   const notes = useGentStore((s) => s.shownNotes);
-  const [open, setOpen] = useState(true);
+  const open = useSyncExternalStore(subscribe, getOpen, () => true);
   const station = useGentStation<HTMLElement>(NOTES);
-  useEffect(() => setOpen(readOpen()), []);
   const toggle = (next: boolean) => {
-    setOpen(next);
+    mem = next;
+    subs.forEach((fn) => fn());
     try {
       localStorage.setItem(OPEN_KEY, next ? "1" : "0");
     } catch {

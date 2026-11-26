@@ -28,6 +28,7 @@
   z-index: 2;
   top: 0;
   left: 50%;
+  --unzoom: 1; /* GentPresence sets the real one inline */
   translate: -50% -78%;
   scale: 0;
   transition: scale var(--motion-fast) var(--ease-out);
@@ -44,8 +45,8 @@
 
 .gent-perch .gent-avatar {
   display: block;
-  width: calc(24px * var(--unzoom, 1));
-  height: calc(24px * var(--unzoom, 1));
+  width: calc(24px * var(--unzoom));
+  height: calc(24px * var(--unzoom));
   filter: var(--shadow-floating-drop);
 }
 
