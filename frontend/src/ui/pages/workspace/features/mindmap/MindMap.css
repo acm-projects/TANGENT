@@ -417,6 +417,17 @@
   right: 4.2rem;
 }
 
+/* the letter on a tag (TagMark): the card's paper colour on the tag's, small and heavy enough to read */
+.tag-mark-letter {
+  fill: var(--color-card);
+  font-family: var(--font-content);
+  font-size: 6.5px;
+  font-weight: var(--font-weight-medium);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
 /* The "Tag this card" popup: a list of what each colour means, the picked one ringed; two small shape tiles below. */
 .tag-picker {
   min-width: 18rem;

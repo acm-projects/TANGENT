@@ -96,6 +96,25 @@
   --gent-ink: #006c93;
   --on-gent-ink: #f3f2ef;
 
+  /* Tag colours (a card's flag or pin, TagMark): graphics only, never text. Night's are lifted a step so they hold
+   * against the dark board round the card. */
+  --tag-ochre-light: #d19a2a;
+  --tag-ochre-dark: #e3b04a;
+  --tag-sage-light: #6f9a78;
+  --tag-sage-dark: #8fbd98;
+  --tag-rust-light: #c0623b;
+  --tag-rust-dark: #db7c54;
+  --tag-slate-light: #5f86b3;
+  --tag-slate-dark: #7fa5d1;
+  --tag-plum-light: #9a6a94;
+  --tag-plum-dark: #b98ab3;
+  --tag-teal-light: #3f9a96;
+  --tag-teal-dark: #5fbab5;
+  --tag-rose-light: #c97a8c;
+  --tag-rose-dark: #e095a6;
+  --tag-graphite-light: #6b6862;
+  --tag-graphite-dark: #9a968e;
+
   /* ── tier 2: semantic ────────────────────────────────────────── */
 
   /* the board everything is pinned to, and the lamp over it. The lamp and
@@ -168,6 +187,16 @@
   --color-pin: light-dark(var(--pin-grey-light), var(--pin-grey-dark));
   --color-danger: var(--oxblood);
   /* Blue means "Gent did this", as red means the user did. */
+  /* the eight tag colours, by name (api/types TagColor); a tag's meaning is its case's label, not its colour */
+  --color-tag-ochre: light-dark(var(--tag-ochre-light), var(--tag-ochre-dark));
+  --color-tag-sage: light-dark(var(--tag-sage-light), var(--tag-sage-dark));
+  --color-tag-rust: light-dark(var(--tag-rust-light), var(--tag-rust-dark));
+  --color-tag-slate: light-dark(var(--tag-slate-light), var(--tag-slate-dark));
+  --color-tag-plum: light-dark(var(--tag-plum-light), var(--tag-plum-dark));
+  --color-tag-teal: light-dark(var(--tag-teal-light), var(--tag-teal-dark));
+  --color-tag-rose: light-dark(var(--tag-rose-light), var(--tag-rose-dark));
+  --color-tag-graphite: light-dark(var(--tag-graphite-light), var(--tag-graphite-dark));
+
   --color-gent: var(--blue-gent);
   /* Gent's flat ink: a solid panel (Panel material="ink") and the text on it */
   --color-gent-fill: var(--gent-ink);

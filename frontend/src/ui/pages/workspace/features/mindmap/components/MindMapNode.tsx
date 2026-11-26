@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { createContext, memo, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from "react";
 import { Button, Frame, DangerButton, Icon, Panel, Popup, Text } from "@/ui/library";
 import { apiErrorMessage } from "@/api";
-import { ENDING_LABELS, TAG_HEX, tagLabels } from "@/api/types";
+import { ENDING_LABELS, tagColor, tagLabels, tagMark } from "@/api/types";
 import type { Ending, NodeTag } from "@/api/types";
 import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
@@ -328,7 +328,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             )}
           </AnimatePresence>
           {(!data.hasParent || data.debate) && <span className="mindmap-node-rule" aria-hidden="true" />}
-          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged: ${tagName || data.tag.color}`} />}
+          {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} mark={tagMark(data.tag.color, tagName)} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged: ${tagName || data.tag.color}`} />}
           {!data.hasParent && <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="The case" />}
           {data.compact && (
             <>
@@ -381,7 +381,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           )}
           {/* what the tag means in this case, under the title (an unnamed colour shows only its flag) */}
           {data.tag && tagName && (
-            <span className="mindmap-node-taglabel" style={{ "--swatch": TAG_HEX[data.tag.color] } as React.CSSProperties}>
+            <span className="mindmap-node-taglabel" style={{ "--swatch": tagColor(data.tag.color) } as React.CSSProperties}>
               <Text as="span" size="xs" content={tagName} />
             </span>
           )}

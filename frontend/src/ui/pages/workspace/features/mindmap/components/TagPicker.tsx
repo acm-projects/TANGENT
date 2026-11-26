@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, apiErrorMessage } from "@/api";
 import { Button, Frame, Input, Text } from "@/ui/library";
-import { TAG_HEX, tagLabels, type NodeTag, type TagColor, type TagShape } from "@/api/types";
+import { TAG_COLORS, tagColor, tagLabels, tagMark, type NodeTag, type TagColor, type TagShape } from "@/api/types";
 import { useTreeStore } from "@/store/treeStore";
 import { TagMark } from "./TagMark";
 
@@ -9,7 +9,7 @@ const SHAPES: { shape: TagShape; label: string }[] = [
   { shape: "flag", label: "Flag" },
   { shape: "pin", label: "Pin" },
 ];
-const COLORS = Object.keys(TAG_HEX) as TagColor[];
+const COLORS = TAG_COLORS;
 
 /* The body of the "Tag this card" popup: a list of what each colour means in this case (a research default set, a
  * few left blank), pick one to pin it; the case's owner can rename them ("Name the colours"). A shape changes a tag
@@ -53,7 +53,7 @@ export function TagPicker({ tag, onTag, onClose }: {
         <Frame as="ol" gap="2" className="tag-picker-list">
           {COLORS.map((color) => (
             <Frame as="li" direction="row" gap="3" align="center" key={color} className="tag-picker-row">
-              <span className="tag-picker-dot" aria-hidden="true" style={{ "--swatch": TAG_HEX[color] } as React.CSSProperties} />
+              <span className="tag-picker-dot" aria-hidden="true" style={{ "--swatch": tagColor(color) } as React.CSSProperties} />
               <Input
                 aria-label={`Name for ${color}`}
                 value={naming[color]}
@@ -83,7 +83,7 @@ export function TagPicker({ tag, onTag, onClose }: {
               type="button"
               className="tag-picker-row tag-picker-option"
               aria-pressed={tag?.color === color}
-              style={{ "--swatch": TAG_HEX[color] } as React.CSSProperties}
+              style={{ "--swatch": tagColor(color) } as React.CSSProperties}
               onClick={() => onTag({ shape, color })}
             >
               <span className="tag-picker-dot" aria-hidden="true" />
@@ -96,7 +96,7 @@ export function TagPicker({ tag, onTag, onClose }: {
         <Frame direction="row" gap="1" role="group" aria-label="Shape">
           {SHAPES.map((option) => (
             <button key={option.shape} type="button" className="tag-picker-shape" aria-pressed={shape === option.shape} aria-label={option.label} title={option.label} onClick={() => pick(option.shape)}>
-              <TagMark shape={option.shape} color={tag?.color ?? "ochre"} aria-hidden="true" />
+              <TagMark shape={option.shape} color={tag?.color ?? "ochre"} mark={tagMark(tag?.color ?? "ochre", labels[tag?.color ?? "ochre"])} aria-hidden="true" />
             </button>
           ))}
         </Frame>

@@ -100,10 +100,12 @@ export interface NodeTag {
   color: TagColor;
 }
 /** Mid-tones that hold ~3:1 on paper and on the dark board; graphics only, never text colour. */
-export const TAG_HEX: Record<TagColor, string> = {
-  ochre: "#d19a2a", sage: "#6f9a78", rust: "#c0623b", slate: "#5f86b3",
-  plum: "#9a6a94", teal: "#3f9a96", rose: "#c97a8c", graphite: "#6b6862",
-};
+/** Every tag colour, in the picker's order. */
+export const TAG_COLORS: TagColor[] = ["ochre", "sage", "rust", "slate", "plum", "teal", "rose", "graphite"];
+/** A tag colour as CSS: its token (colors.css --color-tag-*), which has a Day and a Night value. */
+export const tagColor = (color: TagColor) => `var(--color-tag-${color})`;
+/** What's printed on a tag's flag or pin, so colour isn't the only cue: its name's first letter, or its number. */
+export const tagMark = (color: TagColor, label: string) => (label.trim() ? label.trim()[0]!.toUpperCase() : String(TAG_COLORS.indexOf(color) + 1));
 /** What each colour means unless the case renames it (backend DEFAULT_TAG_LABELS): a research default, three blank. */
 export const DEFAULT_TAG_LABELS: Record<TagColor, string> = {
   ochre: "Key finding", sage: "Supported", rust: "Contradicts", slate: "Needs a source",
