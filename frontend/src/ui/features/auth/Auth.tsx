@@ -55,8 +55,11 @@ export function Auth({ mode, next }: AuthProps) {
         </Frame>
 
         {/* Google's "light" custom button: official four-colour G, unaltered, on a light surface. */}
-        <button
+        <Panel
+          as="button"
           type="button"
+          hierarchy="secondary"
+          stock="composer"
           className="auth-gsi"
           // Absolute URL to the backend (see .env.example), not an internal Next page.
           onClick={() => window.location.assign(googleLoginUrl(process.env.NEXT_PUBLIC_API_BASE_URL!, next))}
@@ -68,7 +71,7 @@ export function Auth({ mode, next }: AuthProps) {
             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
           </svg>
           <Text as="span" size="s" content="Continue with Google" />
-        </button>
+        </Panel>
 
         <Link href={copy.switchTo(next)} className="auth-switch">
           <Text size="s" hierarchy="tertiary" content={copy.switchText} />

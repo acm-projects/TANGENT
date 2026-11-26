@@ -69,7 +69,7 @@
   width: 100%;
 }
 
-/* Google's light button: light surface, hairline border, the G on the left. */
+/* Google's light button: a composer-paper Panel (surface, hairline border, text colour), the G on the left. */
 .auth-gsi {
   display: flex;
   align-items: center;
@@ -78,10 +78,7 @@
   width: 100%;
   min-height: 2.75rem;
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border-on-paper);
   border-radius: var(--radius-md);
-  background: var(--color-composer);
-  color: var(--color-text-on-paper);
   cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--ease-out),
@@ -90,7 +87,7 @@
 }
 
 .auth-gsi:hover {
-  background: var(--color-card-alt);
+  background: var(--texture-grain), var(--color-card-alt);
   box-shadow: var(--shadow-lift);
 }
 
@@ -100,7 +97,7 @@
 }
 
 .auth-gsi:focus-visible {
-  outline: 2px solid var(--color-focus-ring-on-paper);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
