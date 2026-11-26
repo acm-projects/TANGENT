@@ -1,6 +1,7 @@
 import type { ComponentProps, ElementType } from "react";
 import type { Elevation, Hierarchy } from "../../types/Types";
 import { InkLayer } from "../Ink/InkLayer";
+import { TornLayer } from "../Torn/TornLayer";
 import "./Panel.css";
 
 /* A surface: background, border, radius, padding. `as` picks the native tag,
@@ -21,6 +22,8 @@ type PaperParams = {
   ruled?: "none" | "lines" | "margin";
   /** three punched binder holes down the left edge */
   holes?: boolean;
+  /** seeds a torn edge so it keeps its shape (the board passes a per-node number); left out, it comes from useId */
+  tear?: number;
 };
 type Side = "top" | "right" | "bottom" | "left";
 type Corner = "top-left" | "top-right" | "bottom-right" | "bottom-left";
@@ -71,6 +74,7 @@ export function Panel<T extends PanelTag = "div">(props: PanelProps<T>) {
     edge = "clean",
     ruled = "none",
     holes = false,
+    tear,
     stitch = "all",
     round = "all",
     pressed = false,
@@ -99,6 +103,8 @@ export function Panel<T extends PanelTag = "div">(props: PanelProps<T>) {
       data-material={material}
       {...params}
     >
+      {/* torn paper's own outline, computed from this panel's size (primitives/Torn) */}
+      {material === "paper" && edge === "torn" && <TornLayer seed={tear} />}
       {/* Gent's living ink, drawn under the content (primitives/Ink) */}
       {material === "ink" && <InkLayer seed={seed} calm={calm} />}
       {children}

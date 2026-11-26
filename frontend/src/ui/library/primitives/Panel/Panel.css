@@ -114,7 +114,7 @@
       linear-gradient(to right, transparent 28px, var(--color-string) 28px 30px, transparent 30px) 0 0 / 100% 100% no-repeat;
   }
 
-  /* torn: the paper moves to ::before so its mask doesn't clip the shadow. Layers, top first: a 4px-inset
+  /* torn (strip mask: the fallback until TornLayer sets --torn-clip): the paper moves to ::before so its mask doesn't clip the shadow. Layers, top first: a 4px-inset
    * rectangle (intersect: trims the top/bottom strips' nubs at the corners, inside every tear), top and bottom
    * strips, a solid centre, then a cap that stops the side strips 8px short of each end (intersect: it only
    * sees the two side strips below it). So no strip can poke past another at a corner. No border (the tear
@@ -142,6 +142,12 @@
     mask-position: 4px 0, 0 0, 0 100%, 6px 6px, 0 0, 0 0, 100% 0;
     mask-repeat: no-repeat, repeat-x, repeat-x, no-repeat, no-repeat, repeat-y, repeat-y;
     mask-composite: intersect, add, add, add, intersect, add, add;
+  }
+  /* once TornLayer has measured the panel, its own outline replaces the strip mask */
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-torn-ready]::before,
+  [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-torn-ready]::after {
+    mask: none;
+    clip-path: var(--torn-clip);
   }
   [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card"]::before { background: var(--texture-grain), var(--color-card); }
   [data-ui="panel"][data-hierarchy="secondary"][data-edge="torn"][data-stock="card-alt"]::before { background: var(--texture-grain), var(--color-card-alt); }
