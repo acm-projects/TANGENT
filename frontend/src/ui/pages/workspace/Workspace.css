@@ -11,7 +11,27 @@
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   height: 100dvh;
   overflow: hidden;
+  /* the page's lighting over the cork Panel: dark corners, the lamp's pool, then the cork and board colour */
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
+}
+
+/* Decals ride the board's own edges, not the panning viewport */
+.workspace-scrap-a,
+.workspace-scrap-b {
+  position: absolute;
+  z-index: 0;
+}
+
+.workspace-scrap-a {
+  top: -2rem;
+  left: 40%;
+  rotate: 6deg;
+}
+
+.workspace-scrap-b {
+  bottom: -2.5rem;
+  left: 7rem;
+  rotate: -8deg;
 }
 
 .workspace > * {

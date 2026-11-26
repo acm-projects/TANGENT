@@ -73,7 +73,7 @@ export function QuestionPrompt({ node }: QuestionPromptProps) {
       <Frame gap="3">
         <Frame direction="row" gap="1" align="center">
           <Icon icon="help" size="s" />
-          <Text as="span" size="xxs" className="question-kicker" content={`${asker}${q.trail.length ? ` · question ${q.trail.length + 1}` : ""}`} />
+          <Text as="span" face="stamp" size="xxs" className="question-kicker" content={`${asker}${q.trail.length ? ` · question ${q.trail.length + 1}` : ""}`} />
         </Frame>
         {q.trail.map((t) => (
           <Text key={t.prompt} size="xs" hierarchy="tertiary" content={`${t.prompt} ${said(t.answer)}`} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { Background, BackgroundVariant, ReactFlow, useReactFlow } from "@xyflow/react";
+import { ReactFlow, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
@@ -67,6 +67,9 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
   );
   const setActive = useTreeStore((s) => s.setActive);
   const projectName = useTreeStore((s) => s.project?.project_name);
+  // the plate's number: the first four digits of the project's id, upper-cased, stable per case
+  const caseNumber = useTreeStore((s) => (s.project?.id ?? "").replace(/-/g, "").slice(0, 4).toUpperCase());
+  const cardCount = Object.keys(structure.nodesById).length;
   const { nodes, edges } = useMemo(() => toFlow(structure), [structure]);
   const [stagger, setStagger] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -129,10 +132,13 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
         <Text role="status" size="s" className="mindmap-merge-hint" content="Pick a card to merge with · Esc to cancel" />
       )}
       {load.status === "ready" && projectName && (
-        // the case's label, pinned to the board's corner
-        <Panel elevation="floating" className="mindmap-case-label">
-          <Text as="span" size="xxs" className="mindmap-case-kicker" content="Case file" />
+        // the case's name plate, riveted to the board's corner
+        <Panel material="leather" elevation="floating" className="mindmap-case-label">
+          <Text as="span" face="stamp" size="xxs" className="mindmap-case-kicker" content="Case file" />
+          <Text as="span" face="heading" size="m" className="mindmap-case-number" content={`No. ${caseNumber}`} />
+          <hr className="mindmap-case-groove" />
           <Text as="h1" size="l" hierarchy="primary" className="mindmap-case-name" content={projectName} />
+          <Text as="span" size="xs" hierarchy="tertiary" className="mindmap-case-count" content={`${cardCount} ${cardCount === 1 ? "card" : "cards"}`} />
         </Panel>
       )}
       {load.status === "ready" && (
@@ -171,7 +177,6 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
           // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} patternClassName="mindmap-dots" />
           <FlyTo />
         </ReactFlow>
         </Merge>

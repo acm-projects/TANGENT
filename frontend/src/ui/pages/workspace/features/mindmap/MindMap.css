@@ -22,19 +22,12 @@
   }
 }
 
-/* the dot grid (Figma "BG-Grid-Dot") */
-.mindmap-dots {
-  /* keep in step with the dot grid in Login.css */
-  fill: var(--color-text-faint);
-  opacity: 0.45;
-}
-
-/* the string: grey by default, red on the selected path */
+/* the string: graphite by default, red on the selected path (the user's) */
 /* Real string has weight: it throws a soft shadow on the board below it. */
 .mindmap .mindmap-edge .react-flow__edge-path {
   fill: none;
   stroke: var(--color-text-faint);
-  stroke-width: 1.8;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-dasharray: 1;
   filter: drop-shadow(0 2px 1.5px var(--color-string-shadow));
@@ -99,12 +92,10 @@
 }
 
 /* Focus: with a card picked, the cards off its thread lie flat on the board
- * (no lift, a fainter edge) and their strings fade, so the red path reads as
+ * (no drop shadow, so no lift) and their strings fade, so the red path reads as
  * the line of inquiry. Titles keep their contrast; hovering brings a card back. */
 .mindmap[data-focused] .mindmap-node[data-state="default"]:not(:hover, :focus-visible) {
-  border-color: var(--color-border);
-  box-shadow: none;
-  background: var(--texture-grain), color-mix(in srgb, var(--color-surface) 70%, var(--color-board));
+  filter: none;
 }
 
 .mindmap[data-focused] .mindmap-edge:not(.mindmap-edge-path) {
@@ -124,11 +115,12 @@
   width: max-content;
 }
 
+/* The paper, its tear, ink and shadow are the Panel's (torn card stock, or Gent's ink for a question he asked);
+ * this is the card's size, its state colours and its pin. */
 .mindmap-node {
   position: relative;
   padding: var(--space-3) var(--space-6) var(--space-2);
   min-height: 4.5rem;
-  border-radius: var(--radius-md);
   /* one leaf column is 300px wide (layout.ts), so a card never reaches its neighbour */
   max-width: 17rem;
   font: inherit;
@@ -136,37 +128,22 @@
   color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    border-color var(--motion-fast) var(--ease-out),
-    box-shadow var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out),
-    background var(--motion-base) var(--ease-out);
+  transition: color var(--motion-fast) var(--ease-out);
 }
 
 .mindmap-node[data-state="path"] {
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-lift);
   color: var(--color-text-secondary);
 }
 
-/* Figma draws selected and hovered nodes with a 2px border. A 1px border
- * plus a 1px ring looks the same without resizing the node, which would
- * nudge its edges on every hover. */
+/* picked: ringed in the user's red, a little clear of the card (its lift, scale and straightening are in MindMapNode.tsx) */
 .mindmap-node[data-state="selected"] {
-  border-color: var(--color-border-strong);
   color: var(--color-text);
-  box-shadow: var(--shadow-lift), 0 0 0 1px var(--color-border-strong);
+  outline: 2px solid var(--color-string);
+  outline-offset: 5px;
 }
 
-/* hover: the card lifts (the motion is in MindMapNode.tsx), so its shadow grows */
 .mindmap-node:hover {
-  border-color: var(--color-border-emphasis);
   color: var(--color-text);
-  box-shadow: var(--shadow-lift);
-}
-
-.mindmap-node[data-state="selected"]:hover {
-  box-shadow: var(--shadow-lift), 0 0 0 1px var(--color-border-emphasis);
 }
 
 .mindmap-node:focus-visible {
@@ -174,20 +151,26 @@
   outline-offset: 2px;
 }
 
-/* Titles are the heading face. */
 /* The root is the case itself: labelled, a size up, and ruled twice round
- * like the cover of a file. */
+ * like the cover of a file (.mindmap-node-rule). */
 .mindmap-node[data-root] {
   max-width: 20rem;
-  border-width: 3px;
-  border-style: double;
-  border-color: var(--color-border-strong);
+  padding: var(--space-4) var(--space-8) var(--space-3);
+}
+
+/* the file-cover rule: a double line inset from the edge. A debate's verdict gets a single one, below. */
+.mindmap-node-rule {
+  position: absolute;
+  inset: 7px;
+  border: 3px double var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
 }
 
 .mindmap-node-kicker {
   display: block;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  /* the stamp face, a touch above xxs */
+  font-size: 0.6875rem;
   color: var(--color-text-muted);
 }
 
@@ -198,7 +181,6 @@
   margin-top: var(--space-2);
   padding-right: var(--space-2);
   border-right: 1px solid var(--color-border);
-  font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
@@ -216,7 +198,6 @@
   line-height: var(--line-height-tight);
   /* margin, not padding: padding would show the clamped third line */
   margin-block: var(--space-2);
-  font-family: var(--font-heading);
 }
 
 .mindmap-node-subtitle {
@@ -244,31 +225,33 @@
   opacity: 1;
 }
 
-/* The pin each card hangs from, where its string is wound. A domed head: a
- * highlight up-left, a shadow cast down-right onto the card. Graphite at rest;
- * red on the selected path, since red means connected. */
-.mindmap-node::before {
+/* The pin each card hangs from, where its string is wound: an 18px domed head
+ * centred on the top edge. Graphite at rest; red on the selected path, since red
+ * means connected. On ::after: torn paper's ::before is the paper. */
+.mindmap-node::after {
   content: "";
   position: absolute;
-  top: -0.3rem;
+  top: -0.5625rem;
   left: 50%;
-  width: 0.9rem;
-  height: 0.9rem;
+  z-index: 1;
+  width: 1.125rem;
+  height: 1.125rem;
   translate: -50% 0;
   border-radius: var(--radius-full);
   background:
     var(--texture-pin),
-    var(--color-text-faint);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
+    var(--color-pin);
+  box-shadow: var(--shadow-pin);
+  pointer-events: none;
   transition: background-color var(--motion-base) var(--ease-out);
 }
 
-.mindmap-node:is([data-state="path"], [data-state="selected"])::before {
+.mindmap-node:is([data-state="path"], [data-state="selected"])::after {
   background-color: var(--color-string);
 }
 
 /* the selected card's pin is pressed in again as it is picked */
-.mindmap-node[data-state="selected"]::before {
+.mindmap-node[data-state="selected"]::after {
   animation: pin-press var(--motion-spring) var(--ease-spring);
 }
 
@@ -276,7 +259,7 @@
  * one loop the board allows (an in-progress state). Its own media query, since
  * a loop at a zeroed duration would still run. */
 @media (prefers-reduced-motion: no-preference) {
-  .mindmap-node[data-thinking]::before {
+  .mindmap-node[data-thinking]::after {
     animation: pin-think var(--motion-spring) var(--ease-out) infinite;
     animation-duration: calc(var(--motion-spring) * 2);
   }
@@ -284,10 +267,10 @@
 
 @keyframes pin-think {
   from {
-    box-shadow: 1px 2px 2px var(--color-string-shadow), 0 0 0 0 color-mix(in srgb, var(--color-string) 60%, transparent);
+    box-shadow: var(--shadow-pin), 0 0 0 0 color-mix(in srgb, var(--color-string) 60%, transparent);
   }
   to {
-    box-shadow: 1px 2px 2px var(--color-string-shadow), 0 0 0 0.9rem transparent;
+    box-shadow: var(--shadow-pin), 0 0 0 0.9rem transparent;
   }
 }
 
@@ -297,39 +280,36 @@
   }
 }
 
-/* A debate's verdict: a judgment on certificate stock. A second rule inset
+/* A debate's verdict: a judgment on certificate stock. A single rule inset
  * inside the edge, and the court's seal pressed into the top-right corner:
  * an ink double ring round a gavel (not red: red is for the user's own actions). */
-.mindmap-node[data-debate]::after {
-  content: "";
-  position: absolute;
+.mindmap-node[data-debate] .mindmap-node-rule {
   inset: 4px;
   border: 1px solid var(--color-border);
-  border-radius: calc(var(--radius-md) - 3px);
-  pointer-events: none;
   transition: border-color var(--motion-fast) var(--ease-out);
 }
 
-.mindmap-node[data-debate]:is(:hover, [data-state="selected"])::after {
-  border-color: var(--color-border-strong);
+.mindmap-node[data-debate]:is(:hover, [data-state="selected"]) .mindmap-node-rule {
+  border-color: var(--color-text-muted);
 }
 
 .mindmap-node-seal {
   position: absolute;
   top: -0.9rem;
   right: -0.7rem;
-  /* over the inner rule (::after), which would otherwise be drawn across it */
+  /* over the inner rule, which would otherwise be drawn across it */
   z-index: 1;
   display: grid;
   place-items: center;
   width: 2.3rem;
   height: 2.3rem;
   line-height: 1;
-  border: 3px double var(--color-border-emphasis);
+  border: 3px double var(--color-border-on-paper);
   border-radius: var(--radius-full);
-  background: var(--texture-grain), var(--color-surface);
+  background: var(--texture-grain), var(--color-slip);
   box-shadow: 1px 2px 3px var(--color-string-shadow);
-  color: var(--color-text-secondary);
+  /* paper's own ink, so the seal reads on Gent's ink card too */
+  color: var(--color-text-on-paper-secondary);
   rotate: -14deg;
   pointer-events: none;
 }
@@ -373,8 +353,6 @@
   top: -0.7rem;
   right: 0.6rem;
   padding: var(--space-1);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
   rotate: 7deg;
 }
 
@@ -392,11 +370,9 @@
   z-index: 1;
   padding: 0.15em 0.55em;
   border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-text);
+  background: var(--texture-grain), var(--color-slip);
   box-shadow: 1px 2px 2px var(--color-string-shadow);
-  color: var(--color-surface);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  color: var(--color-text-on-paper);
   pointer-events: none;
 }
 
@@ -409,7 +385,7 @@
   z-index: 1;
   width: 1.9rem;
   height: 1.9rem;
-  filter: drop-shadow(1px 2px 1.5px rgb(0 0 0 / 0.3));
+  filter: drop-shadow(1px 2px 1.5px var(--color-string-shadow));
   pointer-events: none;
 }
 
@@ -430,8 +406,6 @@
 /* The "Tag this card" popup: shape tiles and colour swatches, the picked one ringed. */
 .tag-picker-heading {
   color: var(--color-text-secondary);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .tag-picker-shape,
@@ -488,12 +462,9 @@
   padding: 0.1em 0.6em;
   border: 2px solid var(--stamp-ink);
   border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-surface);
+  background: var(--texture-grain), var(--color-slip);
   box-shadow: 1px 2px 2px var(--color-string-shadow);
   color: var(--stamp-ink);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   pointer-events: none;
 }
 
@@ -512,11 +483,7 @@
   opacity: 0.6;
 }
 
-/* A compact card: a thread pressed into one summary, filed on manila stock with a seal like the verdict's. */
-.mindmap-node[data-compact] {
-  background: var(--texture-grain), var(--color-card-alt);
-  border-style: dashed;
-}
+/* A compact card is manila stock (the Panel's stock, MindMapNode.tsx) with a seal like the verdict's. */
 
 /* ── the hover actions ────────────────────────────────────── */
 
@@ -592,19 +559,19 @@
   }
 }
 
-/* The case's label: a slip pinned in the board's top corner, clear of the
- * toolbar, a little crooked. It drops in after the cards. */
+/* The case's name plate: stitched leather in the board's top corner, clear of the
+ * toolbar. The leather, stitch and shadow are the Panel's. It drops in after the cards. */
 .mindmap-case-label {
   position: absolute;
-  /* low enough that its pin hides under an open toolbar panel too */
+  /* low enough that an open toolbar panel covers it too */
   top: var(--space-8);
   left: 6rem;
   /* over the map, under the toolbar's panels (Workspace.css stacks the toolbar at 2) */
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   max-width: min(22rem, 30vw);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  rotate: -1.5deg;
+  padding: var(--space-3) var(--space-6);
   pointer-events: none;
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
   --pop-from: 0 -2rem;
@@ -612,32 +579,33 @@
   --pop-scale: 1.1;
 }
 
-.mindmap-case-label::before {
-  content: "";
-  position: absolute;
-  top: -0.3rem;
-  left: 50%;
-  width: 0.8rem;
-  height: 0.8rem;
-  translate: -50% 0;
-  border-radius: var(--radius-full);
-  background:
-    var(--texture-pin),
-    var(--color-text-faint);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
+.mindmap-case-kicker {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
 }
 
-.mindmap-case-kicker {
-  display: block;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.mindmap-case-number {
+  font-variant-numeric: tabular-nums;
+}
+
+/* a pressed groove: a dark line with a light one under it */
+.mindmap-case-groove {
+  width: 100%;
+  height: 0;
+  margin: var(--space-2) 0;
+  border: 0;
+  border-top: 2px solid var(--color-deboss-shadow);
+  box-shadow: 0 1px 0 var(--color-deboss-light);
 }
 
 .mindmap-case-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mindmap-case-count {
+  font-variant-numeric: tabular-nums;
 }
 
 /* too narrow: the chat takes the screen and the label would crowd the toolbar */
@@ -665,11 +633,12 @@
   z-index: 5;
   max-width: 24rem;
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border);
+  /* plain elements (a motion.div and a Text), so the slip's paper is written from its stock tokens */
+  border: 1px solid var(--color-border-on-paper);
   border-radius: var(--radius-lg);
-  background: var(--texture-grain), var(--color-surface);
+  background: var(--texture-grain), var(--color-slip);
   box-shadow: var(--shadow-floating);
-  color: var(--color-text);
+  color: var(--color-text-on-paper);
   animation: pop-in var(--motion-spring) var(--ease-spring);
   --pop-from: 0 -1rem;
 }
@@ -762,6 +731,13 @@
   position: fixed;
   z-index: 50;
   translate: var(--space-2) -50%;
+  padding: var(--space-1);
+  box-shadow: var(--shadow-lift);
+}
+
+/* options ruled apart like an index card */
+.mark-menu > * + * {
+  border-top: 1px solid var(--color-border);
 }
 
 .drag-action {
@@ -873,8 +849,6 @@
 
 .question-kicker {
   color: var(--color-text-muted);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .question-option {
@@ -894,8 +868,9 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
   background: none;
   color: var(--color-text);
   font: inherit;
@@ -918,7 +893,7 @@
 
 /* the choice the user picked: red, as the user's own choices are everywhere */
 .question-choice[aria-pressed="true"] {
-  border-color: var(--color-string);
+  border-bottom-color: var(--color-string);
   background: color-mix(in srgb, var(--color-string) 8%, transparent);
   box-shadow: inset 3px 0 0 var(--color-string);
 }
@@ -934,4 +909,9 @@
 
 .question-error {
   color: var(--color-danger);
+}
+
+/* on Gent's ink card his own answers can't be blue on blue */
+.mindmap-node[data-material="ink"] .question-branch[data-author="gent"] {
+  color: inherit;
 }
