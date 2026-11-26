@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Button, DangerButton, Decal, Divider, Frame, Icon, Image, InkPanel, InkText, Input, Link, Loading, Panel, Select, Text, TextArea } from "@/ui/library";
+import { Button, Decal, Divider, Frame, Icon, Image, InkPanel, InkText, Input, Link, Loading, Panel, Select, Text, TextArea } from "@/ui/library";
 import type { Hierarchy, TextSize } from "@/ui/library";
 import { LightingPicker } from "@/ui/features/settings/LightingPicker";
-import { PickerSpecimen, PopupSpecimen } from "./PopupSpecimen";
+import { PickerSpecimen, PopupSpecimen, DangerSpecimen } from "./PopupSpecimen";
 import "./DevLibrary.css";
 
 /* The /dev/library gallery: every library primitive and Panel material, built from the real components,
@@ -355,10 +355,10 @@ export function DevLibrary() {
             </Panel>
           </Specimen>
           <Specimen caption="DangerButton at rest">
-            <DangerButton label="Delete case" showIcon icon="delete" onHold={() => {}} />
+            <DangerSpecimen />
           </Specimen>
           <Specimen caption="DangerButton disabled">
-            <DangerButton label="Delete case" showIcon icon="delete" disabled onHold={() => {}} />
+            <DangerSpecimen disabled />
           </Specimen>
           <Specimen caption='Loading label="Reading pollen cores…"'>
             <Loading label="Reading pollen cores…" />
