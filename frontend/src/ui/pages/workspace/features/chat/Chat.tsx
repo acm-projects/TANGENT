@@ -1,12 +1,13 @@
 "use client";
 
-import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
 import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Loading, Panel, Popup, Text } from "@/ui/library";
 import { useDebateStore } from "@/store/debateStore";
 import { StartDebate } from "../debate/components/StartDebate";
 import { useSearchHighlight } from "./searchHighlight";
+import { MergeChoices, MergeStack, PathBar, mergeKey } from "./components/MergeStack";
 import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
@@ -52,55 +53,27 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
     <>
       {items.map((item, i) => {
         if (item.kind === "merge") {
-          const lanes = item.branches.length;
           return (
-            // Two (or more) lines of inquiry joined into this card: one block, each branch a coloured lane that
-            // opens to its thread, drawn running together into where the conversation carries on.
-            <li key={`merge-${i}`} className="chat-merge" style={{ "--lanes": lanes } as CSSProperties}>
-              <Frame direction="row" gap="2" align="center" className="chat-merge-head">
-                <Icon icon="merge" size="s" />
-                <Text as="span" face="stamp" size="xxs" content={`Joined from ${lanes} branches`} />
-              </Frame>
-              <ol className="chat-merge-branches">
-                {item.branches.map((source, lane) => {
-                  const count = countMessages(source.items);
-                  return (
-                    <li key={source.from} className="chat-merge-lane" style={{ "--lane": `var(--merge-lane-${lane % 4})` } as CSSProperties}>
-                      <details>
-                        <summary className="chat-merge-branch-heading">
-                          <span className="chat-merge-lane-dot" aria-hidden="true" />
-                          <Text as="span" size="xs" hierarchy="tertiary" className="chat-merge-exhibit" content={source.exhibit} />
-                          <Text as="span" size="s" className="chat-merge-title" content={source.title ?? "Untitled branch"} />
-                          <Text as="span" size="xs" hierarchy="tertiary" className="chat-merge-count" content={`${count} message${count === 1 ? "" : "s"}`} />
-                        </summary>
-                        <ol className="chat-history chat-merge-history">
-                          <HistoryList
-                            items={source.items}
-                            activeNodeId={activeNodeId}
-                            streaming={streaming}
-                            canRetry={canRetry}
-                            branch={branch}
-                            retry={retry}
-                            edit={edit}
-                          />
-                        </ol>
-                      </details>
-                    </li>
-                  );
-                })}
-              </ol>
-              <MergeJoin lanes={lanes} />
-            </li>
+            <MergeStack
+              key={mergeKey(item)}
+              merge={item}
+              render={(inner) => (
+                <HistoryList items={inner} activeNodeId={activeNodeId} streaming={streaming} canRetry={canRetry} branch={branch} retry={retry} edit={edit} />
+              )}
+            />
           );
         }
 
         const isActive = item.node.id === activeNodeId;
         return (
           <Fragment key={item.node.id}>
-            {i > 0 && (
-              <Frame as="li">
+            {/* where this card's part of the thread starts: the path bar's crumbs scroll here */}
+            {i > 0 ? (
+              <Frame as="li" data-node-divider={item.node.id}>
                 <BranchDivider exhibit={item.exhibit} title={item.node.title} />
               </Frame>
+            ) : (
+              <li className="chat-node-start" data-node-divider={item.node.id} aria-hidden="true" />
             )}
             {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
             {item.node.node_type === "debate" && isActive && (
@@ -183,6 +156,12 @@ export function Chat({ className }: ChatProps) {
   const loaded = chat.loadedMessageCount;
   // A reply starting counts; its tokens don't (the observer below keeps up with them, without re-pinning per token).
   const scrollKey = `${layout}:${chat.activeNodeId}:${loaded}:${chat.streaming !== null}`;
+  // which page of each merge's stack is in front, shared by the stacks and the path bar
+  const [fronts, setFronts] = useState<Record<string, number>>({});
+  const choices = useMemo(
+    () => ({ front: (key: string) => fronts[key] ?? 0, choose: (key: string, lane: number) => setFronts((f) => ({ ...f, [key]: lane })) }),
+    [fronts],
+  );
   // an open search marks its words in the thread too, and brings the picked card's first one into view
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   useSearchHighlight(scroller, chat.activeNodeId, `${chat.activeNodeId}:${loaded}`);
@@ -250,6 +229,7 @@ export function Chat({ className }: ChatProps) {
           }}
         />
       )}
+      <MergeChoices value={choices}>
       <Frame gap="2" className="chat-inner">
         <Frame as="header" direction="row" justify="between" align="center">
           <Button
@@ -292,7 +272,12 @@ export function Chat({ className }: ChatProps) {
         {activeNode && (
           <Frame key={activeNode.id} gap="1" className="chat-title">
             <Text as="h2" size="xl" hierarchy="primary" className="chat-title-name" content={activeNode.title ?? "Untitled card"} />
-            {path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />}
+            {/* with a merge on the way, the path is a bar to pick which branch to read; otherwise one quiet line */}
+            {chat.history.some((it) => it.kind === "merge") ? (
+              <PathBar items={chat.history} activeNodeId={chat.activeNodeId} />
+            ) : (
+              path.length > 0 && <Text as="span" size="s" hierarchy="tertiary" face="heading" className="chat-path" content={`In: ${path.join(" › ")}`} />
+            )}
           </Frame>
         )}
 
@@ -423,6 +408,7 @@ export function Chat({ className }: ChatProps) {
           className={chat.blocker === "no-selection" ? "chat-field chat-field-idle" : "chat-field"}
         />
       </Frame>
+      </MergeChoices>
     </Panel>
   );
 }
@@ -452,27 +438,5 @@ function CourtButton({ nodeId, projectId }: { nodeId: string; projectId: string 
         {starting && <StartDebate projectId={projectId} nodeId={nodeId} onClose={() => setStarting(false)} />}
       </Popup>
     </>
-  );
-}
-
-/** How many messages a branch's thread holds (its own cards and any merge further up). */
-function countMessages(items: HistoryItem[]): number {
-  return items.reduce((n, it) => n + (it.kind === "node" ? (it.messages?.length ?? 0) : it.branches.reduce((m, b) => m + countMessages(b.items), 0)), 0);
-}
-
-/** The lanes drawn running together into one string, which carries on into the card below. */
-function MergeJoin({ lanes }: { lanes: number }) {
-  const w = 120;
-  const xs = Array.from({ length: lanes }, (_, k) => (lanes === 1 ? w / 2 : 12 + (k * (w - 24)) / (lanes - 1)));
-  return (
-    <Frame direction="row" gap="2" align="center" className="chat-merge-join">
-      <svg viewBox={`0 0 ${w} 28`} width={w} height={28} aria-hidden="true">
-        {xs.map((x, k) => (
-          <path key={k} d={`M${x} 0 C${x} 14 ${w / 2} 12 ${w / 2} 24`} style={{ stroke: `var(--merge-lane-${k % 4})` }} />
-        ))}
-        <circle cx={w / 2} cy={24} r={3.5} />
-      </svg>
-      <Text as="span" size="xs" hierarchy="tertiary" content="They meet here, and the thread carries on below." />
-    </Frame>
   );
 }

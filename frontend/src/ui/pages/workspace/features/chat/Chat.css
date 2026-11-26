@@ -242,112 +242,247 @@
   --pop-scale: 0.97;
 }
 
-/* A merge in the thread: one block, a coloured lane per joined branch (open one to read it), and the lanes drawn
- * running together into the string that carries on below. Lane colours are the string's red and three inks. */
-.chat-merge {
-  --merge-lane-0: var(--color-string);
-  --merge-lane-1: var(--color-text-secondary);
-  --merge-lane-2: var(--color-border-emphasis);
-  --merge-lane-3: var(--color-text-muted);
-  margin-block: var(--space-4);
-  padding: var(--space-3) var(--space-3) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--texture-grain), var(--color-surface);
+/* the first card's start in the thread, for the path bar to scroll to (it has no divider) */
+.chat-node-start {
+  height: 0;
 }
 
-.chat-merge-head {
-  padding-inline: var(--space-1);
-  color: var(--color-text-secondary);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+/* ── a merge: pages clipped together (components/MergeStack) ── */
+
+.merge-stack {
+  position: relative;
+  margin-block: var(--space-6) var(--space-4);
+  /* the stack sits a little in from the sheet's edges, so the pages behind have room to show */
+  padding-inline: var(--space-1) var(--space-3);
 }
 
-.chat-merge-branches,
-.chat-merge-history {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.chat-merge-branches {
-  display: grid;
+/* the tabs over the top edge, like index tabs: the front page's joins it, the rest sit lower, behind */
+.merge-stack-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
   gap: var(--space-1);
-  margin-block: var(--space-2);
+  margin: 0 0 -1px var(--space-8);
+  padding: 0;
+  list-style: none;
 }
 
-.chat-merge-branch-heading {
+.merge-stack-tab-slot {
+  min-width: 0;
+}
+
+.merge-stack-tab {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
+  gap: var(--space-1);
+  max-width: 14rem;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--texture-grain), var(--color-card-alt);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  list-style: none;
-  transition: background-color var(--motion-fast) var(--ease-out);
+  translate: 0 4px;
+  transition:
+    translate var(--motion-base) var(--ease-spring),
+    background-color var(--motion-fast) var(--ease-out);
 }
 
-.chat-merge-branch-heading::-webkit-details-marker {
-  display: none;
+.merge-stack-tab:is(:hover, :focus-visible) {
+  translate: 0 1px;
 }
 
-.chat-merge-branch-heading:is(:hover, :focus-visible) {
-  background: var(--color-track);
+.merge-stack-tab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
-.chat-merge-branch-heading::after {
-  content: "expand_more";
-  margin-left: auto;
-  font-family: var(--font-symbols);
-  color: var(--color-text-muted);
-  transition: rotate var(--motion-spring) var(--ease-spring);
+/* the front page's tab: same paper as the page, joined to it */
+.merge-stack-tab[aria-pressed="true"] {
+  translate: 0 0;
+  background: var(--texture-grain), var(--color-card);
+  color: var(--color-text);
+  cursor: default;
 }
 
-.chat-merge-lane > details[open] > .chat-merge-branch-heading::after {
-  rotate: 180deg;
-}
-
-.chat-merge-lane-dot {
-  flex: none;
-  align-self: center;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-full);
-  background: var(--lane);
-}
-
-.chat-merge-exhibit,
-.chat-merge-count {
+.merge-stack-exhibit {
   flex: none;
   font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
 }
 
-.chat-merge-title {
+.merge-stack-tab-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* an open lane: its thread, ruled down the side in the lane's colour */
-.chat-merge-history {
-  margin: var(--space-1) 0 var(--space-2) calc(var(--space-2) + 0.3rem);
-  padding: var(--space-2) 0 var(--space-2) var(--space-4);
-  border-left: 2px solid var(--lane);
+.merge-stack-pages {
+  position: relative;
+  display: grid;
 }
 
-.chat-merge-join {
-  padding-inline: var(--space-1);
+/* the pages behind the front one: their edges show below and to the right, each a touch more askew */
+.merge-stack-under {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--texture-grain), var(--color-card-alt);
+  box-shadow: var(--shadow-floating);
+  translate: calc(var(--depth) * 5px) calc(var(--depth) * 5px);
+  rotate: calc(var(--depth) * 0.6deg);
+  z-index: 0;
 }
 
-.chat-merge-join path {
+/* the front page: the branch's thread, in full */
+.merge-stack-page {
+  position: relative;
+  grid-area: 1 / 1;
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+  background: var(--texture-grain), var(--color-card);
+  box-shadow: var(--shadow-floating);
+  transform-origin: 50% 0;
+}
+
+.merge-stack-head {
+  padding-left: var(--space-6);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.merge-stack-history {
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  list-style: none;
+}
+
+/* the paperclip over the stack's top-left corner, holding every page */
+.merge-stack-clip {
+  position: absolute;
+  top: -1.9rem;
+  left: var(--space-2);
+  z-index: 3;
+  width: 1.1rem;
+  height: 2.6rem;
+  rotate: -8deg;
+  filter: drop-shadow(1px 2px 1px var(--color-string-shadow));
+  pointer-events: none;
+}
+
+.merge-stack-clip path {
   fill: none;
-  stroke-width: 2;
+  stroke: var(--color-text-muted);
+  stroke-width: 2.2;
   stroke-linecap: round;
 }
 
-.chat-merge-join circle {
-  fill: var(--color-string);
+.merge-stack-foot {
+  padding: var(--space-3) var(--space-2) 0;
+  color: var(--color-text-muted);
+}
+
+/* ── the path bar, under the sheet's title, when the thread runs through a merge ── */
+
+.path-bar-list,
+.path-bar-nested {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* a › between steps */
+.path-bar-list > li + li::before,
+.path-bar-nested > li + li::before {
+  content: "›";
+  margin-right: var(--space-1);
+  color: var(--color-text-faint);
+}
+
+.path-bar-crumb button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 0.1rem var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.path-bar-crumb button:is(:hover, :focus-visible) {
+  background: var(--color-track);
+}
+
+.path-bar-crumb button[aria-current] {
+  color: var(--color-text);
+}
+
+.path-bar-exhibit {
+  font-variant-numeric: tabular-nums;
+}
+
+.path-bar-merge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* a merge's choice: its pages as a tiny stack, the front one raised and filled */
+.path-bar-choices {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-track);
+  box-shadow: 2px 2px 0 -1px var(--color-card-alt), 2px 2px 0 0 var(--color-border);
+}
+
+.path-bar-choice {
+  padding: 0.1rem var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out), translate var(--motion-base) var(--ease-spring);
+}
+
+.path-bar-choice[aria-pressed="true"] {
+  background: var(--texture-grain), var(--color-card);
+  color: var(--color-text);
+  box-shadow: var(--shadow-floating);
+  translate: 0 -1px;
+}
+
+.path-bar-choice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* a merge inside the chosen branch: its own choice, in brackets right after */
+.path-bar-nested::before {
+  content: "(";
+  color: var(--color-text-faint);
+}
+
+.path-bar-nested::after {
+  content: ")";
+  color: var(--color-text-faint);
 }
 
 .message-text {

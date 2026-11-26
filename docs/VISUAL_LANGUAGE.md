@@ -276,8 +276,11 @@ plain paper with an empty dashed socket while he's out working.
 - **Tags say what a card is.** Eight colours, each named per case: Key finding, Supported, Contradicts,
   Needs a source, Open question, and three left blank for the case's own. A tagged card shows the name
   under its title; Tag sits on the card's action strip.
-- **A merge reads as a merge.** In the thread, joined branches are one block: a coloured lane per branch
-  (open it to read), drawn running together into the card the thread carries on in.
+- **A merge is pages clipped together.** In the thread, the joined branches are a paperclipped stack: one
+  page in front with its thread, the others behind with tabs peeking over the top. Picking a tab slides the
+  front page down behind the stack and brings the picked one forward. A branch that holds a merge has its
+  own stack inside its page, so merges nest. The path bar under the sheet's title shows each merge as a
+  small stack of choices (nested ones in brackets); choosing one brings that page forward and scrolls to it.
 - **The court is in the sheet.** The sheet's header has the court button (Debate, or Return to court while
   one runs); the board's own court button shows only while the sheet is away.
 - **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).

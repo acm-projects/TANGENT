@@ -1,0 +1,151 @@
+"use client";
+
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { Frame, Icon, Text } from "@/ui/library";
+import { spring } from "@/ui/library/tokens/motion";
+import type { HistoryItem } from "../useChat";
+
+/* A merge in the thread, as paper: the joined branches are pages clipped together, one in front (its thread shown
+ * in full), the others behind with their tabs peeking out over the top. Pick a tab (or a choice in the sheet's path
+ * bar) and the front page slides down behind the stack while the picked one comes forward. A branch that holds a
+ * merge of its own shows its own stack inside its page, so merges nest the same way at any depth.
+ *
+ * Which page is in front is shared (MergeChoices) so the stack and the path bar agree. Styles in ../Chat.css. */
+
+export type MergeItem = Extract<HistoryItem, { kind: "merge" }>;
+
+/** A merge's identity in the thread: its branches' source cards, which don't change while it's shown. */
+export const mergeKey = (merge: MergeItem) => merge.branches.map((b) => b.from).join("+");
+
+type Choices = { front(key: string): number; choose(key: string, lane: number): void };
+export const MergeChoices = createContext<Choices>({ front: () => 0, choose: () => {} });
+
+export function MergeStack({ merge, render }: { merge: MergeItem; render(items: HistoryItem[]): ReactNode }) {
+  const { front, choose } = useContext(MergeChoices);
+  const key = mergeKey(merge);
+  const lanes = merge.branches.length;
+  const at = Math.min(front(key), lanes - 1);
+  const page = merge.branches[at]!;
+  return (
+    <MotionConfig reducedMotion="user">
+      <li className="merge-stack" data-merge-key={key} style={{ "--pages": lanes } as CSSProperties}>
+        {/* the tabs over the top edge: the front page's tab joins its page, the others sit behind */}
+        <ol className="merge-stack-tabs" aria-label="Joined branches">
+          {merge.branches.map((b, lane) => (
+            <motion.li layout transition={spring.lift} key={b.from} className="merge-stack-tab-slot">
+              <button
+                type="button"
+                className="merge-stack-tab"
+                aria-pressed={lane === at}
+                onClick={() => choose(key, lane)}
+                title={b.title ?? "Untitled branch"}
+              >
+                <Text as="span" size="xs" className="merge-stack-exhibit" content={b.exhibit} />
+                <Text as="span" size="xs" className="merge-stack-tab-title" content={b.title ?? "Untitled branch"} />
+              </button>
+            </motion.li>
+          ))}
+        </ol>
+        <div className="merge-stack-pages">
+          {/* the pages behind: edges showing under and beside the front one, a little askew */}
+          {Array.from({ length: Math.min(lanes - 1, 3) }, (_, k) => (
+            <span key={k} className="merge-stack-under" aria-hidden="true" style={{ "--depth": k + 1 } as CSSProperties} />
+          ))}
+          <svg className="merge-stack-clip" viewBox="0 0 24 56" aria-hidden="true">
+            <path d="M8 46 V12 a5 5 0 0 1 10 0 V44 a8 8 0 0 1 -16 0 V16" />
+          </svg>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={page.from}
+              className="merge-stack-page"
+              // the page coming forward rises from just behind; the one it replaces slides down and back
+              initial={{ y: -14, x: 10, rotate: 1.2, scale: 0.97, opacity: 0.4 }}
+              animate={{ y: 0, x: 0, rotate: 0, scale: 1, opacity: 1, zIndex: 2 }}
+              exit={{ y: 22, x: 14, rotate: 2.4, scale: 0.96, opacity: 0, zIndex: 0 }}
+              transition={spring.peel}
+            >
+              <Frame direction="row" gap="2" align="center" className="merge-stack-head">
+                <Icon icon="merge" size="s" />
+                <Text as="span" face="stamp" size="xxs" content={`Branch ${page.exhibit} · page ${at + 1} of ${lanes}`} />
+              </Frame>
+              <ol className="chat-history merge-stack-history">{render(page.items)}</ol>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        <Frame direction="row" gap="2" align="center" className="merge-stack-foot">
+          <Icon icon="south" size="s" />
+          <Text as="span" size="xs" hierarchy="tertiary" content={`${lanes} branches clipped together · the thread carries on below`} />
+        </Frame>
+      </li>
+    </MotionConfig>
+  );
+}
+
+/** The thread's path, under the sheet's title: a crumb per card, and at each merge a choice of which page is in
+ * front (nested in brackets when the chosen branch holds a merge of its own). A crumb scrolls the thread to its
+ * card; a choice also brings its page forward. */
+export function PathBar({ items, activeNodeId }: { items: HistoryItem[]; activeNodeId: string | null }) {
+  return (
+    <nav aria-label="Path to this card" className="path-bar">
+      <ol className="path-bar-list">
+        <Crumbs items={items} activeNodeId={activeNodeId} />
+      </ol>
+    </nav>
+  );
+}
+
+function scrollTo(selector: string) {
+  document.querySelector(`.chat-scroll ${selector}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function Crumbs({ items, activeNodeId }: { items: HistoryItem[]; activeNodeId: string | null }) {
+  const { front, choose } = useContext(MergeChoices);
+  return (
+    <>
+      {items.map((item) => {
+        if (item.kind === "node") {
+          const here = item.node.id === activeNodeId;
+          return (
+            <li key={item.node.id} className="path-bar-crumb">
+              <button type="button" aria-current={here ? "location" : undefined} onClick={() => scrollTo(`[data-node-divider="${item.node.id}"]`)}>
+                <Text as="span" size="xs" className="path-bar-exhibit" content={item.exhibit} />
+                {here && <Text as="span" size="xs" content={item.node.title ?? "This card"} />}
+              </button>
+            </li>
+          );
+        }
+        const key = mergeKey(item);
+        const at = Math.min(front(key), item.branches.length - 1);
+        const nested = item.branches[at]!.items.filter((it): it is MergeItem => it.kind === "merge");
+        return (
+          <li key={key} className="path-bar-merge">
+            {/* a little stack: one choice per page, the front one raised */}
+            <span className="path-bar-choices" role="group" aria-label="Which branch to read">
+              {item.branches.map((b, lane) => (
+                <button
+                  key={b.from}
+                  type="button"
+                  className="path-bar-choice"
+                  aria-pressed={lane === at}
+                  title={b.title ?? "Untitled branch"}
+                  onClick={() => {
+                    choose(key, lane);
+                    scrollTo(`[data-merge-key="${key}"]`);
+                  }}
+                >
+                  {b.exhibit}
+                </button>
+              ))}
+            </span>
+            {nested.length > 0 && (
+              <ol className="path-bar-nested" aria-label="Inside this branch">
+                <Crumbs items={nested} activeNodeId={activeNodeId} />
+              </ol>
+            )}
+          </li>
+        );
+      })}
+    </>
+  );
+}
