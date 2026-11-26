@@ -38,7 +38,7 @@
   text-align: center;
 }
 
-/* The case badge lockup: a leather tab (CASE FILE, number, groove, name) on the card's top edge. */
+/* The case badge lockup: a leather tab (CASE FILE, groove, name) on the card's top edge. */
 .auth-badge {
   display: inline-flex;
   align-items: center;
@@ -46,7 +46,7 @@
   padding: var(--space-1) var(--space-3);
 }
 
-/* the pressed groove between the file number and the name */
+/* the pressed groove between CASE FILE and the name */
 .auth-badge-groove {
   align-self: stretch;
   width: 3px;
@@ -67,6 +67,41 @@
 
 .auth-google {
   width: 100%;
+}
+
+/* Google's light button: light surface, hairline border, the G on the left. */
+.auth-gsi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border-on-paper);
+  border-radius: var(--radius-md);
+  background: var(--color-composer);
+  color: var(--color-text-on-paper);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    translate var(--motion-fast) var(--ease-out);
+}
+
+.auth-gsi:hover {
+  background: var(--color-card-alt);
+  box-shadow: var(--shadow-lift);
+}
+
+.auth-gsi:active {
+  box-shadow: var(--shadow-press);
+  translate: 0 1px;
+}
+
+.auth-gsi:focus-visible {
+  outline: 2px solid var(--color-focus-ring-on-paper);
+  outline-offset: 2px;
 }
 
 .auth-legal,
