@@ -117,11 +117,19 @@
   /* 1em is 1/14 of the card's width */
   font-size: calc(100cqi / 14);
   padding: 0.7em 0.7em 0.9em;
-  transition: box-shadow var(--motion-base) var(--ease-out);
+  transition: filter var(--motion-base) var(--ease-out);
 }
 
+/* Lifted off the board: ProjectCard's spring raises and tips the slot, and the
+ * shadow grows under it. A filter, not a box-shadow: torn paper draws on ::before,
+ * and a drop-shadow follows the tear. Pressed, it lies flat again. */
 .case-link:is(:hover, :focus-visible) .case-card {
-  box-shadow: var(--shadow-lift);
+  filter: var(--shadow-lift-drop);
+}
+
+.case-link:active .case-card {
+  filter: var(--shadow-floating-drop);
+  transition-duration: var(--motion-fast);
 }
 
 /* a grey pushpin, its head lit from the top left */
@@ -210,14 +218,6 @@
   color: var(--color-danger);
   font-size: 0.8em;
   opacity: 0.85;
-}
-
-@keyframes stamp-slam {
-  from {
-    opacity: 0;
-    scale: 2.4;
-    rotate: -24deg;
-  }
 }
 
 /* ── settings ──────────────────────────────────────────────── */

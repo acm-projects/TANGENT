@@ -110,6 +110,31 @@
   display: none;
 }
 
+/* The open tool is pinned to its panel: a red pin drops in beside its tile (red,
+ * since the panel beside it is connected to it). */
+.toolbar-tile[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -0.65rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  translate: 0 -50%;
+  border-radius: var(--radius-full);
+  background: var(--texture-pin), var(--color-string);
+  box-shadow: var(--shadow-pin);
+  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
+  /* a translate, so it starts above the -50% that centres the dot */
+  --pop-from: 0 -200%;
+  --pop-scale: 2;
+  --pop-rotate: 0deg;
+}
+
+.toolbar-tile[data-tip="left"][aria-pressed="true"]::after {
+  right: auto;
+  left: -0.65rem;
+}
+
 /* a tile tips as it lifts, like a card nudged on the board */
 [data-ui="panel"][data-component="button"].toolbar-tile:not([data-material="leather"]):hover:not(:disabled, :active) {
   rotate: -4deg;
@@ -284,15 +309,23 @@
   box-shadow: var(--shadow-floating);
   overflow: hidden;
   rotate: -3deg;
-  transition: rotate var(--motion-spring) var(--ease-spring);
+  transition:
+    rotate var(--motion-spring) var(--ease-spring),
+    translate var(--motion-spring) var(--ease-spring),
+    scale var(--motion-spring) var(--ease-spring),
+    box-shadow var(--motion-base) var(--ease-out);
 }
 
 .source-card:nth-child(even) .source-thumb {
   rotate: 2.5deg;
 }
 
+/* pointed at, the photo is picked up off the file: it straightens, rises and casts a longer shadow */
 .source-card:is(:hover, :focus-visible) .source-thumb {
   rotate: 0deg;
+  translate: 0 -2px;
+  scale: 1.06;
+  box-shadow: var(--shadow-lift);
 }
 
 .source-thumb-image {

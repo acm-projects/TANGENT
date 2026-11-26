@@ -206,17 +206,26 @@ each one maps to a spring preset (§6), so tuning happens in one file. Durations
 | Motion | Trigger | What happens |
 |---|---|---|
 | **Pin** | card created | the card drops onto the board with a small tilt and settles on a short spring; the pin presses |
-| **Lift** | hover, pick, drag | shadow grows, card rises (3px on the path, 6px and 1.04 scale when picked), the tilt straightens |
+| **Lift** | hover, focus, pick, drag | shadow grows (`shadow-lift`, or `shadow-lift-drop` on torn paper), card rises (3px on the path, 6px and 1.04 scale when picked). On the map the tilt straightens; a dashboard case card rises 10px and tips a little further its own way; pressed, it lies flat |
+| **Stamp** | a mark arrives (Shared, Current, the case badge, a verdict) | slams down from big and crooked onto the paper, after the paper has landed (`stamp-slam`) |
+| **Swing** | pointer brushes something hung (ID badge) | swings away from the brush, as hard as the pointer moved, and settles crooked (`spring.swing`) |
+| **Pin to** | a rail tool opens | a red pin drops in beside its tile: the panel is connected to it |
+| **Lamp** | counsel takes the floor | a lamp pool lights their table (`spot-lamp`); the other table steps back (dims, never hides) |
 | **String tension** | dragging a card | the string follows on a lagging spring; one small wobble on release |
 | **Ink in** | streaming tokens | each slice fades from a slight blur to sharp, like wet ink drying |
-| **Swing** | tags | tags swing on their knot |
+| **Swing (tags)** | tags | tags swing on their knot |
 | **Sheet** | notes sheet, drawers, popups | paper slides or drops in, a small tilt, springs flat |
 
 Rules:
 
 - Springs for anything physical (pin, lift, string); CSS durations and `@starting-style`
   (DESIGN.md Rule 7) for simple fades and enter/exit.
-- Nothing loops except an in-progress state: a breathing pin (Loading), Gent's ink.
+- Nothing loops except an in-progress state: a breathing pin (Loading), Gent's ink, the
+  pin of whoever has the floor, a button that's waiting on another site (Continue with
+  Google holds its press and its G breathes until the page goes).
+- Paper that holds still on the board rests a little crooked (≤1.5° if it holds text) and
+  straightens when you work in it: the sign-in card, source thumbnails. (The case label
+  ignores the pointer, so it just rests crooked.)
 - **Reduced motion:** durations go to zero, ink-in becomes a plain append, Gent's ink is still.
 
 ---

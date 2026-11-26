@@ -525,6 +525,21 @@ Override what the component renders at its root, not how it is built inside.
   uses the `motion` package. The presets live in `tokens/motion.ts` (`spring.pin`,
   `spring.lift`): tune them there, never inline. Wrap motion components in
   `<MotionConfig reducedMotion="user">`. Strings don't animate.
+- **Velocity needs a physics spring.** Motion ignores the `velocity` you hand a
+  time-defined spring (`visualDuration`/`bounce`). A preset meant to carry the pointer's
+  momentum (`spring.swing`) is written in `stiffness`/`damping`. Motion also skips a spring
+  whose start already equals its target, so nudge the value off the target first.
+- **Staggers are for arriving.** A `delay` that deals a list in must not also delay
+  hover, focus and press: once an item has landed, its transition drops the delay
+  (keep it on `layout` if it flies somewhere later).
+- **Hover has a keyboard twin.** Any lift, tip or reveal on `:hover` also happens on
+  `:focus-visible` or `:focus-within`; for a motion component, mirror it from focus state.
+- **Shadows on torn paper are filters.** Torn paper draws on `::before` behind a mask, so
+  a `box-shadow` change is invisible. Lift it with `--shadow-lift-drop`, rest it on
+  `--shadow-floating-drop`.
+- **Stamps share one keyframe.** `stamp-slam` in `motion.css`, tuned with `--slam-rotate`
+  and `--slam-scale`, after the thing it lands on (`--motion-slow` delay). No per-feature
+  stamp keyframes, and no hard-coded `420ms`.
 - Enter/exit animation is native now: `@starting-style` plus
   `transition-behavior: allow-discrete`. Reach for that before any JS.
 - **Reduced motion** works by zeroing the duration tokens under

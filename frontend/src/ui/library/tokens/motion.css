@@ -22,6 +22,10 @@
   --pop-from: 0 0.75rem;
   --pop-rotate: -2deg;
   --pop-scale: 0.82;
+
+  /* stamp-slam's starting pose (below): how far off true the stamp comes down. */
+  --slam-rotate: -24deg;
+  --slam-scale: 2.4;
 }
 
 /* Entrances for things that appear, shared app-wide: a pinned sheet dropping
@@ -34,6 +38,17 @@
     scale: var(--pop-scale);
     translate: var(--pop-from);
     rotate: var(--pop-rotate);
+  }
+}
+
+/* A rubber stamp brought down on the page: it starts big and crooked above the
+ * paper and lands on a spring at its own rotate. Set --slam-rotate and
+ * --slam-scale to say how hard. */
+@keyframes stamp-slam {
+  from {
+    opacity: 0;
+    scale: var(--slam-scale);
+    rotate: var(--slam-rotate);
   }
 }
 

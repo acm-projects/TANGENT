@@ -38,12 +38,17 @@
   text-align: center;
 }
 
-/* The case badge lockup: a leather tab (CASE FILE, groove, name) on the card's top edge. */
+/* The case badge lockup: a leather tab (CASE FILE, groove, name) on the card's top edge.
+ * Once the card has landed, the badge is stamped onto it. */
 .auth-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
+  rotate: -1deg;
+  animation: stamp-slam var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  --slam-rotate: -10deg;
+  --slam-scale: 1.6;
 }
 
 /* the pressed groove between CASE FILE and the name */
@@ -96,6 +101,23 @@
   translate: 0 1px;
 }
 
+/* sent off to Google: the press holds while the page goes, so the click visibly took */
+.auth-gsi[data-busy] {
+  box-shadow: var(--shadow-press);
+  translate: 0 1px;
+  cursor: progress;
+}
+
+.auth-gsi[data-busy] svg {
+  animation: auth-gsi-wait var(--motion-spring) var(--ease-in-out) infinite alternate;
+}
+
+@keyframes auth-gsi-wait {
+  to {
+    opacity: 0.35;
+  }
+}
+
 .auth-gsi:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -106,13 +128,20 @@
   text-align: center;
 }
 
-/* The card drops onto the board with a tilt and settles; its contents deal in
- * after it, top to bottom. */
+/* The card drops onto the board with a tilt and settles a little crooked on its
+ * pin; its contents deal in after it, top to bottom. Pointed at or worked in, it
+ * straightens, like a card you pick up to read. */
 .auth {
+  rotate: -0.8deg;
+  transition: rotate var(--motion-spring) var(--ease-spring);
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 0 -3rem;
   --pop-rotate: -5deg;
   --pop-scale: 0.9;
+}
+
+.auth:is(:hover, :focus-within) {
+  rotate: 0deg;
 }
 
 .auth > * > * {

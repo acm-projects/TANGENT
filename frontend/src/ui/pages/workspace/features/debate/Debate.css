@@ -178,6 +178,17 @@
   overflow-y: auto;
   border-radius: var(--radius-lg);
   scrollbar-width: thin;
+  transition: opacity var(--motion-slow) var(--ease-out);
+}
+
+/* Whoever has the floor stands in the lamp; across the room the other table
+ * steps back into the dark while they speak (dim to focus, never hidden). */
+.debate-table[data-floor] {
+  background: var(--spot-lamp);
+}
+
+.court-floor:has(.debate-table[data-floor]) .debate-table:not([data-floor]) {
+  opacity: 0.72;
 }
 
 .debate-table[data-side="against"] {
@@ -582,7 +593,9 @@
   border: 4px double var(--color-border-emphasis);
   border-radius: var(--radius-sm);
   rotate: -2deg;
-  animation: debate-stamp 420ms var(--ease-spring) 0.6s backwards;
+  animation: stamp-slam var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
+  --slam-rotate: -8deg;
+  --slam-scale: 1.6;
 }
 
 .debate-stamp[data-picked] {
@@ -601,20 +614,6 @@
 .debate-summary {
   max-width: 44ch;
   text-wrap: pretty;
-}
-
-@keyframes debate-stamp {
-  from {
-    opacity: 0;
-    scale: 1.6;
-    rotate: -8deg;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .debate-stamp {
-    animation: none;
-  }
 }
 
 .debate-error {

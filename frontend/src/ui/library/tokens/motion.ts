@@ -10,4 +10,8 @@ export const spring = {
   peel: { type: "spring", visualDuration: 0.3, bounce: 0.15 },
   /** a dashboard card flying between a folder and the grid */
   fly: { type: "spring", visualDuration: 0.55, bounce: 0.2 },
+  /** Something hung from one point (the ID badge on its clip), knocked by the pointer: it carries the
+   * knock's velocity, so it may bounce. Stiffness/damping, not visualDuration: Motion drops the velocity
+   * you hand a time-defined spring. ~1.7 swings a second, damping ratio ~0.4. */
+  swing: { type: "spring", stiffness: 120, damping: 9, mass: 1 },
 } as const;

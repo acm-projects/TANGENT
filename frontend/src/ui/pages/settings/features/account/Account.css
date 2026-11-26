@@ -339,7 +339,7 @@
   background: var(--color-card-alt);
 }
 
-.account-workspace:hover .account-workspace-tab {
+.account-workspace:is(:hover, :focus-within) .account-workspace-tab {
   rotate: -6deg;
 }
 
@@ -402,6 +402,9 @@
   flex: none;
   padding: 0.1em 0.5em;
   rotate: -3deg;
+  animation: stamp-slam var(--motion-spring) var(--ease-spring) calc(var(--motion-slow) + var(--motion-base)) backwards;
+  --slam-rotate: -14deg;
+  --slam-scale: 1.8;
   border: 0.14em solid var(--color-string);
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);

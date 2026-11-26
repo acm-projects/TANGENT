@@ -1,22 +1,52 @@
 "use client";
 
-import { motion } from "motion/react";
+import { useEffect, type PointerEvent } from "react";
+import { animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import type { Account } from "@/api/types";
 import { Frame, Image, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 
 /* The investigator's ID: a leather badge hung from a clip, with their photo (from
- * Google) or their initial, name and email. It swings on its clip when the
- * pointer brushes it, and settles back crooked. A new name reissues it: the
- * badge turns over and comes back round with the name on it. */
+ * Google) or their initial, name and email. When the pointer brushes it, it
+ * swings away from the brush, as hard as the pointer was moving, and settles
+ * back crooked on spring.swing (it carries the knock, so it may bounce). A new
+ * name reissues it: the badge turns over and comes back round with the name on it. */
+
+const REST = -2;
+/** deg/s of swing per px of pointer movement, and the most a knock can give */
+const KNOCK = 6;
+const MAX_KNOCK = 110;
+const MIN_KNOCK = 45;
 
 export function IdBadge({ account }: { account: Account }) {
+  const rotate = useMotionValue(-14);
+  const still = useReducedMotion();
+
+  useEffect(() => {
+    const hang = animate(rotate, REST, spring.pin);
+    return () => hang.stop();
+  }, [rotate]);
+
+  function knock(e: PointerEvent<HTMLDivElement>) {
+    if (still) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    // from the left it swings right (clockwise), from the right it swings left
+    const away = e.clientX < box.left + box.width / 2 ? 1 : -1;
+    const speed = Math.min(MAX_KNOCK, Math.max(MIN_KNOCK, Math.abs(e.movementX) * KNOCK));
+    // From the live angle, so a second brush mid-swing adds to it instead of jumping. Motion skips a
+    // spring whose start is already its target, so a badge at rest is first nudged the way it's knocked.
+    const velocity = rotate.getVelocity() + away * speed;
+    if (rotate.get() === REST) rotate.jump(REST + away * 0.25);
+    animate(rotate, REST, { ...spring.swing, velocity });
+  }
+
   return (
     <motion.div
       className="id-badge-hang"
-      initial={{ rotate: -14, y: -40, opacity: 0 }}
-      animate={{ rotate: -2, y: 0, opacity: 1, transition: spring.pin }}
-      whileHover={{ rotate: [-2, 4, -3, 1.5, -2], transition: { duration: 1.1, ease: "easeOut" } }}
+      style={{ rotate }}
+      initial={{ y: -40, opacity: 0 }}
+      animate={{ y: 0, opacity: 1, transition: spring.pin }}
+      onPointerEnter={knock}
     >
       <motion.div
         key={account.name}

@@ -104,6 +104,9 @@
   --color-board: light-dark(var(--board-light), var(--board-dark));
   --board-lamp: radial-gradient(ellipse 60% 70% at 40% 40%,
       light-dark(var(--lamp-light), var(--lamp-dark)), transparent 72%);
+  /* a desk lamp pulled over one spot (the counsel table that has the floor): a pool from the top edge */
+  --spot-lamp: radial-gradient(ellipse 90% 60% at 50% 0%,
+      light-dark(var(--lamp-light), var(--lamp-dark)), transparent 75%);
   --board-vignette: radial-gradient(ellipse 120% 100% at 45% 45%,
       transparent 45%, light-dark(var(--vignette-light), var(--vignette-dark)));
   --color-scrap: light-dark(var(--scrap-light), var(--scrap-dark));
@@ -192,6 +195,9 @@
     drop-shadow(0 3px 8px light-dark(rgb(40 30 20 / 0.14), rgb(0 0 0 / 0.45)));
   --shadow-lift: 0 2px 2px light-dark(rgb(40 30 20 / 0.08), rgb(0 0 0 / 0.3)),
     0 14px 24px -8px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.6));
+  /* --shadow-lift as a filter, for torn paper lifted off the board (a hovered case card) */
+  --shadow-lift-drop: drop-shadow(0 2px 2px light-dark(rgb(40 30 20 / 0.08), rgb(0 0 0 / 0.3)))
+    drop-shadow(0 14px 16px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.6)));
   --shadow-badge: 0 2px 3px rgb(10 6 2 / 0.35), 0 12px 22px -6px rgb(10 6 2 / 0.55);
   --shadow-rail: 3px 0 4px rgb(10 6 2 / 0.3), 10px 0 24px rgb(10 6 2 / 0.35);
   --shadow-pin: 1px 4px 4px rgb(20 12 6 / 0.45);

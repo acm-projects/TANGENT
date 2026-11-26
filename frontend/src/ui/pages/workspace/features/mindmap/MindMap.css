@@ -603,6 +603,8 @@
   max-width: min(22rem, 30vw);
   padding: var(--space-3) var(--space-6);
   pointer-events: none;
+  /* pinned up a little crooked, like everything else on the board (text: no more than 1.5°) */
+  rotate: -1.5deg;
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-slow) backwards;
   /* starts below the board's top edge: the cork clips overflow, so a drop from above it showed the badge cut off */
   --pop-from: 0 0.75rem;
