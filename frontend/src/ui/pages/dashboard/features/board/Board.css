@@ -77,9 +77,62 @@
 
 /* ── the grid ──────────────────────────────────────────────── */
 
+/* ── the piles: open, cold, closed ── */
+
+.board-piles {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* the open cases are what you came for: they take the whole first row; the cold and the closed share the next,
+ * each wrapping its own cards */
+.board-pile {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.board-pile[data-pile="open"] {
+  flex-basis: 100%;
+}
+
+/* a pile's name on a strip of masking tape stuck crooked to the cork, its ends torn */
+.board-pile-tape {
+  padding: var(--space-1) var(--space-4);
+  background: var(--texture-grain), color-mix(in srgb, var(--color-slip) 78%, transparent);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text-on-paper);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  rotate: -1.2deg;
+  clip-path: polygon(0 8%, 3% 0, 6% 10%, 9% 2%, 100% 0, 97% 14%, 100% 30%, 98% 50%, 100% 72%, 97% 88%, 100% 100%, 4% 100%, 1% 90%, 3% 70%, 0 52%, 2% 30%);
+}
+
+.board-pile[data-pile="cold"] .board-pile-tape {
+  rotate: 0.8deg;
+}
+
+.board-pile[data-pile="closed"] .board-pile-tape {
+  rotate: -0.4deg;
+}
+
+/* A cold case: its photo has faded and yellowed, the card itself greyed a little; pointed at, it comes back. */
+.case-card[data-status="cold"] .case-card-photo {
+  filter: sepia(0.55) saturate(0.6) contrast(0.9);
+  opacity: 0.8;
+  transition:
+    filter var(--motion-base) var(--ease-out),
+    opacity var(--motion-base) var(--ease-out);
+}
+
+.case-link:is(:hover, :focus-visible) .case-card[data-status="cold"] .case-card-photo {
+  filter: none;
+  opacity: 1;
+}
+
 .board-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-8) var(--space-6);
   padding: 0;
   list-style: none;
@@ -90,6 +143,12 @@
 .case-slot {
   position: relative;
   container-type: inline-size;
+}
+
+/* every card on the board is one size, whatever pile it's on */
+.board-grid > li {
+  flex: none;
+  width: 13rem;
 }
 
 .case-slot:has(.case-settings[data-open]) {
@@ -206,23 +265,65 @@
   height: 100%;
 }
 
-.case-sketch line {
-  stroke: var(--color-text-faint); /* graphite, off the path */
-  stroke-width: 0.9;
+/* the strings: graphite, the thread to the newest card red (red over grey, as on the map). They keep their
+ * weight however small the photo draws the board. */
+.case-sketch-string {
+  fill: none;
+  stroke: var(--color-text-faint);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.case-sketch-string[data-path] {
+  stroke: var(--color-string);
+  stroke-width: 1.6;
+}
+
+/* each card: a slip of the card stock, a hairline edge, the case card double-framed */
+.case-sketch-paper {
+  fill: var(--color-card);
+  stroke: var(--color-border-on-paper);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.case-sketch-frame {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.case-sketch-ink {
+  stroke: var(--color-text-faint);
+  stroke-width: 14;
   stroke-linecap: round;
 }
 
-.case-sketch line[data-path] {
-  stroke: var(--color-string);
-  stroke-width: 1.3;
+.case-sketch-pin {
+  fill: var(--color-pin);
 }
 
-.case-sketch circle {
-  fill: var(--color-text-muted);
-}
-
-.case-sketch circle[data-path] {
+.case-sketch-card[data-path] .case-sketch-pin {
   fill: var(--color-string);
+}
+
+/* where the case left off: ringed in red, as a picked card is on the map */
+.case-sketch-ring {
+  fill: none;
+  stroke: var(--color-string);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.case-sketch-flag {
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+
+/* a branch that ended recedes */
+.case-sketch-card[data-ended] {
+  opacity: 0.5;
 }
 
 .case-card-name {
@@ -246,6 +347,19 @@
 
 /* a rubber stamp across the photo's corner, in the oxblood ink */
 /* Stamped low on the photo, clear of the ⋯ button, and slammed down on arrival. */
+/* closed: stamped big across the photo */
+.case-card-stamp[data-stamp="closed"] {
+  bottom: auto;
+  top: 38%;
+  right: 50%;
+  translate: 50% 0;
+  padding: 0.15em 0.6em;
+  font-size: 1.05em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  rotate: -12deg;
+}
+
 .case-card-stamp {
   position: absolute;
   bottom: 6em;

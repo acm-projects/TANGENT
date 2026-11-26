@@ -24,6 +24,8 @@ const projects: ProjectSummary[] = [
   project("p-1", "Drought and the Bronze Age collapse"),
   project("p-2", "Why do cats purr?"),
   project("p-3", "Sourdough starter science"),
+  project("p-4", "What killed Tutankhamun?"),
+  project("p-5", "Who built Göbekli Tepe?"),
 ];
 
 function project(id: string, name: string): ProjectSummary {
@@ -73,6 +75,22 @@ node("n-6", "p-1", "n-5", 0, "Medinet Habu inscriptions", []);
 node("n-7", "p-1", "p-1-root", 2, "Earthquake storm theory", []);
 seedTree("p-2", "Why do cats purr?");
 seedTree("p-3", null);
+
+// a cold case: nothing new since August, with a merge and a tag on it
+const august = (day: number) => `2026-08-${String(day).padStart(2, "0")}T10:00:00Z`;
+const aged = (n: MockNode, at: string) => ((n.created_at = at), n);
+aged(seedTree("p-4", "What killed Tutankhamun?"), august(2));
+aged(node("t-1", "p-4", "p-4-root", 0, "The chariot accident", [["Was it a chariot crash?", "A 2005 CT scan found a badly broken left leg that may not have healed."]]), august(3));
+aged(node("t-2", "p-4", "p-4-root", 1, "Malaria and bone disease", []), august(3));
+aged(node("t-3", "p-4", "t-2", 0, "The 2010 DNA study", []), august(4)).tag = { color: "ochre", shape: "flag" };
+aged(node("t-4", "p-4", "t-1", 0, "Injury plus infection"), august(6)).merge_source_ids = ["t-1", "t-3"];
+
+// a closed case: every branch has ended
+aged(seedTree("p-5", "Who built Göbekli Tepe?"), "2026-11-10T10:00:00Z");
+for (const [id, parent, fork, title] of [["g-1", "p-5-root", 0, "Hunter-gatherers"], ["g-2", "p-5-root", 1, "An early farming village"], ["g-3", "g-1", 0, "Dating the enclosures"]] as const) {
+  const n = aged(node(id, "p-5", parent, fork, title), "2026-11-12T10:00:00Z");
+  if (id !== "g-1") n.resolved = { by: "user", at: "2026-11-20T10:00:00Z", kind: id === "g-2" ? "dead_lead" : undefined };
+}
 
 const sources: Source[] = [
   { id: "p12", name: "Langgut et al. 2013, Climate and the Late Bronze Collapse", kind: "pdf", origin: "upload", scope: "global", node_id: null, url: null, thumbnail_url: null, use_count: 2, status: "ready" },

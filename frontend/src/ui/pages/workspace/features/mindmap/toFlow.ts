@@ -2,7 +2,7 @@ import type { Edge, Node as FlowNode } from "@xyflow/react";
 import type { AttachmentKind, Ending, NodeMeta, NodeTag } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
-import { layoutTree } from "@/store/layout";
+import { caseLayout } from "@/store/layout";
 
 /**
  * The ReactFlow adapter: tree structure in, React Flow nodes and edges out.
@@ -54,49 +54,8 @@ export const UNTITLED = "New branch";
 /** ...and for a merged node, until the same happens. */
 export const UNTITLED_MERGE = "Merged branches";
 
-/** The merged cards whose sources are on the map, each with those sources. */
-function mergesOf(s: StructureSlice): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const n of Object.values(s.nodesById)) {
-    const sources = (n.merge_source_ids ?? []).filter((id) => s.nodesById[id]);
-    if (sources.length) out.set(n.id, sources);
-  }
-  return out;
-}
-
-/** How merged cards are drawn: each hangs under its shallowest source, so it sits in that source's column
- * (ties: its first parent), and one row below its deepest, so it reads as coming after everything it joins.
- * Its own branches hang under it as usual. Only the drawing moves; `parent_id` is untouched. */
-function drawnTree(s: StructureSlice, merges: Map<string, string[]>) {
-  const rows: Record<string, number> = {};
-  if (!merges.size) return { children: s.childrenByParent, rows };
-  const depths = new Map<string, number>();
-  const depth = (id: string): number => {
-    const known = depths.get(id);
-    if (known !== undefined) return known;
-    depths.set(id, 0); // cycle guard: corrupt data mustn't recurse forever
-    const sources = merges.get(id);
-    const parent = s.nodesById[id]?.parent_id;
-    const d = sources ? 1 + Math.max(...sources.map(depth)) : parent ? 1 + depth(parent) : 0;
-    depths.set(id, d);
-    return d;
-  };
-  const children = { ...s.childrenByParent };
-  for (const [id, sources] of merges) {
-    const parent = s.nodesById[id]!.parent_id;
-    const under = sources.reduce((a, b) => (depth(b) < depth(a) ? b : a));
-    rows[id] = depth(id);
-    if (under === parent) continue;
-    if (parent) children[parent] = (children[parent] ?? []).filter((c) => c !== id);
-    children[under] = [...(children[under] ?? []), id];
-  }
-  return { children, rows };
-}
-
 export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Edge[] } {
-  const merges = mergesOf(s);
-  const drawn = drawnTree(s, merges);
-  const positions = layoutTree(s.rootId, drawn.children, drawn.rows);
+  const { positions, merges } = caseLayout(s);
   const feeding = new Set([...merges.values()].flat());
   // The selected node and its ancestors are "on the path" -- the history the
   // chat panel shows. Everything else is dimmed.
