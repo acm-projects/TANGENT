@@ -219,7 +219,7 @@ export function GentDock() {
           <Frame direction="row" gap="0" align="center" className="gent-dock-actions">
             {busy && <Button hierarchy="tertiary" size="s" label="Stop Gent" icon="stop" showIcon showLabel={false} onClick={() => void stopTask()} />}
             <Button hierarchy="tertiary" size="s" label={busy ? "Tell Gent" : "Send to Gent"} icon="arrow_upward" showIcon showLabel={false} disabled={!text.trim() || !model} onClick={submit} />
-            {!chatOpen && <Button hierarchy="tertiary" size="s" label="Open Gent&apos;s conversation" icon="keyboard_arrow_up" showIcon showLabel={false} onClick={() => setChatOpen(true)} />}
+            {!chatOpen && <Button hierarchy="tertiary" size="s" label="Open Gent's conversation" icon="keyboard_arrow_up" showIcon showLabel={false} onClick={() => setChatOpen(true)} />}
           </Frame>
           )}
         </div>
