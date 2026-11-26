@@ -8,7 +8,7 @@ const GUIDE: { icon: string; text: string }[] = [
   { icon: "south", text: "Drag a card down to branch it" },
   { icon: "north", text: "Drag a card up to delete it" },
   { icon: "conversion_path", text: "Hover a card to trace its thread" },
-  { icon: "keyboard", text: "Tab between cards, Esc closes a panel" },
+  { icon: "keyboard", text: "Tab between cards, ↓ for a card's actions, Esc closes a panel" },
 ];
 
 export function FieldGuide() {

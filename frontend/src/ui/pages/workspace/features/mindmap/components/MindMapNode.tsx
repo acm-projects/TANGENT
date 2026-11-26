@@ -70,6 +70,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   const closeMark = useCallback(() => setMarkAt(null), []);
   // Right-click pins the tray out: it stays until Escape or a click elsewhere, not just while hovered.
   const [pinned, setPinned] = useState(false);
+  // The tray is only reachable (and in the Tab order) while it's showing: the card pointed at, picked, peeled or
+  // pinned. Otherwise Tab goes card to card; ArrowDown on a card steps into its tray.
+  const [hovered, setHovered] = useState(false);
+  const trayRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const [debating, setDebating] = useState(false);
   const [tagging, setTagging] = useState(false);
@@ -241,6 +245,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
       data-peeled={peeled || undefined}
       data-search={searchHit}
       data-more={menu !== null || undefined}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       onContextMenu={(e) => {
         e.preventDefault();
         setPinned(true);
@@ -263,7 +269,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           className="mindmap-handle"
         />
       )}
+      {/* Motion makes a tap target focusable (tabindex 0); the card button inside is the stop, so this one isn't */}
       <motion.div
+        tabIndex={-1}
         // a confirmed fork replaces its placeholder card, which already pinned in
         initial={confirmedForks.has(id) ? false : { y: -10, scale: 1.04, rotate: lean * 3, opacity: 0 }}
         // Peeled: the hover lift, exaggerated, so the card tips up and away from the tray.
@@ -310,6 +318,12 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           data-merge-from={merge.from === id || undefined}
           ref={gentStation}
           {...drag.handlers}
+          onKeyDownCapture={(e: ReactKeyboardEvent<HTMLElement>) => {
+            if (e.key !== "ArrowDown" || e.target !== e.currentTarget) return;
+            e.preventDefault();
+            setPeeled(true);
+            requestAnimationFrame(() => trayRef.current?.querySelector<HTMLElement>("button:not(:disabled)")?.focus());
+          }}
           aria-current={data.state === "selected" ? "true" : undefined}
           // the native tooltip would pop up over a drag in progress
           title={drag.dragging ? undefined : data.title}
@@ -407,7 +421,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
         direction="row"
         gap="2"
         justify="center"
+        ref={trayRef}
         className="mindmap-node-actions nopan"
+        inert={!(hovered || peeled || pinned || data.state === "selected")}
         role="group"
         aria-label={`Actions for ${data.title}`}
         onPointerEnter={() => {
