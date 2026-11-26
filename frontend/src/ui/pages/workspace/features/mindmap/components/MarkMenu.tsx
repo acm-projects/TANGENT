@@ -1,13 +1,13 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { Button, Frame } from "@/ui/library";
+import { Button, Panel } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 
 export type MarkOption = { icon: string; label: string; onClick: (e?: MouseEvent) => void };
 
 /* The "Mark as" menu a drag to the right drops where the pointer let go: one button per way the branch can end,
- * springing out of the cursor one after another. A pick, Escape or a press anywhere else closes it. Portalled to
+ * a floating paper menu, its options ruled apart, springing out of the cursor one after another. A pick, Escape or a press anywhere else closes it. Portalled to
  * <body> in screen coordinates, like the drag's string (DragAction.tsx). Styles in ../MindMap.css. */
 export function MarkMenu({ at, options, onClose }: {
   at: { x: number; y: number } | null;
@@ -39,9 +39,10 @@ export function MarkMenu({ at, options, onClose }: {
   return createPortal(
     <AnimatePresence>
       {at && (
-        <Frame
+        <Panel
           ref={ref}
-          gap="2"
+          stock="paper"
+          elevation="floating"
           className="mark-menu"
           role="menu"
           aria-label="Mark as"
@@ -57,7 +58,7 @@ export function MarkMenu({ at, options, onClose }: {
               <Button
                 size="l"
                 role="menuitem"
-                elevation="floating"
+                hierarchy="tertiary"
                 showIcon
                 icon={option.icon}
                 label={option.label}
@@ -70,7 +71,7 @@ export function MarkMenu({ at, options, onClose }: {
               />
             </motion.div>
           ))}
-        </Frame>
+        </Panel>
       )}
     </AnimatePresence>,
     document.body,

@@ -26,7 +26,7 @@ export function TagPicker({ tag, onTag, onClose }: {
   return (
     <Frame gap="4" className="tag-picker">
       <Frame gap="2">
-        <Text as="span" size="xxs" className="tag-picker-heading" content="Shape" />
+        <Text as="span" face="stamp" size="xxs" className="tag-picker-heading" content="Shape" />
         <Frame direction="row" gap="2">
           {SHAPES.map((option) => (
             <button key={option.shape} type="button" className="tag-picker-shape" aria-pressed={shape === option.shape} onClick={() => pick(option.shape)}>
@@ -37,7 +37,7 @@ export function TagPicker({ tag, onTag, onClose }: {
         </Frame>
       </Frame>
       <Frame gap="2">
-        <Text as="span" size="xxs" className="tag-picker-heading" content="Colour" />
+        <Text as="span" face="stamp" size="xxs" className="tag-picker-heading" content="Colour" />
         <Frame direction="row" gap="3">
           {COLORS.map((color) => (
             <button

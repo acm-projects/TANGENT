@@ -95,6 +95,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // ...and hangs a little crooked on its pin (±0.4–1.6°), as a hand pins it. Picked up to read (selected), it straightens.
   const lean = tilt * (0.4 + (parseInt(id.slice(-3, -1), 16) / 255) * 1.2);
   const rest = data.state === "selected" ? 0 : lean;
+  // A tree mixes both card stocks so the board doesn't read as one sheet: a stable digit of the id picks (a compact card is always manila).
+  const stock = data.compact || parseInt(id.slice(-5, -4), 16) % 2 ? "card-alt" : "card";
 
   // Node actions are optimistic (nodeActions.ts): the map changes at once, and a failure is undone there and reported here.
   // The tray sits inside the React Flow node, so a click must not also select the card.
@@ -166,6 +168,8 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
     const node = s.nodesById[id];
     return node?.node_type === "question" && node.question && (!node.question.answers.length || s.activeNodeId === id) ? node : null;
   });
+  // a question Gent asked is in his ink, not on paper
+  const gentAsked = useTreeStore((s) => s.nodesById[id]?.question?.asker.by === "gent");
   // ...and once it has landed with the card not picked, a "New" slip waits on it until it is (treeStore unread)
   const unread = useTreeStore((s) => Boolean(s.unread[id]));
   // An empty branch (no messages, nothing under it, no reply on its way) has nothing to lose, so it goes without asking.
@@ -278,6 +282,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
                   e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), useTreeStore.getState().setActive(id)),
               }
             : { as: "button" as const, type: "button" as const })}
+          {...(gentAsked
+            ? { material: "ink" as const, seed: parseInt(id.slice(0, 6), 16) }
+            : { material: "paper" as const, stock, edge: "torn" as const })}
           elevation="floating"
           className="mindmap-node nopan"
           data-state={data.state}
@@ -306,15 +313,16 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
                 animate={{ scale: 1, rotate: -8, opacity: 1, transition: spring.pin }}
                 exit={{ scale: 0.6, rotate: 6, y: -10, opacity: 0, transition: spring.lift }}
               >
-                <Text as="span" size="xxs" content="New" />
+                <Text as="span" face="stamp" size="xxs" content="New" />
               </motion.span>
             )}
           </AnimatePresence>
+          {(!data.hasParent || data.debate) && <span className="mindmap-node-rule" aria-hidden="true" />}
           {data.tag && <TagMark shape={data.tag.shape} color={data.tag.color} className="mindmap-node-tagmark" data-shape={data.tag.shape} role="img" aria-label={`Tagged ${data.tag.color}`} />}
-          {!data.hasParent && <Text as="span" size="xxs" className="mindmap-node-kicker" content="The case" />}
+          {!data.hasParent && <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="The case" />}
           {data.compact && (
             <>
-              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Compacted" />
+              <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Compacted" />
               {/* the thread above, pressed into one summary: the conversation starts afresh from here */}
               <span className="mindmap-node-seal" aria-label="A compacted thread" role="img">
                 <Icon icon="compress" size="m" />
@@ -323,7 +331,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           )}
           {data.debate && (
             <>
-              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Judgment" />
+              <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Judgment" />
               {/* the court's seal pressed into the corner: this card is a debate's verdict */}
               <span className="mindmap-node-seal" aria-label="A debate's verdict" role="img">
                 <Icon icon="gavel" size="m" />
@@ -332,7 +340,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
           )}
           {data.question && (
             <>
-              <Text as="span" size="xxs" className="mindmap-node-kicker" content="Question for you" />
+              <Text as="span" face="stamp" size="xxs" className="mindmap-node-kicker" content="Question for you" />
               {/* a question an AI asked: answer it on the slip below, and each answer branches from here */}
               <span className="mindmap-node-seal" aria-label="A question for you" role="img">
                 <Icon icon="question_mark" size="m" />
@@ -340,10 +348,10 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
             </>
           )}
           <Frame direction="row" gap="2" align="center">
-            <Text as="span" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
-            <Text as="span" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
+            <Text as="span" face="heading" size="s" className="mindmap-node-exhibit" content={data.exhibit} aria-hidden="true" />
+            <Text as="span" face="heading" size={data.hasParent ? "m" : "xl"} content={data.title} className="mindmap-node-title" />
             {data.tags.map((tag) => (
-              <Panel key={tag} elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
+              <Panel key={tag} stock="slip" elevation="floating" className="mindmap-node-tag" aria-label={`Has ${tag} attachments`}>
                 <Icon icon={TAG_ICON[tag] ?? "draft"} size="s" />
               </Panel>
             ))}
@@ -370,7 +378,7 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
                 animate={{ scale: 1, rotate: -4, opacity: 1, transition: spring.pin }}
                 exit={{ scale: 0.6, opacity: 0, transition: spring.lift }}
               >
-                <Text as="span" size="xxs" content={`${ENDING_LABELS[data.ending ?? "resolved"]}${data.resolvedBy === "gent" ? " by Gent" : ""}`} />
+                <Text as="span" face="stamp" size="xxs" content={`${ENDING_LABELS[data.ending ?? "resolved"]}${data.resolvedBy === "gent" ? " by Gent" : ""}`} />
               </motion.span>
             )}
           </AnimatePresence>

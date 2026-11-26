@@ -218,7 +218,7 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
           </svg>
         )}
         {/* keyed by the action, so the tip pops again when it changes */}
-        <Panel key={tipKey} elevation="floating" className="drag-action-tip" style={{ left: drag.to.x, top: drag.to.y }}>
+        <Panel key={tipKey} stock="paper" elevation="floating" className="drag-action-tip" style={{ left: drag.to.x, top: drag.to.y }}>
           <Icon icon={tip.icon} size="s" />
           <Text as="span" size="s" content={tip.label} />
         </Panel>

@@ -14,7 +14,7 @@ export function TagMark({ shape, color, ...rest }: { shape: TagShape; color: Tag
   return (
     <svg viewBox="0 0 24 24" {...rest}>
       {/* var() only works in style, not in a presentation attribute */}
-      <path d={PATH[shape]} fill={TAG_HEX[color]} strokeWidth="1.6" style={{ stroke: "var(--color-surface)", paintOrder: "stroke" }} />
+      <path d={PATH[shape]} fill={TAG_HEX[color]} strokeWidth="1.6" style={{ stroke: "var(--color-card)", paintOrder: "stroke" }} />
     </svg>
   );
 }
