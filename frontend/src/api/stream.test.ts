@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sseFrames, streamGent, streamMessage } from "./stream";
+import { followMessage, sseFrames, streamGent, streamMessage } from "./stream";
 import type { GentEvent, StreamEvent } from "./types";
 
 describe("sseFrames", () => {
@@ -146,6 +146,32 @@ describe("streamGent", () => {
     expect(JSON.parse(init.body as string)).toEqual({ messages: [{ role: "user", content: "go" }], notes: [], model: "m", active_node_id: "n2" });
     expect(events.map((e) => e.type)).toEqual(["cwd", "notes", "note", "tool", "result", "tree", "reply", "done"]);
     expect(events[0]).toEqual({ type: "cwd", ref });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("followMessage", () => {
+  const opts = { baseURL: "/api", nodeId: "n1", getAccessToken: () => "t", refresh: async () => "t2" };
+  const frame = (event: string, data: object) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+
+  it("GETs the live reply: the question first, then the reply's events", async () => {
+    const fetchMock = vi.fn(async () => new Response(frame("prompt", { content: "hi" }) + frame("token", { text: "a" }) + frame("done", {}), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const prompts: string[] = [];
+    const events: StreamEvent[] = [];
+
+    expect(await followMessage({ ...opts, onPrompt: (c) => prompts.push(c), onEvent: (e) => events.push(e) })).toBe(true);
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect([url, init.method, init.body]).toEqual(["/api/nodes/n1/messages/live", "GET", undefined]);
+    expect(prompts).toEqual(["hi"]);
+    expect(events).toEqual([{ type: "token", text: "a" }, { type: "done" }]);
+    vi.unstubAllGlobals();
+  });
+
+  it("resolves false when nothing is in flight (204)", async () => {
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 204 }));
+    expect(await followMessage({ ...opts, onPrompt: () => {}, onEvent: () => {} })).toBe(false);
     vi.unstubAllGlobals();
   });
 });

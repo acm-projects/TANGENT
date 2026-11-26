@@ -228,6 +228,7 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
   if (a === "shares" && d === "shares") return json({ shares: [] });
   if (a === "shares" && d === "share") return json({ message: "Invite sent (mock: nothing was emailed)." });
   if (a === "shares" && b && !c && method === "GET") return json({ project_name: projects[0].project_name, inviter_name: "Alex Kim", email: account.email });
+  if (route === "GET /nodes/live") return json({ node_ids: [] });
   if (route === "GET /debates/models") return json({ models: models.map((m) => ({ id: m.id, label: m.name })), default: models[0].id, rounds: { default: 3, max: 5 } });
 
   return fail(501, `The mock backend doesn't handle ${route}.`);

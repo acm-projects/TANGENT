@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, apiErrorMessage } from "@/api";
 import { projectPath } from "@/ui/features/auth/paths";
 import { useTreeStore } from "@/store/treeStore";
+import { followLiveReplies } from "../chat/resume";
 import { redirectToCopy } from "./nodeActions";
 
 /* Loads a project's tree into the shared tree store. The map then renders
@@ -28,6 +29,7 @@ export function useMindMap(projectId: string): MindMapStatus {
 
   useEffect(() => {
     let cancelled = false;
+    const following = new AbortController();
     const treeRequest = api.trees.forProject(projectId);
     treeRequest.catch(() => {}); // awaited below; this only stops an unhandled rejection if we redirect first
     (async () => {
@@ -51,11 +53,14 @@ export function useMindMap(projectId: string): MindMapStatus {
         store.setNotice(null);
       }
       setState({ status: "ready" });
+      // a reply that was being written when the page reloaded carries on streaming here
+      void followLiveReplies(projectId, following.signal).catch(() => {});
     })().catch((e: unknown) => {
       if (!cancelled) setState({ status: "error", message: apiErrorMessage(e, "Could not load this tree.") });
     });
     return () => {
       cancelled = true;
+      following.abort();
     };
   }, [projectId]);
 

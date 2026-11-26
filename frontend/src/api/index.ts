@@ -37,7 +37,7 @@ export const api = {
 export type Api = typeof api;
 
 // Streaming is not request/response, so it is not part of `api`.
-export { DebateGoneError, followGent, streamDebate, streamGent, streamMessage } from "./stream";
+export { DebateGoneError, followGent, followMessage, streamDebate, streamGent, streamMessage } from "./stream";
 export type { GentThread } from "./stream";
 export type { DebateStreamEvent } from "./stream";
 export { apiErrorMessage, apiErrorStatus, CopyExistsError, forkedProjectIdOf } from "./errors";

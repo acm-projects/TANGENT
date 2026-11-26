@@ -9,7 +9,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
@@ -96,6 +96,50 @@ class NodeModelConflict(Exception):
 # Replies a user can stop, by (user id, prompted node id). Set by POST .../messages/stop, watched by send_message.
 # shortcut: in-process only, so a stop must reach the worker that runs the stream; move to Redis pub/sub when scaling out.
 _stops: dict[tuple[UUID, UUID], asyncio.Event] = {}
+
+
+class _LiveReply:
+    """A reply being written, kept so a reloaded page can pick it back up: every SSE frame sent so far (replayed to
+    a late reader first) and the readers following it now. Lives from the POST until a short while after the end."""
+
+    def __init__(self, project_id: UUID, prompt: str):
+        self.project_id = project_id
+        self.prompt = prompt
+        self.frames: list[str] = []
+        self.readers: set[asyncio.Queue] = set()
+        self.done = False
+
+    def publish(self, frame: str) -> None:
+        self.frames.append(frame)
+        for q in self.readers:
+            q.put_nowait(frame)
+
+    def close(self) -> None:
+        self.done = True
+        for q in self.readers:
+            q.put_nowait(None)
+
+    async def follow(self, replay: bool = True):
+        """Yield the frames so far (when `replay`), then each new one until the reply ends."""
+        q: asyncio.Queue = asyncio.Queue()
+        backlog = list(self.frames) if replay else []
+        if not self.done:
+            self.readers.add(q)
+        try:
+            for frame in backlog:
+                yield frame
+            if self.done:
+                return
+            while (frame := await q.get()) is not None:
+                yield frame
+        finally:
+            self.readers.discard(q)
+
+
+# Replies in flight, by (user id, prompted node id), for GET /nodes/live and GET /nodes/{id}/messages/live.
+# shortcut: in-process like _stops, so a reload must reach the worker that runs the stream.
+_live: dict[tuple[UUID, UUID], _LiveReply] = {}
+LIVE_GRACE_S = 30.0  # a finished reply stays readable this long, for a page that reloaded just as it ended
 
 MAX_TOOL_ROUNDS = 4  # model turns that may call research tools; the next one must answer
 ANSWER_NOW = ("Write your answer now, in plain text, from what you have found so far (say what you couldn't find). "
@@ -387,6 +431,18 @@ async def _create_child(
             continue
         return child
     raise HTTPException(409, "Could not allocate a branch slot; try again")
+
+
+class LiveOut(BaseModel):
+    node_ids: list[UUID]
+
+
+@router.get("/live", response_model=LiveOut)
+async def live_replies(project_id: UUID, user: User = Depends(get_current_user)):
+    """The caller's replies still being written in `project_id`: the nodes a reloaded page should follow
+    (GET /nodes/{id}/messages/live). Only the caller's own, so no project check is needed to list them."""
+    return LiveOut(node_ids=[node for (uid, node), run in _live.items()
+                             if uid == user.id and run.project_id == project_id and not run.done])
 
 
 @router.get("/{node_id}", response_model=NodeOut)
@@ -1208,27 +1264,53 @@ async def send_message(
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below
 
-    async def run(queue: "asyncio.Queue[Optional[str]]") -> None:
+    # Every frame also goes to the live record, so a page that reloads mid-reply can follow it (messages/live).
+    key = (user_id, node_id)
+    live = _LiveReply(project_id, req.content)
+    _live[key] = live
+
+    async def run() -> None:
         try:
             await answer_in_node(
                 user_id, project_id, node_id, messages, prompt, req.model,
-                lambda event, data: queue.put_nowait(_sse(event, data)), retry=req.retry,
+                lambda event, data: live.publish(_sse(event, data)), retry=req.retry,
             )
         finally:
-            queue.put_nowait(None)
+            live.close()
+            await asyncio.sleep(LIVE_GRACE_S)
+            if _live.get(key) is live:
+                del _live[key]
+
+    task = asyncio.create_task(run())
+    _background_tasks.add(task)  # strong reference: the loop only keeps weak ones
+    task.add_done_callback(_background_tasks.discard)
 
     async def events():
-        queue: asyncio.Queue = asyncio.Queue()
-        task = asyncio.create_task(run(queue))
-        _background_tasks.add(task)  # strong reference: the loop only keeps weak ones
-        task.add_done_callback(_background_tasks.discard)
-        while True:
-            item = await queue.get()
-            if item is None:
-                return
-            yield item
+        async for frame in live.follow():
+            yield frame
 
     # no-transform stops Next's /api rewrite from gzip-buffering the stream; X-Accel-Buffering does the same for nginx.
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/{node_id}/messages/live")
+async def follow_message(node_id: UUID, user: User = Depends(get_current_user)):
+    """Pick a reply on `node_id` back up after a reload: SSE `prompt {content}` (the question being answered), then
+    every frame sent so far and each new one, ending with `done` or `error` as POST .../messages does. 204 when the
+    caller has no reply in flight there. Only the caller's own reply, so it needs no project check."""
+    live = _live.get((user.id, node_id))
+    if live is None or live.done:
+        return Response(status_code=204)
+
+    async def events():
+        yield _sse("prompt", {"content": live.prompt})
+        async for frame in live.follow():
+            yield frame
+
     return StreamingResponse(
         events(),
         media_type="text/event-stream",

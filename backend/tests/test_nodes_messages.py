@@ -664,3 +664,59 @@ def test_a_reply_that_only_says_open_is_sent_back_to_research_and_never_saved(cl
     client.persisted.clear()
     r = client.post(f"/nodes/{NODE}/messages", json={"content": "again"})
     assert events(r)[-1][0] == "error" and client.persisted == []
+
+
+def test_a_reloaded_page_lists_and_follows_a_reply_still_being_written(client):
+    live = nodes_router._LiveReply(PROJECT, "hi")
+    live.publish(nodes_router._sse("token", {"text": "Hel"}))
+    nodes_router._live[(USER.id, NODE)] = live
+    try:
+        assert client.get(f"/nodes/live?project_id={PROJECT}").json() == {"node_ids": [str(NODE)]}
+        assert client.get(f"/nodes/live?project_id={uuid.uuid4()}").json() == {"node_ids": []}
+
+        async def finish():
+            await asyncio.sleep(0.05)
+            live.publish(nodes_router._sse("token", {"text": "lo"}))
+            live.publish(nodes_router._sse("done", {"model": "m"}))
+            live.close()
+
+        async def read():
+            frames = []
+            asyncio.get_running_loop().create_task(finish())
+            async for f in live.follow():
+                frames.append(f)
+            return frames
+
+        frames = asyncio.run(read())
+        assert [f.split("\n")[0] for f in frames] == ["event: token", "event: token", "event: done"]
+        # once it has ended there's nothing to follow
+        assert client.get(f"/nodes/{NODE}/messages/live").status_code == 204
+        assert client.get(f"/nodes/live?project_id={PROJECT}").json() == {"node_ids": []}
+    finally:
+        nodes_router._live.pop((USER.id, NODE), None)
+
+
+def test_following_replays_the_prompt_and_what_was_sent_so_far(client):
+    live = nodes_router._LiveReply(PROJECT, "hi")
+    live.publish(nodes_router._sse("token", {"text": "Hel"}))
+    live.publish(nodes_router._sse("done", {"model": "m"}))  # sent, but the run hasn't closed yet
+    nodes_router._live[(USER.id, NODE)] = live
+    try:
+        # end the response after the replayed `done` (the run would close it)
+        orig = live.follow
+
+        async def replay_then_end(replay=True):
+            async for f in orig(replay):
+                yield f
+                if f.startswith("event: done"):
+                    return
+
+        live.follow = replay_then_end
+        r = client.get(f"/nodes/{NODE}/messages/live")
+        assert events(r) == [("prompt", {"content": "hi"}), ("token", {"text": "Hel"}), ("done", {"model": "m"})]
+    finally:
+        nodes_router._live.pop((USER.id, NODE), None)
+
+
+def test_following_is_204_when_nothing_is_in_flight(client):
+    assert client.get(f"/nodes/{uuid.uuid4()}/messages/live").status_code == 204

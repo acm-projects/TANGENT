@@ -52,43 +52,69 @@ export interface StreamOptions {
  */
 export async function streamMessage(opts: StreamOptions): Promise<void> {
   const body = await openStream(opts, `/nodes/${opts.nodeId}/messages`, { content: opts.content, model: opts.model, retry: opts.retry });
+  await relayMessage(body!, opts.onEvent);
+}
+
+export interface FollowOptions {
+  baseURL: string;
+  nodeId: string;
+  getAccessToken(): string | null;
+  refresh(): Promise<string>;
+  /** The question being answered, first, before any of the reply. */
+  onPrompt(content: string): void;
+  onEvent(e: StreamEvent): void;
+  signal?: AbortSignal;
+}
+
+/** Pick a reply back up after a reload (GET /nodes/:id/messages/live): the question, everything sent so far,
+ * then the rest as it comes, ending as streamMessage does. Resolves false when nothing is in flight there. */
+export async function followMessage(opts: FollowOptions): Promise<boolean> {
+  const body = await openStream(opts, `/nodes/${opts.nodeId}/messages/live`);
+  if (!body) return false;
+  await relayMessage(body, opts.onEvent, opts.onPrompt);
+  return true;
+}
+
+async function relayMessage(body: ReadableStream<Uint8Array>, onEvent: (e: StreamEvent) => void, onPrompt?: (content: string) => void): Promise<void> {
   for await (const { event, data } of sseFrames(body)) {
-    if (event === "token") opts.onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
-    else if (event === "tool") opts.onEvent({ type: "tool", ...(JSON.parse(data) as ToolCallRow) });
-    else if (event === "reasoning") opts.onEvent({ type: "reasoning", text: (JSON.parse(data) as { text: string }).text });
-    else if (event === "question") opts.onEvent({ type: "question", id: (JSON.parse(data) as { id: string }).id });
-    else if (event === "reopened") opts.onEvent({ type: "reopened", ids: (JSON.parse(data) as { ids: string[] }).ids });
-    else if (event === "done") return void opts.onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }) });
+    if (event === "prompt") onPrompt?.((JSON.parse(data) as { content: string }).content);
+    else if (event === "token") onEvent({ type: "token", text: (JSON.parse(data) as { text: string }).text });
+    else if (event === "tool") onEvent({ type: "tool", ...(JSON.parse(data) as ToolCallRow) });
+    else if (event === "reasoning") onEvent({ type: "reasoning", text: (JSON.parse(data) as { text: string }).text });
+    else if (event === "question") onEvent({ type: "question", id: (JSON.parse(data) as { id: string }).id });
+    else if (event === "reopened") onEvent({ type: "reopened", ids: (JSON.parse(data) as { ids: string[] }).ids });
+    else if (event === "done") return void onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }) });
     else if (event === "error") {
       const { message, fork, forked_project_id } = JSON.parse(data) as { message: string; fork?: ForkInfo; forked_project_id?: string };
-      return void opts.onEvent({ type: "error", message, fork, forkedProjectId: forked_project_id });
+      return void onEvent({ type: "error", message, fork, forkedProjectId: forked_project_id });
     }
   }
   // Stream closed with no terminal event: surface it instead of hanging the UI in "streaming".
-  opts.onEvent({ type: "error", message: "stream ended unexpectedly" });
+  onEvent({ type: "error", message: "stream ended unexpectedly" });
 }
 
-/** POST a body and open the SSE reply: one retry, only on 401 (rejected before any processing), and the
- * server's own error text (or a CopyExistsError) when it refuses. */
+/** POST a body (or, with none, GET) and open the SSE reply: one retry, only on 401 (rejected before any
+ * processing), and the server's own error text (or a CopyExistsError) when it refuses. Null on 204: nothing to read. */
 async function openStream(
   opts: { baseURL: string; getAccessToken(): string | null; refresh(): Promise<string>; signal?: AbortSignal },
   path: string,
-  payload: unknown,
-): Promise<ReadableStream<Uint8Array>> {
+  payload?: unknown,
+): Promise<ReadableStream<Uint8Array> | null> {
   const send = (token: string | null) =>
     fetch(`${opts.baseURL}${path}`, {
-      method: "POST",
+      method: payload === undefined ? "GET" : "POST",
       headers: {
-        "Content-Type": "application/json",
+        ...(payload === undefined ? {} : { "Content-Type": "application/json" }),
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify(payload),
+      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
       signal: opts.signal,
     });
 
   let res = await send(opts.getAccessToken());
   if (res.status === 401) res = await send(await opts.refresh());
+  if (res.status === 204) return null;
   if (!res.ok || !res.body) {
     // FastAPI errors are { detail: "..." }; show that instead of a bare status code.
     const detail = await res.json().then((b: { detail?: unknown }) => b.detail, () => undefined);
@@ -116,9 +142,9 @@ export interface GentStreamOptions {
 /** Run one Gent task (POST /projects/:id/gent) and relay its events until `done` or `error`. Like
  * streamMessage it never re-sends: the task would run twice. */
 export async function streamGent(opts: GentStreamOptions): Promise<void> {
-  const body = await openStream(opts, `/projects/${opts.projectId}/gent`, {
+  const body = (await openStream(opts, `/projects/${opts.projectId}/gent`, {
     messages: opts.messages, notes: opts.notes, model: opts.model, active_node_id: opts.activeNodeId ?? null,
-  });
+  }))!;
   for await (const { event, data } of sseFrames(body)) {
     const e = toGentEvent(event, JSON.parse(data));
     if (!e) continue;

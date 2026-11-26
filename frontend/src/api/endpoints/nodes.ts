@@ -5,6 +5,8 @@ import type { AnswerResult, CompactResult, Ending, ForkedNode, Node, NodeTag, Re
 export function createNodesApi({ http }: ApiClient) {
   return {
     get: (nodeId: string) => http.get<Node>(`/nodes/${nodeId}`).then((r) => r.data),
+    /** The caller's replies still being written in a project, for a reloaded page to follow (followMessage). */
+    live: (projectId: string) => http.get<{ node_ids: string[] }>("/nodes/live", { params: { project_id: projectId } }).then((r) => r.data.node_ids),
     /** fork_index is assigned server-side (max sibling + 1, retry on unique violation). */
     fork: (nodeId: string) => http.post<ForkedNode>(`/nodes/${nodeId}/fork`).then((r) => r.data),
     /** Cuts the node after the reply at `afterIndex`: a new child takes the rest and the node's children.
