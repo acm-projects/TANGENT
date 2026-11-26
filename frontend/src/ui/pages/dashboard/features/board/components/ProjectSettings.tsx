@@ -4,7 +4,7 @@ import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { apiErrorMessage } from "@/api";
 import type { ProjectSummary } from "@/api/types";
-import { Button, Divider, Frame, DangerButton, Input, Panel, Text } from "@/ui/library";
+import { Button, Divider, Frame, DangerButton, Panel, Text, TextArea } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 
 /* A card's settings: the ⋯ button, and the small sheet that unfolds out of it.
@@ -112,13 +112,20 @@ export function ProjectSettings({ project, onRename, onDelete }: ProjectSettings
                     <Text as="span" size="xs" hierarchy="tertiary" content="Name" />
                     <Frame direction="row" gap="1" align="center">
                       <Panel className="case-settings-field">
-                        <Input
+                        {/* grows to fit, so a long name reads whole instead of scrolled to its end; Enter saves */}
+                        <TextArea
                           aria-label="Case name"
                           value={name}
                           maxLength={100}
                           disabled={!owner || busy}
                           autoFocus={owner}
-                          onChange={(e) => setName(e.target.value)}
+                          onChange={(e) => setName(e.target.value.replace(/\n/g, " "))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              e.currentTarget.form?.requestSubmit();
+                            }
+                          }}
                         />
                       </Panel>
                       <Button

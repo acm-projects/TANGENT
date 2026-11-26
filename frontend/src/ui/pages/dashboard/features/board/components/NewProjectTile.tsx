@@ -6,15 +6,12 @@ import { apiErrorMessage } from "@/api";
 import { Button, Frame, Input, Panel, Text } from "@/ui/library";
 import { spring } from "@/ui/library/tokens/motion";
 import { nextProjectName } from "../nextName";
-import { CaseSketch } from "./CaseSketch";
 
 /* The grid's last cell: an empty dashed outline with a +. Pressing it turns
  * the outline into a blank card in the same spot (one shared layoutId, so it
  * morphs) with its name field ready: "Project (n)", selected, so typing
  * replaces it. Enter or Create makes the project; onCreated then opens it.
- * Escape or × puts the outline back. Its picture is what a new tree is: one root. */
-
-const LONE_ROOT = [{ x: 50, y: 30, parent: null, onPath: true }];
+ * Escape or × puts the outline back. Its photo is a fresh case's, the one it will have once made. */
 
 type NewProjectTileProps = {
   names: string[];
@@ -75,8 +72,9 @@ export function NewProjectTile({ names, onCreate, onCreated }: NewProjectTilePro
     >
       <Panel material="paper" stock="card" edge="torn" elevation="floating" className="case-card case-draft">
         <span className="case-card-pin" aria-hidden="true" />
-        <span className="case-card-photo">
-          <CaseSketch pins={LONE_ROOT} />
+        {/* the photo every one-card case has, so the new card already looks like the one it becomes */}
+        <span className="case-card-photo" data-fresh>
+          <Text as="span" face="stamp" size="xxs" className="case-card-fresh" content="A fresh case" />
         </span>
         <Panel className="case-draft-field">
           <Input
