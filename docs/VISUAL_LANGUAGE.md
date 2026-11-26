@@ -280,7 +280,8 @@ plain paper with an empty dashed socket while he's out working.
   page in front with its thread, the others behind with tabs peeking over the top. Picking a tab slides the
   front page down behind the stack and brings the picked one forward. A branch that holds a merge has its
   own stack inside its page, so merges nest. The stacks are the only
-  control: the board already shows the path, so the sheet doesn't repeat it.
+  control: the board already shows the path, so the sheet doesn't repeat it. Flipping is for reading only:
+  the merged card's context always holds every branch, and the stack says so.
 - **The court is in the sheet.** The sheet's header has the court button (Debate, or Return to court while
   one runs); the board's own court button shows only while the sheet is away.
 - **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).

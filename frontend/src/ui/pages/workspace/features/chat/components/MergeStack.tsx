@@ -11,8 +11,8 @@ import type { HistoryItem } from "../useChat";
  * bar) and the front page slides down behind the stack while the picked one comes forward. A branch that holds a
  * merge of its own shows its own stack inside its page, so merges nest the same way at any depth.
  *
- * Which page is in front is kept by the sheet (MergeChoices), so it survives the thread re-rendering. The stacks are
- * the only control: there is no separate chooser. Styles in ../Chat.css. */
+ * Which page is in front is only what's being read: the merged card's context always holds every branch, so flipping
+ * changes nothing the model sees. It's kept by the sheet (MergeChoices), so it survives the thread re-rendering. Styles in ../Chat.css. */
 
 export type MergeItem = Extract<HistoryItem, { kind: "merge" }>;
 
@@ -32,7 +32,8 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
     <MotionConfig reducedMotion="user">
       <li className="merge-stack" style={{ "--pages": lanes } as CSSProperties}>
         {/* the tabs over the top edge: the front page's tab joins its page, the others sit behind */}
-        <ol className="merge-stack-tabs" aria-label="Joined branches">
+        {/* reading order only: every page is in the merged card's context, whichever is in front */}
+        <ol className="merge-stack-tabs" aria-label="Joined branches: pick one to read (all are in the card's context)">
           {merge.branches.map((b, lane) => (
             <motion.li layout transition={spring.lift} key={b.from} className="merge-stack-tab-slot">
               <button
@@ -40,7 +41,7 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
                 className="merge-stack-tab"
                 aria-pressed={lane === at}
                 onClick={() => choose(key, lane)}
-                title={b.title ?? "Untitled branch"}
+                title={`${b.title ?? "Untitled branch"}: bring to the front to read`}
               >
                 <Text as="span" size="xs" className="merge-stack-exhibit" content={b.exhibit} />
                 <Text as="span" size="xs" className="merge-stack-tab-title" content={b.title ?? "Untitled branch"} />
@@ -76,7 +77,7 @@ export function MergeStack({ merge, render }: { merge: MergeItem; render(items: 
         </div>
         <Frame direction="row" gap="2" align="center" className="merge-stack-foot">
           <Icon icon="south" size="s" />
-          <Text as="span" size="xs" hierarchy="tertiary" content={`${lanes} branches clipped together · the thread carries on below`} />
+          <Text as="span" size="xs" hierarchy="tertiary" content={`All ${lanes} branches are in this card's context · flip the pages to read each`} />
         </Frame>
       </li>
     </MotionConfig>
