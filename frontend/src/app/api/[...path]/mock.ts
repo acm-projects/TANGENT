@@ -167,7 +167,10 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
           const hit = n.chats.find((m) => m.content.toLowerCase().includes(q));
           if (!hit) return [];
           const at = hit.content.toLowerCase().indexOf(q);
-          return [{ address: null, id: n.id, title: n.title ?? "", snippet: hit.content.slice(Math.max(0, at - 40), at + 80) }];
+          // cut like the backend's excerpt: an ellipsis wherever the text runs on
+          const from = Math.max(0, at - 40);
+          const snippet = (from ? "…" : "") + hit.content.slice(from, at + 80) + (at + 80 < hit.content.length ? "…" : "");
+          return [{ address: null, id: n.id, title: n.title ?? "", snippet }];
         });
       return json({ results });
     }

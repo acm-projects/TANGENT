@@ -685,6 +685,16 @@
   line-height: 1.2;
 }
 
+/* a toolbar panel open over the board's corner covers the plate, or leaves a sliver of it peeking out: it steps
+ * aside until the panel closes */
+.mindmap-case-label {
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.workspace:has(.toolbar-panel) .mindmap-case-label {
+  opacity: 0;
+}
+
 /* too narrow: the chat takes the screen and the label would crowd the toolbar */
 @media (max-width: 48rem) {
   .mindmap-case-label {

@@ -97,7 +97,7 @@
 
 /* Full screen keeps a reading measure: the thread and the field sit in a
  * centred column instead of running the width of the screen. */
-.chat[data-layout="expanded"] :is(.chat-history, .chat-field, .chat-empty) {
+.chat[data-layout="expanded"] :is(.chat-history, .chat-field, .chat-empty, .chat-context) {
   width: 100%;
   max-width: 48rem;
   margin-inline: auto;

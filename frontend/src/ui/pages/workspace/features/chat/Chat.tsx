@@ -111,7 +111,11 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
             {/* only the card being written on needs the hint; an empty card above it is just its divider */}
             {item.messages?.length === 0 && !streaming && isActive && writable && item.node.node_type !== "question" && (
               <Frame as="li" className="chat-hint">
-                <Text hierarchy="tertiary" size="s" content="A fresh branch. Ask something to continue from here." />
+                <Text
+                  hierarchy="tertiary"
+                  size="s"
+                  content={item.node.parent_id ? "A fresh branch. Ask something to continue from here." : "A fresh case. Ask the first question to start the board."}
+                />
               </Frame>
             )}
           </Fragment>

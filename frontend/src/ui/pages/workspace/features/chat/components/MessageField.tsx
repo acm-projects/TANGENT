@@ -152,7 +152,12 @@ export function MessageField({ blocker, branching = false, models, selectedModel
             ref={input}
             aria-label="Message"
             placeholder={
-              branching ? "Ask a follow-up…" : (blocker === null || blocker === "pending") && about ? `Ask about ${about}…` : PLACEHOLDER[blocker ?? "ready"]
+              branching
+                ? "Ask a follow-up…"
+                : (blocker === null || blocker === "pending") && about
+                  ? // a card named as a question reads oddly after "Ask about": just invite one
+                    about.trim().endsWith("?") ? "Ask a question…" : `Ask about ${about}…`
+                  : PLACEHOLDER[blocker ?? "ready"]
             }
             value={text}
             disabled={disabled}
