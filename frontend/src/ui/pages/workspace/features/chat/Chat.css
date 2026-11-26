@@ -1,20 +1,9 @@
-/* Chat — layout and one-offs, unlayered (DESIGN.md §2).
- * Measurements: Figma "Chat" (24:531), "ChatBubble" (16:219),
- * "MessageField" (10:39). */
+/* Chat — layout and one-offs, unlayered (DESIGN.md §2). The sheet, slips and composer are Panels
+ * (paper, torn, holes; stocks slip and composer): this file keeps layout, sizing, motion and state. */
 
 /* ── the panel ─────────────────────────────────────────────── */
 
-/* registered so the fold can animate (the corner unfolding) */
-@property --fold {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 0px;
-}
-
 .chat {
-  /* the folded corner covers the full-screen button until it is hovered */
-  --fold-rest: 3.5rem;
-  --fold: var(--fold-rest);
   /* Room left for the toolbar: its column (16px gap, 3rem tile, 16px gap) plus
    * this sheet's own margin, so full screen sits as far from the tiles as they
    * sit from the screen edge. */
@@ -24,13 +13,13 @@
   /* a dragged width (inline style) never covers the toolbar column */
   max-width: calc(100% - var(--toolbar-room));
   margin: var(--space-2);
-  padding: var(--space-2);
+  /* the left padding clears the binder holes (the paper's own holes padding is overridden here) */
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-12);
   /* width springs between docked and full screen */
   transition:
     translate var(--motion-slow) var(--ease-out),
     opacity var(--motion-slow) var(--ease-out),
-    width var(--motion-spring) var(--ease-spring),
-    --fold var(--motion-spring) var(--ease-spring);
+    width var(--motion-spring) var(--ease-spring);
 }
 
 /* the sheet swings in from the right edge when it opens */
@@ -47,11 +36,11 @@
   transition: none;
 }
 
-/* The resize handle: a strip along the sheet's left edge, below the fold.
+/* The resize handle: a strip along the sheet's left edge.
  * A short grip line shows on hover, focus and drag. */
 .chat-resize {
   position: absolute;
-  inset-block: calc(var(--fold-rest) + var(--space-4)) var(--space-4);
+  inset-block: var(--space-4);
   left: -0.375rem;
   width: 0.75rem;
   cursor: ew-resize;
@@ -89,63 +78,8 @@
   }
 }
 
-/* The sheet is a ::before layer so its top-left corner can be cut off at an
- * angle; a clip-path on the panel itself would clip the shadow too. The shadow
- * is a drop-shadow filter on the panel, which follows the cut. The cut-off half
- * of the corner square is see-through; the other half is the folded flap
- * (::after, below). */
-.chat:not([data-layout="collapsed"]) {
-  border: 0;
-  background: none;
-  /* shortcut: a box shadow ignores the cut corner; the NotesSheet retheme replaces this sheet's shape */
-  box-shadow: var(--shadow-floating);
-}
-
-/* The full-screen button sits under the folded corner, hidden. Hovering or
- * focusing it unfolds the corner flat and the button shows. */
-.chat:has(.chat-fold-button:is(:hover, :focus-visible)) {
-  --fold: 0px;
-}
-
-.chat:not([data-layout="expanded"]) .chat-fold-button:not(:hover, :focus-visible) {
-  opacity: 0;
-}
-
-/* the flap: the corner folded over onto the sheet, drawn above the content
- * so it covers the button; clicks pass through it to the button */
-.chat:not([data-layout="collapsed"])::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  width: max(0px, var(--fold));
-  height: max(0px, var(--fold));
-  pointer-events: none;
-  background:
-    /* the flap's two straight edges */
-    linear-gradient(var(--color-border), var(--color-border)) right / 1px 100% no-repeat,
-    linear-gradient(var(--color-border), var(--color-border)) bottom / 100% 1px no-repeat,
-    /* outline on the crease, solid fill behind it */
-    linear-gradient(135deg, transparent 50%, var(--color-border) 50% calc(50% + 1px), var(--color-surface-raised) 0);
-  filter: drop-shadow(1px 1px 1px rgb(0 0 0 / 0.12));
-}
-
-.chat:not([data-layout="collapsed"])::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  background: var(--texture-grain), var(--color-surface);
-  /* the panel's old 1px edge, drawn inside the clipped sheet so the cut keeps it */
-  box-shadow: inset 0 0 0 1px var(--color-border);
-  clip-path: polygon(max(0px, var(--fold)) 0, 100% 0, 100% 100%, 0 100%, 0 max(0px, var(--fold)));
-}
-
 .chat[data-layout="expanded"] {
-  /* full screen, leaving the toolbar column visible; the corner stays unfolded so the exit button shows */
-  --fold: 0px;
+  /* full screen, leaving the toolbar column visible */
   width: calc(100% - var(--toolbar-room));
 }
 
@@ -176,11 +110,10 @@
   min-height: 0;
 }
 
-/* The sheet's heading: the card being read, typed like a case file label. */
+/* The sheet's heading: the card being read, then the path to it, over a hairline. */
 .chat-title {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 0 -0.75rem;
   --pop-rotate: -1.5deg;
@@ -188,16 +121,34 @@
 }
 
 .chat-title-kicker {
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  flex: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
 
 .chat-title-name {
-  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 1.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* the path, behind a small red square: the user's way through the case */
+.chat-path {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.chat-path::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--color-string);
 }
 
 /* The one scroll container: just the history. The message box and anything
@@ -222,18 +173,18 @@
 
 /* the empty card's string runs right to the sheet's edge, past its padding */
 .chat-scroll:has(> .chat-empty) {
-  margin-left: calc(-1 * var(--space-2));
-  padding-left: var(--space-2);
+  margin-left: calc(-1 * var(--space-12));
+  padding-left: var(--space-12);
 }
 
-/* a blank card, outlined in pencil, pinned crooked to the sheet */
+/* a small torn card pinned crooked to the sheet, its string running out to the board */
 .chat-empty-card {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   max-width: 22rem;
   padding: var(--space-8) var(--space-6);
-  border: 1.5px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
   rotate: -2deg;
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   --pop-from: 0 1.5rem;
@@ -246,8 +197,7 @@
 }
 
 /* its pin, at the top left */
-.chat-empty-card::after {
-  content: "";
+.chat-empty-pin {
   position: absolute;
   top: calc(var(--space-6) - 0.35rem);
   left: var(--space-4);
@@ -255,7 +205,7 @@
   height: 0.7rem;
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-string);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
   --pop-from: 0 -1rem;
   --pop-rotate: 0deg;
@@ -264,8 +214,7 @@
 
 /* and the string, reaching from the pin out past the sheet's edge toward the board
  * (the scroll area clips it at the edge) */
-.chat-empty-card::before {
-  content: "";
+.chat-empty-string {
   position: absolute;
   top: calc(var(--space-6) - 1px);
   right: calc(100% - var(--space-4) - 0.35rem);
@@ -284,7 +233,7 @@
 }
 
 /* the copy follows the card in, one line after another */
-.chat-empty-card > * {
+.chat-empty-card > :not(.chat-empty-pin, .chat-empty-string) {
   animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
   animation-delay: calc(var(--motion-fast) + sibling-index() * var(--motion-fast) / 2);
   --pop-from: 0 0.75rem;
@@ -436,7 +385,7 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-surface-raised);
+  background: var(--texture-grain), var(--color-card-alt);
   box-shadow: var(--shadow-floating);
   color: var(--color-text-secondary);
   rotate: 0.4deg;
@@ -456,8 +405,8 @@
   height: 1.1rem;
   translate: -50% 0;
   rotate: -4deg;
-  background: light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.1));
-  box-shadow: 0 0 0 1px light-dark(rgb(40 30 20 / 0.06), rgb(255 255 255 / 0.05));
+  background: color-mix(in srgb, var(--color-card) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 6%, transparent);
   backdrop-filter: blur(1px);
   /* torn, not cut: ragged at both ends */
   clip-path: polygon(0 8%, 3% 0, 97% 4%, 100% 0, 98% 30%, 100% 55%, 97% 80%, 100% 100%, 2% 96%, 0 100%, 3% 70%, 0 45%, 2% 25%);
@@ -498,7 +447,7 @@
 .message-markdown :not(pre) > code {
   padding: 0.1em 0.35em;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
+  background: var(--color-card-alt);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -507,7 +456,7 @@
   overflow-x: auto;
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  background: var(--color-card-alt);
 }
 
 .message-markdown pre code {
@@ -570,7 +519,7 @@
   background:
     var(--texture-pin),
     var(--color-string);
-  box-shadow: 1px 1px 1px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
 }
 
 .message-thinking::after {
@@ -627,20 +576,14 @@
   }
 }
 
-/* The question is a slip of paper laid on the sheet, a touch crooked, written
- * in the heading face: it is what the thread below is answering. */
+/* The question is a slip (Panel, slip stock, red margin line), a touch crooked, written in the heading face:
+ * it is what the thread below is answering. */
 .message-user-bubble {
   position: relative;
   max-width: min(32rem, 85%);
-  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  /* a legal pad's red margin line, inset from the edge: red marks what the user did */
-  background:
-    linear-gradient(var(--color-string), var(--color-string)) var(--space-3) 0 / 1px 100% no-repeat,
-    var(--texture-grain),
-    color-mix(in srgb, var(--color-text) 5%, var(--color-surface));
-  box-shadow: var(--shadow-floating);
+  /* the slip's own left padding clears its margin line */
+  padding-block: var(--space-3);
+  padding-right: var(--space-4);
   rotate: -0.6deg;
   transition:
     rotate var(--motion-spring) var(--ease-spring),
@@ -649,9 +592,7 @@
 
 /* a question Gent asked: his ink note on the sheet (InkPanel draws it), not a slip of the user's paper */
 .message-user-bubble[data-author="gent"] {
-  border-color: transparent;
-  background: none;
-  box-shadow: none;
+  padding: var(--space-3) var(--space-4);
 }
 
 .message-user-bubble[data-author="gent"]::before {
@@ -660,6 +601,9 @@
 
 .message-user-bubble:hover {
   rotate: 0deg;
+}
+
+[data-ui="panel"].message-user-bubble:hover {
   box-shadow: var(--shadow-lift);
 }
 
@@ -669,21 +613,15 @@
   position: absolute;
   top: -0.3rem;
   right: var(--space-4);
-  width: 0.6rem;
-  height: 0.6rem;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-string);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
+  box-shadow: var(--shadow-pin);
   animation: pop-in var(--motion-spring) var(--ease-spring) var(--motion-base) backwards;
   --pop-from: 0 -0.75rem;
   --pop-rotate: 0deg;
   --pop-scale: 1.8;
-}
-
-.message-user-bubble .message-text {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-m);
-  line-height: var(--line-height-tight);
 }
 
 .message-meta {
@@ -768,9 +706,7 @@
   color: var(--color-text-muted);
 }
 
-/* the rules are the red string a branch hangs on */
 .branch-divider > [data-ui="divider"] {
-  border-top: 1.5px solid var(--color-string);
   animation: branch-rule var(--motion-spring) var(--ease-spring) backwards;
 }
 
@@ -782,40 +718,11 @@
   transform-origin: left;
 }
 
-/* The evidence tag tied into the string: a slip of card, a touch crooked,
- * that swings in on its knot. */
-.branch-divider-tag {
-  flex: none;
-  max-width: 75%;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-surface-raised);
-  box-shadow: var(--shadow-floating);
-  rotate: -1.5deg;
-  transform-origin: top center;
-  animation: tag-swing var(--motion-spring) var(--ease-spring) var(--motion-fast) backwards;
-}
-
 /* a branch is a connection, so its mark is the string's red */
 .branch-divider-icon {
-  color: var(--color-string);
-}
-
-.branch-divider-exhibit {
   flex: none;
-  font-family: var(--font-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-
-.branch-divider-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-heading);
-  color: var(--color-text);
+  color: var(--color-string);
+  animation: tag-swing var(--motion-spring) var(--ease-spring) var(--motion-fast) backwards;
 }
 
 @keyframes branch-rule {
@@ -838,20 +745,14 @@
 
 /* ── message field ─────────────────────────────────────────── */
 
-/* An index card laid on the bottom of the sheet: a head over its red rule,
- * then ruled lines to write on. It sits a touch crooked and straightens and
+/* An index card laid on the bottom of the sheet (Panel, composer stock, ruled
+ * lines): a head over its red rule, then the lines to write on. It sits a touch crooked and straightens and
  * lifts while you write, as if picked up. */
 .message-field {
   container-type: inline-size;
   --rule: 1.75rem;
-  --color-border-ruled: light-dark(color-mix(in srgb, var(--color-border) 80%, transparent), color-mix(in srgb, var(--color-text) 14%, transparent));
   margin: 0 var(--space-1) var(--space-1);
   padding: var(--space-2) var(--space-3) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  /* whiter than the sheet, as card stock is */
-  background: var(--texture-grain), light-dark(color-mix(in srgb, var(--color-surface) 35%, #fff), var(--color-surface-raised));
-  box-shadow: var(--shadow-floating);
   rotate: -0.35deg;
   transition:
     rotate var(--motion-spring) var(--ease-spring),
@@ -974,7 +875,7 @@
   padding-top: var(--space-1);
 }
 
-/* writing lines: one faint rule per line of text, scrolling with it */
+/* written on the card's ruled lines (the Panel draws them) */
 .message-field-input {
   flex: 1;
   min-height: calc(var(--rule) * 2);
@@ -984,8 +885,6 @@
   font-family: var(--font-heading);
   font-size: var(--font-size-m);
   line-height: var(--rule);
-  /* one tile per line, so every rule lands on a whole pixel */
-  background: linear-gradient(transparent calc(var(--rule) - 1px), var(--color-border-ruled) 0) 0 0 / 100% var(--rule) local;
 }
 
 /* Send is a round ink stamp. Disabled it sits small and faint; the moment
@@ -1006,15 +905,18 @@
 
 [data-ui="panel"][data-component="button"].message-field-send:disabled {
   scale: 0.8;
+  border-color: transparent;
+  background: var(--color-track);
+  color: var(--color-text-muted);
   box-shadow: none;
 }
 
 /* Red, like every action the user takes. The icon is a graphic on it (3:1 is
- * enough), so paper-white works on the flag red in both themes. */
+ * enough), so the card's own paper works on the red in both themes. */
 [data-ui="panel"][data-component="button"].message-field-send:not(:disabled, [data-stop]) {
   border-color: transparent;
   background: var(--color-string);
-  color: #fff;
+  color: var(--color-composer);
   box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--color-string) 55%, transparent);
   animation: send-armed var(--motion-slow) var(--ease-out);
 }
@@ -1024,7 +926,7 @@
 }
 
 [data-ui="panel"][data-component="button"].message-field-send:hover:not(:disabled, :active, [data-stop]) {
-  background: color-mix(in srgb, var(--color-string) 88%, #000);
+  background: color-mix(in srgb, var(--color-string) 88%, var(--color-text));
   box-shadow: 0 8px 18px -4px color-mix(in srgb, var(--color-string) 60%, transparent);
 }
 
@@ -1072,7 +974,7 @@
   color: var(--color-text-secondary);
 }
 
-/* the folded line: icon, counts and a caret, quiet until pointed at */
+/* the folded line: icon, counts, the meter, the limit and a caret, quiet until pointed at */
 .chat-token-usage > summary {
   display: flex;
   align-items: center;
@@ -1084,6 +986,18 @@
   cursor: pointer;
   list-style: none;
   transition: color var(--motion-fast) var(--ease-out);
+}
+
+/* 6px bar: this card solid, the rest of the branch faded, over the empty track */
+.chat-meter {
+  flex: none;
+  width: 5rem;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background:
+    linear-gradient(var(--color-text-secondary), var(--color-text-secondary)) 0 0 / var(--meter-node) 100% no-repeat,
+    linear-gradient(color-mix(in srgb, var(--color-text-secondary) 35%, transparent), color-mix(in srgb, var(--color-text-secondary) 35%, transparent)) 0 0 / var(--meter-branch) 100% no-repeat,
+    var(--color-track);
 }
 
 .chat-token-usage > summary::-webkit-details-marker {
@@ -1157,11 +1071,11 @@
 /* ── a question card in the history (components/QuestionRecord.tsx) ── */
 
 .question-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   max-width: min(32rem, 100%);
   padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
 }
 
 .question-record-kicker {
@@ -1195,8 +1109,9 @@
   color: var(--color-string);
 }
 
+/* on Gent's ink the tick is the ink's own pale, not blue on blue */
 .question-record[data-by="gent"] li[data-chosen] [data-ui="icon"] {
-  color: var(--color-gent);
+  color: inherit;
 }
 
 /* the answers message: an answer sheet, each question small above the answer the user gave */
@@ -1224,10 +1139,7 @@
   border-bottom: 1px dashed var(--color-border-strong);
 }
 
-/* a compact card's summary: filed on manila stock, like its card on the map */
+/* a compact card's summary: filed on manila stock (Panel, card-alt), like its card on the map */
 .message-compact-record {
   padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--texture-grain), var(--color-card-alt);
 }
