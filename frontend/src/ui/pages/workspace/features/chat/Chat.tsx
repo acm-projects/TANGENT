@@ -2,6 +2,7 @@
 
 import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
+import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { VerdictCard } from "../debate/components/VerdictCard";
 import { BranchDivider } from "./components/BranchDivider";
@@ -15,11 +16,13 @@ const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumF
 
 /* The chat panel (Figma "Chat", 24:531, and "Chat History", 160:7205).
  *
- * Three layouts, all owned here:
+ * Two layouts, both owned here:
  *   docked     the default: floats over the right half of the map; its left
- *              edge drags to resize (pointer, or arrow keys when focused)
+ *              edge drags to resize (pointer, or arrow keys when focused).
+ *              With no card picked it slides off the right edge (data-idle) and
+ *              gives the board back: the map is the subject until you pick a card.
  *   expanded   full screen (the top-left button)
- *   collapsed  nothing here: its reopen tile sits beside the Field Notes (agent/GentLayer)
+ * Closing (the header's ×, Esc, or a click on the board) puts the card back, and the sheet leaves with it.
  *
  * Only the history scrolls (.chat-scroll); the error, token usage and the
  * message box sit fixed below it, the box a ruled line on the sheet.
@@ -135,12 +138,6 @@ export function Chat({ className }: ChatProps) {
   const [earlierFor, setEarlierFor] = useState<string | null>(null);
   const folded = earlierFor === chat.activeNodeId ? 0 : chat.foldedCount;
 
-  // Selecting a node brings a collapsed chat back. An effect: the layout is a shared store, which mustn't change
-  // while rendering.
-  const activeNodeId = chat.activeNodeId;
-  useEffect(() => {
-    if (activeNodeId && useChatLayout.getState().layout === "collapsed") useChatLayout.getState().setLayout("docked");
-  }, [activeNodeId]);
   // null until the user drags: the CSS default width applies.
   const [width, setWidth] = useState<number | null>(null);
   const [resizing, setResizing] = useState(false);
@@ -161,7 +158,7 @@ export function Chat({ className }: ChatProps) {
   // Keep the newest message in view as history loads and tokens stream in.
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeNode = chat.activeNode;
-  // `layout` is in the key because reopening a collapsed panel remounts the list. Every section's count, since
+  // `layout` is in the key so going full screen re-pins the bottom. Every section's count, since
   // an ancestor's (often long) history can load after the selected card's.
   const loaded = chat.loadedMessageCount;
   // A reply starting counts; its tokens don't (the observer below keeps up with them, without re-pinning per token).
@@ -186,8 +183,9 @@ export function Chat({ className }: ChatProps) {
     };
   }, [scrollKey]);
 
-  // collapsed, the chat is just its reopen tile, which sits beside the Field Notes (agent/GentLayer)
-  if (layout === "collapsed") return null;
+  // No card picked: the sheet waits off the board's right edge. Still mounted (and inert), so a half-written
+  // draft survives, and it comes back along the same path it left by.
+  const idle = layout === "docked" && !activeNode;
 
   return (
     <Panel
@@ -195,12 +193,13 @@ export function Chat({ className }: ChatProps) {
       ref={sheetRef}
       className={classes}
       data-layout={layout}
+      data-idle={idle || undefined}
+      inert={idle}
       data-resizing={resizing || undefined}
-      style={layout === "docked" && width ? { width } : undefined}
+      style={layout === "docked" && width ? ({ "--chat-width": `${width}px` } as CSSProperties) : undefined}
       aria-label="Chat"
       material="paper"
       edge="torn"
-      holes
       elevation="floating"
     >
       {layout === "docked" && (
@@ -251,14 +250,18 @@ export function Chat({ className }: ChatProps) {
               content={`Case notes · ${(activeNode.merge_source_ids?.length ?? 0) > 0 ? "Joint node" : "Node"} ${chat.activeExhibit}`}
             />
           )}
+          {/* Put the card back: the sheet slides off the way it came, as with Esc or a click on the board. */}
           <Button
             hierarchy="tertiary"
             size="l"
-            label="Collapse chat"
-            icon="chevron_right"
+            label="Close (Esc)"
+            icon="close"
             showIcon
             showLabel={false}
-            onClick={() => setLayout("collapsed")}
+            onClick={() => {
+              if (layout === "expanded") setLayout("docked");
+              useTreeStore.getState().setActive(null);
+            }}
           />
         </Frame>
 
@@ -272,16 +275,10 @@ export function Chat({ className }: ChatProps) {
         <Frame ref={scrollRef} gap="0" className="chat-scroll">
 
           {chat.history.length === 0 ? (
-            // an empty evidence card, its string reaching out across to the board
-            <Frame justify="center" align="center" className="chat-empty">
-              <Panel stock="card" edge="torn" elevation="floating" className="chat-empty-card">
-                {/* the pin and the string reaching out to the board */}
-                <span className="chat-empty-pin" aria-hidden="true" />
-                <span className="chat-empty-string" aria-hidden="true" />
-                <Text as="span" face="stamp" size="xxs" className="chat-title-kicker" content="Exhibit —" />
-                <Text as="h2" size="xl" hierarchy="primary" className="chat-empty-title" content="Pick a card off the board" />
-                <Text hierarchy="tertiary" content="Select a node on the map to read its thread here." />
-              </Panel>
+            // a card with nothing on it yet: say so quietly, and point at the field below
+            <Frame justify="center" align="center" gap="1" className="chat-empty">
+              <Text hierarchy="secondary" content="Nothing on this card yet." />
+              <Text size="s" hierarchy="tertiary" content="Ask below to start its thread." />
             </Frame>
           ) : (
             <Frame as="ol" gap="2" className="chat-history" aria-live="polite" aria-label="Conversation">
@@ -325,8 +322,9 @@ export function Chat({ className }: ChatProps) {
         {chat.error && <Text role="alert" size="s" className="chat-error" content={chat.error} />}
 
         {activeNode && (
-          // One quiet line (node, branch and, after a reply, how full the context is); open it for the full counts.
-          <details className="chat-token-usage">
+          // One line (node, branch and, after a reply, how full the context is); open it for the full counts.
+          // Quiet until it matters: it shows while writing or pointed at, and stays out once the context is filling.
+          <details className="chat-token-usage" data-filling={(contextUsagePercentage ?? 0) >= 75 || undefined}>
             <summary>
               <Icon icon="data_usage" size="s" hierarchy="tertiary" />
               <Text

@@ -3,12 +3,10 @@
 import { MotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
 import { PACE_REST, setInkPace } from "@/ui/library/primitives/Ink/ink";
-import { useChatLayout } from "@/store/chatLayout";
 import { useGentStore } from "@/store/gentStore";
 import { useTreeStore } from "@/store/treeStore";
 import { api } from "@/api";
 import { refreshTree } from "../mindmap/nodeActions";
-import { Tile } from "../toolbar/Toolbar";
 import { FieldNotes } from "./FieldNotes";
 import { GentDock } from "./GentDock";
 import { GentPresence } from "./travel/GentPresence";
@@ -37,15 +35,13 @@ export function GentLayer({ className }: { className?: string }) {
     const timer = setInterval(() => void refreshTree(projectId).catch(() => {}), TREE_REFRESH_MS);
     return () => clearInterval(timer);
   }, [busy, projectId]);
-  const chatCollapsed = useChatLayout((s) => s.layout === "collapsed");
   // his springs (the dock, his questions, the Field Notes) calm down for prefers-reduced-motion, as the map's do
   return (
     <MotionConfig reducedMotion="user">
     <div ref={setLayer} className={["gent-layer", className].filter(Boolean).join(" ")}>
-      {/* the board's bottom-right corner: the Field Notes, and the folded chat's reopen tile beside them */}
+      {/* the board's bottom-right corner: the Field Notes */}
       <div className="gent-layer-corner">
         <FieldNotes />
-        {chatCollapsed && <Tile icon="chevron_left" label="Open chat" tip="left" onClick={() => useChatLayout.getState().setLayout("docked")} />}
       </div>
       <GentDock />
       <canvas ref={setFlightCanvas} className="gent-flight" aria-hidden />

@@ -1,4 +1,4 @@
-import { Decal, Panel } from "@/ui/library";
+import { Panel } from "@/ui/library";
 import { RememberCase } from "@/ui/features/last-case/lastCase";
 import { GentLayer } from "./features/agent/GentLayer";
 import { Chat } from "./features/chat/Chat";
@@ -21,9 +21,6 @@ export function Workspace({ slug, projectId }: WorkspaceProps) {
   return (
     <Panel as="main" material="cork" className="workspace">
       <RememberCase id={projectId} />
-      {/* scraps pinned at the board's edges, never under the tree */}
-      <Decal kind="scrap" className="workspace-scrap-a" />
-      <Decal kind="scrap" className="workspace-scrap-b" />
       <MindMap slug={slug} projectId={projectId} className="workspace-map" />
       {/* one row over the map: Gent's layer takes whatever the toolbar and the chat leave between them */}
       <div className="workspace-row">

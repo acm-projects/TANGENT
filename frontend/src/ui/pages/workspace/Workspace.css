@@ -15,25 +15,6 @@
   background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
 }
 
-/* Decals ride the board's own edges, not the panning viewport */
-.workspace-scrap-a,
-.workspace-scrap-b {
-  position: absolute;
-  z-index: 0;
-}
-
-.workspace-scrap-a {
-  top: -2rem;
-  left: 40%;
-  rotate: 6deg;
-}
-
-.workspace-scrap-b {
-  bottom: -2.5rem;
-  left: 7rem;
-  rotate: -8deg;
-}
-
 .workspace > * {
   grid-area: 1 / 1;
   min-height: 0;
@@ -85,7 +66,7 @@
   container: gent-layer / size;
 }
 
-/* bottom right: the Field Notes, with the folded chat's reopen tile to their right */
+/* bottom right: the Field Notes (a tile until there is something on them) */
 .workspace-gent > .gent-layer-corner {
   grid-area: 1 / 2;
   align-self: end;

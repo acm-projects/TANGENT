@@ -120,6 +120,8 @@ The material is just the cork; the lighting belongs to the page.
 
 Marks on the board that aren't materials: torn newspaper scraps (pushed to the edges, never under
 text), at most one coffee ring (`stain`), and later fingerprints. Each is a `Decal`, decoration only.
+Decals belong to the quiet screens (sign-in, dashboard); the workspace board has none, since the map
+and its strings are already the board's texture.
 
 ### Paper
 
@@ -252,9 +254,21 @@ plain paper with an empty dashed socket while he's out working.
 
 ## 8. Layout
 
-- **App:** the leather rail on the left (`space-rail`, 72px), the board in the middle, the
-  notes sheet docked on the right (`sheet-width`, 520px), Gent's dock at the bottom centre of
-  the board, the case badge top-left of the board.
+- **App:** the leather rail on the left (`space-rail`, 72px), the board in the middle, Gent's
+  dock at the bottom centre of the board, the case label top-left (two lines: `CASE FILE NO. … ·
+  N CARDS`, then the case name in full).
+- **The map is the subject.** With no card picked, nothing else is on the board: the notes sheet
+  waits off the right edge, Field Notes are a tile until there's something on them, and no decals
+  sit on the workspace board. Picking a card slides the sheet in from the right (`sheet-width`, a
+  reading measure: 24–40rem, 40vw); closing it (×, Esc, or a click on the board) slides it back out
+  the same way and puts the card back.
+- **The camera keeps what you're looking at in the clear.** The clear part of the board is right of
+  the rail and any open tool panel, left of the sheet, above the dock. A picked card the sheet would
+  cover glides into it at the same zoom; search hits under the search panel glide out (zooming out
+  only if they can't fit, never below 0.5); a clicked search result is centred in it. Nothing
+  moves for a card that's already in the clear.
+- **Bookkeeping stays out of the way.** Token counts show on the picked card only, and the sheet's
+  usage line appears while you write, when you point at it, or once the context is 75% full.
 - **Other screens** (dashboard, settings, sign-in) use the same board and paper, with leather
   only for navigation. A list of cases is a grid of cards; a form is a sheet of paper on the board.
 - **Landing page:** one column up to `content-max` (1200px), body text no wider than `measure`

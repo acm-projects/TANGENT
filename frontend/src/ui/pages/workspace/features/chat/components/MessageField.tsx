@@ -122,7 +122,10 @@ export function MessageField({ blocker, models, selectedModel, modelLocked, mode
               loading={modelsLoading}
               disabled={modelLocked || blocker === "streaming"}
             />
-            {modelLocked && <Text as="span" size="xxs" hierarchy="tertiary" content="Locked for this node" />}
+            {/* a reply here continues this card's model, so it can't change: a lock says so without a sentence */}
+            {modelLocked && (
+              <Icon icon="lock" size="xs" hierarchy="tertiary" role="img" aria-hidden={false} aria-label="Model locked for this node" title="Model locked for this node" />
+            )}
             <Button
               hierarchy="tertiary"
               label="Attach PDF"

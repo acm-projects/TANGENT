@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
-/** The chat panel's layout, shared so its reopen tile can live beside the Field Notes (agent/GentLayer). */
-export type ChatLayout = "docked" | "expanded" | "collapsed";
+/** The chat panel's layout, shared so Gent's layer can step aside when the chat goes full screen. */
+export type ChatLayout = "docked" | "expanded";
 
 export const useChatLayout = create<{
   layout: ChatLayout;

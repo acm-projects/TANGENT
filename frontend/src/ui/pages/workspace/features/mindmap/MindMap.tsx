@@ -1,9 +1,9 @@
 "use client";
 
-import { ReactFlow, useReactFlow } from "@xyflow/react";
+import { ReactFlow, useReactFlow, type Viewport } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiErrorMessage } from "@/api";
 import { useShallow } from "zustand/react/shallow";
 import { selectThread, useTreeStore } from "@/store/treeStore";
@@ -22,16 +22,99 @@ import "./MindMap.css";
  * Layout is derived (layout.ts), so nodes can't be dragged -- a dragged
  * position would have to be stored, and stored positions drift (§7.3). */
 
-// The chat panel covers the right half, so cards are centred in the left half.
-const VIEW_PADDING = { top: "20%", bottom: "20%", left: "8%", right: "52%" } as const;
+// Where the tree starts on the board: with a card picked the chat sheet covers the right ~40%; with none, the
+// sheet is off the board and the tree centres in the whole of it (clear of the rail).
+const VIEW_PADDING = { top: "20%", bottom: "20%", left: "8%", right: "46%" } as const;
+const OPEN_PADDING = { top: "14%", bottom: "18%", left: "10%", right: "6%" } as const;
+/** The gap the camera keeps between a card and anything covering the board, and the room kept under it for Gent's dock. */
+const MARGIN = 48;
+const DOCK_ROOM = 96;
+const GLIDE_MS = 450;
 
-/** Flies the map to the card a search picked (treeStore.requestFlyTo). Inside <ReactFlow>, for its camera. */
-function FlyTo() {
+type Box = { x: number; y: number; width: number; height: number };
+
+/** The part of the board nothing covers, in the map pane's own pixels: right of the toolbar (and its open panel),
+ * left of the chat sheet (when it's on the board), above Gent's dock. */
+function clearArea(): Box | null {
+  const pane = document.querySelector(".mindmap")?.getBoundingClientRect();
+  if (!pane) return null;
+  const tools = document.querySelector(".workspace-toolbar")?.getBoundingClientRect();
+  const sheet = document.querySelector<HTMLElement>(".chat[data-layout='docked']:not([data-idle])");
+  const left = (tools ? tools.right - pane.left : 0) + MARGIN;
+  // the sheet may still be sliding in: its width is already final, so measure that, not where it is now
+  const right = pane.width - (sheet ? sheet.offsetWidth + 16 : 0) - MARGIN;
+  return { x: left, y: MARGIN, width: Math.max(0, right - left), height: Math.max(0, pane.height - MARGIN - DOCK_ROOM) };
+}
+
+/** Keeps what the user is looking for in the clear part of the board, gliding the camera only when it has to:
+ *  - a picked card the sheet would cover is moved back into the open, at the same zoom;
+ *  - search hits hidden under the search panel are brought out (zooming out a little if they don't fit);
+ *  - a search result clicked (flyTo) is centred in the clear part, at a readable zoom. */
+function Camera() {
+  const active = useTreeStore((s) => s.activeNodeId);
+  const hits = useTreeStore((s) => s.search?.ids);
   const flyTo = useTreeStore((s) => s.flyTo);
-  const { fitView } = useReactFlow();
+  const { getInternalNode, getNodesBounds, getViewport, setViewport } = useReactFlow();
+  // Where the board was before the sheet pushed it aside, and where the camera put it: when the sheet leaves,
+  // the board glides back the way it came, unless the user has moved it since (then it stays where they put it).
+  const pushed = useRef<{ from: Viewport; to: Viewport } | null>(null);
+  const same = (a: Viewport, b: Viewport) => Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2 && Math.abs(a.zoom - b.zoom) < 0.01;
+
   useEffect(() => {
-    if (flyTo) void fitView({ nodes: [{ id: flyTo.id }], padding: VIEW_PADDING, minZoom: 0.6, maxZoom: 1, duration: 600 });
-  }, [flyTo, fitView]);
+    if (active || !pushed.current) return;
+    const { from, to } = pushed.current;
+    pushed.current = null;
+    if (same(getViewport(), to)) void setViewport(from, { duration: GLIDE_MS });
+  }, [active, getViewport, setViewport]);
+
+  // a picked card, or the search's hits: moved into the clear only if they're out of it
+  useEffect(() => {
+    const ids = active ? [active] : (hits ?? []);
+    if (!ids.length) return;
+    // a frame later: the sheet and panels have their final widths (they're only sliding)
+    const raf = requestAnimationFrame(() => {
+      const clear = clearArea();
+      if (!clear) return;
+      const { x, y, zoom } = getViewport();
+      const b = getNodesBounds(ids);
+      // zoom out only for a set of hits that can't fit at this zoom, never past readable
+      const z = active ? zoom : Math.max(0.5, Math.min(zoom, clear.width / b.width, clear.height / b.height));
+      // a zoom change scales the board about the pane's corner; then it pans
+      const ox = x * (z / zoom);
+      const oy = y * (z / zoom);
+      const box = { x: b.x * z + ox, y: b.y * z + oy, width: b.width * z, height: b.height * z };
+      // how far to move a span so it lies in the room (centred if it's too big for it)
+      const nudge = (start: number, size: number, from: number, room: number) =>
+        size > room ? from + (room - size) / 2 - start : start < from ? from - start : start + size > from + room ? from + room - (start + size) : 0;
+      const dx = nudge(box.x, box.width, clear.x, clear.width);
+      const dy = nudge(box.y, box.height, clear.y, clear.height);
+      if (!dx && !dy && z === zoom) return;
+      const to = { x: ox + dx, y: oy + dy, zoom: z };
+      if (active) {
+        // keep the first "from" across a run of picks; a pan the user made in between starts a new run
+        const run = pushed.current && same({ x, y, zoom }, pushed.current.to) ? pushed.current.from : { x, y, zoom };
+        pushed.current = { from: run, to };
+      }
+      void setViewport(to, { duration: GLIDE_MS });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [active, hits, getNodesBounds, getViewport, setViewport]);
+
+  // a search result clicked: centred in the clear part at a readable zoom. After the effect above, so it wins
+  // when the click also picks the card; flyTo carries a stamp, so the same card asked for twice glides again.
+  useEffect(() => {
+    if (!flyTo) return;
+    const raf = requestAnimationFrame(() => {
+      const clear = clearArea();
+      const node = getInternalNode(flyTo.id);
+      if (!clear || !node) return;
+      const z = Math.min(1, Math.max(getViewport().zoom, 0.8));
+      const cx = node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2;
+      const cy = node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2;
+      void setViewport({ x: clear.x + clear.width / 2 - cx * z, y: clear.y + clear.height / 2 - cy * z, zoom: z }, { duration: GLIDE_MS * 1.3 });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [flyTo, getInternalNode, getViewport, setViewport]);
   return null;
 }
 
@@ -87,6 +170,21 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mergeFrom]);
+  // Escape puts the picked card back on the board (and the sheet slides away with it), the same as clicking the
+  // board: the way out of the sheet. Not while typing, not while a merge or a dialog has Escape for itself.
+  const picked = structure.activeNodeId !== null;
+  useEffect(() => {
+    if (!picked || mergeFrom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable], dialog[open], [role='dialog'], [role='menu']")) return;
+      if (document.querySelector("dialog[open]")) return;
+      setActive(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picked, mergeFrom, setActive]);
   const merge = useMemo(
     () => ({
       from: mergeFrom,
@@ -133,12 +231,16 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
       )}
       {load.status === "ready" && projectName && (
         // the case's name plate, riveted to the board's corner
+        // Two lines and no more: which file this is, then its name in full. The board is the subject.
         <Panel material="leather" elevation="floating" className="mindmap-case-label">
-          <Text as="span" face="stamp" size="xxs" className="mindmap-case-kicker" content="Case file" />
-          <Text as="span" face="heading" size="m" className="mindmap-case-number" content={`No. ${caseNumber}`} />
-          <hr className="mindmap-case-groove" />
-          <Text as="h1" size="l" hierarchy="primary" className="mindmap-case-name" content={projectName} />
-          <Text as="span" size="xs" hierarchy="tertiary" className="mindmap-case-count" content={`${cardCount} ${cardCount === 1 ? "card" : "cards"}`} />
+          <Text
+            as="span"
+            face="stamp"
+            size="xxs"
+            className="mindmap-case-kicker"
+            content={`Case file No. ${caseNumber} · ${cardCount} ${cardCount === 1 ? "card" : "cards"}`}
+          />
+          <Text as="h1" face="heading" size="m" hierarchy="primary" className="mindmap-case-name" content={projectName} />
         </Panel>
       )}
       {load.status === "ready" && (
@@ -170,14 +272,14 @@ export function MindMap({ slug, projectId, className }: MindMapProps) {
           onNodeMouseEnter={(e, node) => traceThread(e.currentTarget, node.id)}
           onNodeMouseLeave={(e) => traceThread(e.currentTarget, null)}
           fitView
-          // The chat panel covers the right half, so centre the tree in the left half.
-          fitViewOptions={{ padding: VIEW_PADDING, minZoom: 0.45, maxZoom: 1 }}
+          // the sheet is only on the board with a card picked: centre the tree in what it leaves
+          fitViewOptions={{ padding: structure.activeNodeId ? VIEW_PADDING : OPEN_PADDING, minZoom: 0.5, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={2}
           // MIT allows this; React Flow asks commercial users who hide it to subscribe to Pro.
           proOptions={{ hideAttribution: true }}
         >
-          <FlyTo />
+          <Camera />
         </ReactFlow>
         </Merge>
         </MapProject>

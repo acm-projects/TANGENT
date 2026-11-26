@@ -20,24 +20,28 @@ import "./FieldNotes.css";
 const OPEN_KEY = "tangent:field-notes:open";
 const RINGS = 13;
 
-function readOpen() {
+/** The user's own choice, if they've made one: null until they open or fold the notes themselves. */
+function readOpen(): boolean | null {
   try {
-    return localStorage.getItem(OPEN_KEY) !== "0";
+    const v = localStorage.getItem(OPEN_KEY);
+    return v === null ? null : v !== "0";
   } catch {
-    return true;
+    return null;
   }
 }
 
-// read after hydration (the server renders it open); `mem` keeps a toggle alive when storage is blocked
-let mem: boolean | null = null;
+// read after hydration; `mem` keeps a toggle alive when storage is blocked (undefined: not read yet)
+let mem: boolean | null | undefined;
 const subs = new Set<() => void>();
 const subscribe = (fn: () => void) => (subs.add(fn), () => void subs.delete(fn));
-const getOpen = () => (mem ??= readOpen());
+const getOpen = () => (mem === undefined ? (mem = readOpen()) : mem);
 
 export function FieldNotes({ className }: { className?: string }) {
   // what Gent has written in so far: his changes arrive one at a time as he writes them (notesQueue.ts)
   const notes = useGentStore((s) => s.shownNotes);
-  const open = useSyncExternalStore(subscribe, getOpen, () => true);
+  // Until the user decides, the pad is out only when there's something on it: an empty notebook is just its tile.
+  const chosen = useSyncExternalStore(subscribe, getOpen, () => null);
+  const open = chosen ?? notes.length > 0;
   const station = useGentStation<HTMLElement>(NOTES);
   const toggle = (next: boolean) => {
     mem = next;

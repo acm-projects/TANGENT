@@ -20,7 +20,8 @@
   --space-rail: 72px;
 
   /* layout widths: the notes sheet, a landing page's column, a line of body text */
-  --sheet-width: 520px;
+  /* the chat sheet beside the map: a reading measure, never half the board */
+  --sheet-width: clamp(24rem, 40vw, 40rem);
   --content-max: 1200px;
   --measure: 40rem;
 
