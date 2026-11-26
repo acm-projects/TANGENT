@@ -31,6 +31,11 @@
     outline-offset: 2px;
   }
 
+  [data-ui="picker"]:active:not(:disabled) {
+    color: var(--color-text);
+    background: color-mix(in srgb, currentColor 7%, transparent);
+  }
+
   [data-ui="picker"]:disabled {
     cursor: default;
     opacity: 0.6;
@@ -75,6 +80,16 @@
     color: var(--color-text);
     scrollbar-width: thin;
     scrollbar-color: var(--color-border-strong) transparent;
+    caret-color: var(--color-text);
+  }
+
+  .picker-list ::selection {
+    background: color-mix(in srgb, currentColor 20%, transparent);
+  }
+
+  .picker-option:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
   }
 
   .picker-option {
@@ -105,7 +120,7 @@
 
   /* the option under the pointer or the keys (hover moves the keys' place, so the two never disagree) */
   .picker-option:focus {
-    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+    background: color-mix(in srgb, currentColor 7%, transparent);
   }
 
   /* the marks rank: muted at rest, in ink on the chosen option and the one in hand */
@@ -133,11 +148,14 @@
   /* the chosen option is pinned: a domed pin head, as the board's pins are */
   .picker-pin {
     flex: none;
-    width: 0.625rem;
-    height: 0.625rem;
-    margin-inline: var(--space-2) var(--space-1);
+    width: 1rem;
+    height: 1rem;
+    margin-inline: calc(var(--space-2) - 0.1875rem) calc(var(--space-1) - 0.1875rem);
     border-radius: var(--radius-full);
     background: var(--texture-pin), var(--picker-mark);
-    box-shadow: 0 1px 2px var(--color-string-shadow);
+    box-shadow: var(--shadow-pin);
+    /* drawn at 1rem so --shadow-pin lands right, then scaled to the 0.625rem head */
+    scale: 0.625;
+    margin-block: -0.1875rem;
   }
 }

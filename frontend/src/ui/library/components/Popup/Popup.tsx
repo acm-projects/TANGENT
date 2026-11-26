@@ -6,7 +6,7 @@ import { Panel } from "../../primitives/Panel/Panel";
 import { Text } from "../../primitives/Text/Text";
 import "./Popup.css";
 
-/* A modal popup: a sheet of paper over a dimmed board. It is a native <dialog>
+/* A modal popup: a sheet of torn paper, graphite-pinned, over a dimmed board. It is a native <dialog>
  * opened with showModal(), so the browser handles focus trapping, Escape to
  * close and the top layer (it escapes any transformed parent, such as a map
  * node). Clicking the dim backdrop closes it too.
@@ -53,9 +53,10 @@ export function Popup({ open, onClose, title, children }: PopupProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Panel elevation="floating">
+      <span aria-hidden="true" className="popup-pin" />
+      <Panel stock="paper" edge="torn" elevation="floating">
         <Frame gap="4">
-          <Text as="h2" id={titleId} size="l" hierarchy="primary" content={title} />
+          <Text as="h2" id={titleId} face="heading" size="l" hierarchy="primary" content={title} />
           {children}
         </Frame>
       </Panel>

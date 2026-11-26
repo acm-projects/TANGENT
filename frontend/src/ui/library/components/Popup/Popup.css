@@ -37,21 +37,19 @@
     padding: var(--space-6);
   }
 
-  /* the sheet is pinned to the board like everything else on it: a graphite
-   * pin, since a question isn't a connection */
-  [data-ui="popup"] > [data-ui="panel"]::before {
-    content: "";
+  /* a real element, not the Panel's ::before (torn paper draws on that): a graphite pin, since a question isn't a
+   * connection */
+  [data-ui="popup"] > .popup-pin {
     position: absolute;
+    z-index: 1;
     top: -0.35rem;
     left: 50%;
     width: 0.9rem;
     height: 0.9rem;
     translate: -50% 0;
     border-radius: var(--radius-full);
-    background:
-      var(--texture-pin),
-      var(--color-text-faint);
-    box-shadow: 1px 2px 2px var(--color-string-shadow);
+    background: var(--texture-pin), var(--color-text-faint);
+    box-shadow: var(--shadow-pin);
   }
 
   [data-ui="popup"]::backdrop {
