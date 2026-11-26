@@ -43,7 +43,7 @@
   border-radius: var(--radius-full);
   background: var(--texture-pin), var(--color-text-secondary);
   box-shadow: var(--shadow-pin);
-  animation: debate-pulse 1.6s var(--ease-in-out) infinite;
+  animation: debate-pulse var(--motion-loop) var(--ease-in-out) infinite;
 }
 
 .debate-kicker {
@@ -239,7 +239,7 @@
   background: var(--texture-pin), var(--color-text);
   scale: 1.3;
   box-shadow: var(--shadow-pin);
-  animation: debate-pulse 1.6s var(--ease-in-out) infinite;
+  animation: debate-pulse var(--motion-loop) var(--ease-in-out) infinite;
 }
 
 .debate-table[data-floor] .debate-placard {
@@ -252,12 +252,12 @@
 }
 
 .debate-bench[data-floor] .debate-bench-gavel {
-  animation: debate-gavel 1.4s var(--ease-spring) infinite;
+  animation: debate-gavel var(--motion-loop) var(--ease-spring) infinite;
 }
 
 /* judgment entered: the gavel comes down once */
 .debate-bench[data-ruled] .debate-bench-gavel {
-  animation: debate-gavel 0.9s var(--ease-spring) 0.3s 1 backwards;
+  animation: debate-gavel calc(var(--motion-spring) * 1.5) var(--ease-spring) calc(var(--motion-base) * 1.5) 1 backwards;
 }
 
 /* counsel's working notes, each a scrap of card; older ones fade up the page */
@@ -381,7 +381,7 @@
   margin-left: 0.1em;
   vertical-align: -0.12em;
   background: var(--color-text-muted);
-  animation: debate-caret 1s steps(2, jump-none) infinite;
+  animation: debate-caret var(--motion-blink) steps(2, jump-none) infinite;
 }
 
 .debate-turn[data-speaking] .debate-speaker .debate-kicker {

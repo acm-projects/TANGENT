@@ -284,7 +284,8 @@ plain paper with an empty dashed socket while he's out working.
   the merged card's context always holds every branch, and the stack says so.
 - **The court is in the sheet.** The sheet's header has the court button (Debate, or Return to court while
   one runs); the board's own court button shows only while the sheet is away.
-- **Screens are laid down, not swapped.** Each screen settles in from just below, a hair small (template.tsx).
+- **Screens are laid down, not swapped.** Each screen fades in over the board (template.tsx). Opacity only: moving it
+  would carry its fixed-position parts (pickers, the settings tab) with it.
 - **The board breathes.** Leaf columns are 340px apart and generations 240px, so neighbouring cards keep
   about 70px of cork between them.
 - **You can always ask.** A card with branches takes no more messages of its own, so its field says "Sends on a

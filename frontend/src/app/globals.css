@@ -48,17 +48,16 @@
   }
 }
 
-/* Screens change like paper on the board (app/template.tsx): the new one settles in from just below, a hair small,
- * over the board colour. Durations are the tokens, so reduced motion makes it a plain cut. No transform is left
- * behind once it settles (backwards fill only), so fixed-position children stay fixed to the screen. */
+/* Screens change like paper on the board (app/template.tsx): the new one fades in over the board colour. Opacity
+ * only: a translate or scale on any ancestor would make it the containing block for every position: fixed child
+ * (pickers, the settings tab, Gent's flight), which would then drift with it. Durations are the tokens, so reduced
+ * motion makes it a plain cut. */
 .screen-enter {
-  animation: screen-lay-down var(--motion-slow) var(--ease-out) backwards;
+  animation: screen-fade-in var(--motion-slow) var(--ease-out) backwards;
 }
 
-@keyframes screen-lay-down {
+@keyframes screen-fade-in {
   from {
     opacity: 0;
-    translate: 0 0.75rem;
-    scale: 0.995;
   }
 }

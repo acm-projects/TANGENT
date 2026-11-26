@@ -40,7 +40,7 @@
    * and any animationend on the button fires onHold. */
   @media (prefers-reduced-motion: no-preference) {
     [data-ui="panel"][data-component="button"][data-hold="holding"] {
-      animation: ui-hold-tremble 90ms linear infinite alternate;
+      animation: ui-hold-tremble calc(var(--motion-fast) * 0.75) linear infinite alternate;
     }
   }
 

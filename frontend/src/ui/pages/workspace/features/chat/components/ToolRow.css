@@ -70,7 +70,7 @@
 }
 
 .tool-row[data-pending] [data-ui="icon"]:not(.tool-row-chevron) {
-  animation: tool-row-busy 1.2s var(--ease-out) infinite;
+  animation: tool-row-busy var(--motion-loop) var(--ease-out) infinite;
 }
 
 @keyframes tool-row-busy {

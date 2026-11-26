@@ -7,6 +7,13 @@
   --motion-base: 200ms;
   --motion-slow: 400ms;
 
+  /* Loops, for an in-progress state only (VISUAL_LANGUAGE §5): a breath (a pulsing pin, a busy row), a slow sweep,
+   * a caret's blink. Not zeroed under reduced motion below: each loop turns itself off there, since a loop at 0ms
+   * would flicker rather than stop. */
+  --motion-loop: 1.6s;
+  --motion-loop-slow: 7s;
+  --motion-blink: 1s;
+
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 

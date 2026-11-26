@@ -114,7 +114,7 @@
   inset: 0;
   border-radius: inherit;
   border: 2px solid var(--color-text-on-gent);
-  animation: gent-splash 420ms var(--ease-out) forwards;
+  animation: gent-splash var(--motion-slow) var(--ease-out) forwards;
 }
 
 @keyframes gent-splash {
@@ -129,7 +129,7 @@
 }
 
 .gent-socket[data-home][data-phase="arriving"] .gent-avatar {
-  animation: gent-pop-up 420ms var(--ease-spring) 120ms backwards;
+  animation: gent-pop-up var(--motion-slow) var(--ease-spring) var(--motion-fast) backwards;
 }
 
 @keyframes gent-pop-up {
@@ -143,6 +143,12 @@
 .gent-socket[data-phase="leaving"] .gent-avatar {
   scale: 0;
   transition: scale var(--motion-fast) var(--ease-out);
+}
+
+/* the avatar's colours (GentAvatar.tsx): his ink on paper by default, set here so the SVG needs no var() fallback */
+.gent-avatar {
+  --avatar-ink: var(--gent-ink);
+  --avatar-paper: var(--on-gent-ink);
 }
 
 /* the avatar's pale ink on the dark panel: drawn as the paper colour */
@@ -515,7 +521,7 @@
 /* out working: his empty socket circles, like a search */
 .gent-dock[data-state="working"] .gent-socket:not([data-home])::before,
 .gent-dock[data-state="waiting"] .gent-socket:not([data-home])::before {
-  animation: gent-socket-search 7s linear infinite;
+  animation: gent-socket-search var(--motion-loop-slow) linear infinite;
 }
 
 @keyframes gent-socket-search {

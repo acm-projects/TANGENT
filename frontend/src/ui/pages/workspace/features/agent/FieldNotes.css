@@ -294,7 +294,7 @@
 /* Gent writing in, one change at a time (notesQueue.ts): his blue ink wipes on a new item, washes a reworded
  * one, stamps a tick, draws the strike-through */
 .field-note[data-gent-writes="add"] {
-  animation: note-ink-in 420ms var(--ease-out) both;
+  animation: note-ink-in var(--motion-slow) var(--ease-out) both;
 }
 
 @keyframes note-ink-in {
@@ -307,7 +307,7 @@
 }
 
 .field-note[data-gent-writes="edit"] .field-note-text {
-  animation: note-wash 520ms var(--ease-out);
+  animation: note-wash var(--motion-slow) var(--ease-out);
 }
 
 @keyframes note-wash {
@@ -331,7 +331,7 @@
 }
 
 .field-note[data-gent-writes="strike"] .field-note-ink {
-  transition: background-size 420ms var(--ease-out);
+  transition: background-size var(--motion-slow) var(--ease-out);
   background-size: 100% 0.7em;
 }
 
