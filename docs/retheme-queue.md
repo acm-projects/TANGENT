@@ -4,7 +4,7 @@ Source: the **Tangent** design-system artifact (https://claude.ai/artifact/WmPTf
 derived from the **Tanget Design System** canvas (https://claude.ai/artifact/Pf2jhiWECCLzcMrtH7LyMq).
 Day = vanilla leather on pale kraft cork; Night = charcoal leather on dark wood. Paper stays light in both.
 
-Status: **batch 2 (components, torn corners, review fixes) merged; in review.** Work runs bottom up.
+Status: **every layer done (landing page skipped by the user); in review.** Work runs bottom up.
 
 ## How we build
 
@@ -113,7 +113,7 @@ Done (by Claude, since everything else depends on it). Notes for the agents:
 ## 5. Brand / marketing
 
 - [x] Wordmark: `features/auth/{Auth,InviteCard,OnboardingForm}` (plain, case badge and app-mark lockups)
-- [ ] Hero: **NEW**, build it; needs a landing page (`pages/landing/` is empty, `app/page.tsx` redirects). Scope it when we get there.
+- [x] Hero: skipped by the user (no landing page).
 - Slide: skipped (decks only)
 
 ## 6. REPO-ONLY surfaces: retheme from tokens and materials
