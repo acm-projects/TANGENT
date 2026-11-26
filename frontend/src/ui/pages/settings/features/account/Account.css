@@ -233,7 +233,7 @@
 
 /* ── the sections ─────────────────────────────────────────── */
 
-/* A section is a torn sheet on the board; its number is stamped across the head. */
+/* A section is a torn sheet on the board. */
 .account-section {
   position: relative;
   padding: var(--space-6);
@@ -259,11 +259,6 @@
   60% {
     rotate: 0.5deg;
   }
-}
-
-.account-section-tab {
-  align-self: start;
-  color: var(--color-text-secondary);
 }
 
 /* the section's own head on the sheet, ruled off from its body */
