@@ -636,8 +636,17 @@
   box-shadow: var(--shadow-lift);
 }
 
-/* a question's Edit, under its slip on the right: quiet until the question is pointed at */
+/* a question's Edit, tucked under its slip on the right: quiet until the question is pointed at. Out of the flow,
+ * in the message's bottom padding, so a hidden button doesn't hold the thread apart. */
+.message-user {
+  position: relative;
+  padding-bottom: var(--space-8);
+}
+
 .message-user-actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-out);
 }

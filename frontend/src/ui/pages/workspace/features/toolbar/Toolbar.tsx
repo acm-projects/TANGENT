@@ -32,6 +32,17 @@ export function Toolbar({ slug, projectId, className }: ToolbarProps) {
 
   const toggle = (panel: Exclude<Panel, null>) => setOpen((cur) => (cur === panel ? null : panel));
 
+  // ⌘K / Ctrl+K opens Search from anywhere in the workspace, the way most apps do
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      setOpen("search");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     // on document, ahead of the map's window listener: Escape closes the panel and nothing else

@@ -581,6 +581,11 @@
   flex-wrap: wrap;
 }
 
+/* each setting takes an even share of the row, and drops to its own line before it gets cramped */
+.debate-start-option {
+  flex: 1 1 6rem;
+  min-width: 0;
+}
 
 .debate-outcome {
   padding-top: var(--space-4);

@@ -70,9 +70,11 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
       }}
     >
       <Text size="s" hierarchy="tertiary" content="State the motion. Counsel for and against argue it with papers to back them, the bench scores the case, and the judgment lands as a new card." />
+      <Frame gap="1">
       <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="The motion" />
       <Panel className="debate-start-topic">
         <TextArea
+          autoFocus
           aria-label="The motion before the court"
           placeholder={cardTitle ? `The motion before the court, e.g. a claim about "${cardTitle}"` : "The motion before the court: a claim one side argues for and the other against"}
           value={topic}
@@ -86,21 +88,32 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
           }}
         />
       </Panel>
+      </Frame>
       {options ? (
-        <Frame direction="row" gap="2" align="center" className="debate-start-options">
-          <Select aria-label="Debater" value={model} options={choices} onChange={(e) => setModel(e.target.value)} />
-          <Select
-            aria-label="Opposing debater"
-            value={rival}
-            options={[{ value: SAME, label: "argues both sides" }, ...choices.filter((c) => c.value !== model).map((c) => ({ ...c, label: `vs ${c.label}` }))]}
-            onChange={(e) => setRival(e.target.value)}
-          />
-          <Select
-            aria-label="Rebuttal rounds"
-            value={String(rounds)}
-            options={Array.from({ length: options.rounds.max }, (_, i) => ({ value: String(i + 1), label: `${i + 1} rebuttal round${i ? "s" : ""}` }))}
-            onChange={(e) => setRounds(Number(e.target.value))}
-          />
+        // three labelled settings side by side, each a kicker over its choice
+        <Frame direction="row" gap="3" className="debate-start-options">
+          <Frame gap="1" className="debate-start-option">
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Counsel" />
+            <Select aria-label="Debater" value={model} options={choices} onChange={(e) => setModel(e.target.value)} />
+          </Frame>
+          <Frame gap="1" className="debate-start-option">
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Versus" />
+            <Select
+              aria-label="Opposing debater"
+              value={rival}
+              options={[{ value: SAME, label: "Itself" }, ...choices.filter((c) => c.value !== model)]}
+              onChange={(e) => setRival(e.target.value)}
+            />
+          </Frame>
+          <Frame gap="1" className="debate-start-option">
+            <Text as="span" size="xxs" face="stamp" className="debate-kicker" content="Rebuttals" />
+            <Select
+              aria-label="Rebuttal rounds"
+              value={String(rounds)}
+              options={Array.from({ length: options.rounds.max }, (_, i) => ({ value: String(i + 1), label: `${i + 1} round${i ? "s" : ""}` }))}
+              onChange={(e) => setRounds(Number(e.target.value))}
+            />
+          </Frame>
         </Frame>
       ) : (
         !error && <Loading label="Calling the court…" />

@@ -232,6 +232,8 @@
   padding-inline: 0.15em;
   font-size: 1.15em;
   line-height: 1.2;
+  /* always room for two lines, so every photo on the board is the same size whatever the name's length */
+  min-height: 2.4em;
   overflow: hidden;
   overflow-wrap: anywhere;
 }

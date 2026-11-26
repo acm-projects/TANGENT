@@ -14,6 +14,8 @@
 
 .case-board-card {
   position: absolute;
+  /* over the strings: a string runs out from under its card, so it never crosses the card's writing */
+  z-index: 2;
   width: 14vw;
   padding: var(--space-4);
   /* out of focus: the board is behind the card you are reading */
@@ -57,7 +59,7 @@
   rotate: -6deg;
 }
 
-/* the strings, over the cards and under the auth card */
+/* the strings, under the cards (they run out from beneath each) and the auth card */
 .case-board-strings {
   position: absolute;
   inset: 0;
