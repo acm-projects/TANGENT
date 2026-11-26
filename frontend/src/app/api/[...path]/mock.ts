@@ -213,6 +213,18 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
       const child = node(newId("n"), n.project_id, b, nextFork(b), null);
       return json({ ...meta(child), fork: null });
     }
+    if (c === "split") {
+      // cut after message `after_seq`: the rest (and every child) moves into a new tail child; a tangent beside it
+      const after = Number(body.after_seq);
+      const tail = node(newId("n"), n.project_id, b, nextFork(b), null);
+      [...nodes.values()].filter((x) => x.parent_id === b && x.id !== tail.id).forEach((x) => (x.parent_id = tail.id));
+      tail.chats = n.chats.slice(after + 1).map((m, i) => ({ ...m, seq: i }));
+      tail.title = tail.chats.find((m) => m.role === "user")?.content.slice(0, 48) ?? null;
+      tail.node_type = "chat";
+      n.chats = n.chats.slice(0, after + 1);
+      const tangent = body.tangent ? node(newId("n"), n.project_id, b, nextFork(b), null) : null;
+      return json({ head: meta(n), tail: meta(tail), tangent: tangent && meta(tangent), fork: null });
+    }
     if (c === "reset") {
       subtree(b).slice(1).forEach((id) => nodes.delete(id));
       n.chats = [];

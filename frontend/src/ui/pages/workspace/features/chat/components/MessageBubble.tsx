@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import type { ChatMessage } from "@/api/types";
 import { api } from "@/api";
-import { Button, Frame, Icon, InkPanel, Panel, Text } from "@/ui/library";
+import { Button, Frame, Icon, InkPanel, Panel, Text, TextArea } from "@/ui/library";
 import { ToolRow, toolIcon } from "./ToolRow";
 
 /* One message (Figma "ChatBubble", 16:219).
@@ -26,6 +26,9 @@ type MessageBubbleProps = {
   onBranch?: (nodeId: string, seq: number) => void;
   /** Ask the question again for a new reply in this one's place. Only the newest reply on the selected leaf has it. */
   onRetry?: () => void;
+  /** Edit this question (`seq` of `nodeId`): asked again, reworded, on a new branch beside this one. Omitted while
+   * streaming, and on questions that can't be (the case's first, Gent's, answer sheets). */
+  onEdit?: (nodeId: string, seq: number, content: string) => void;
   /** true for the reply that is still arriving */
   streaming?: boolean;
   /** how a reply's markdown elements render (Gent's report links the cards it names); keep it a stable object */
@@ -33,9 +36,9 @@ type MessageBubbleProps = {
   projectId?: string;
 };
 
-export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, streaming = false, markdown, projectId }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, nodeId, onBranch, onRetry, onEdit, streaming = false, markdown, projectId }: MessageBubbleProps) {
   return message.role === "user" ? (
-    <UserMessage message={message} />
+    <UserMessage message={message} onEdit={onEdit && nodeId ? (text) => onEdit(nodeId, message.seq, text) : undefined} />
   ) : (
     <AssistantMessage message={message} nodeId={nodeId} onBranch={onBranch} onRetry={onRetry} streaming={streaming} markdown={markdown} projectId={projectId} />
   );
@@ -51,8 +54,9 @@ function answersIn(content: string) {
   return pairs.length ? pairs : null;
 }
 
-function UserMessage({ message }: { message: ChatMessage }) {
+function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: (content: string) => void }) {
   const answers = answersIn(message.content);
+  const [draft, setDraft] = useState<string | null>(null);
   if (answers) {
     return (
       // the user's answers to a card's questions: an answer sheet, each question with the answer they ticked
@@ -83,13 +87,62 @@ function UserMessage({ message }: { message: ChatMessage }) {
           <InkPanel radius={8} seed={message.seq + 3} className="message-user-bubble" data-author="gent">
             <Text content={message.content} className="message-text" />
           </InkPanel>
+        ) : draft !== null ? (
+          // rewording it: the slip becomes a field; saving asks it on a new branch, the original stays
+          <EditSlip
+            draft={draft}
+            onChange={setDraft}
+            onCancel={() => setDraft(null)}
+            onSave={() => {
+              const text = draft.trim();
+              setDraft(null);
+              if (text && text !== message.content.trim()) onEdit?.(text);
+            }}
+          />
         ) : (
-          // the user's own question: a slip with their red margin and tack
+          // the user's own question: a slip with their red margin
           <Panel stock="slip" ruled="margin" elevation="floating" className="message-user-bubble">
             <Text face="heading" size="m" content={message.content} className="message-text" />
           </Panel>
         ))}
+      {onEdit && draft === null && message.author !== "gent" && (
+        <Frame direction="row" gap="1" className="message-actions message-user-actions">
+          <Button hierarchy="tertiary" size="s" icon="edit" showIcon label="Edit" onClick={() => setDraft(message.content)} />
+        </Frame>
+      )}
     </Frame>
+  );
+}
+
+/** The question being reworded: Enter (or Branch) saves, Esc cancels, Shift+Enter is a new line. */
+function EditSlip({ draft, onChange, onCancel, onSave }: { draft: string; onChange(v: string): void; onCancel(): void; onSave(): void }) {
+  return (
+    <Panel stock="slip" ruled="margin" elevation="floating" className="message-user-bubble message-user-editing">
+      <TextArea
+        aria-label="Edit question"
+        value={draft}
+        autoFocus
+        rows={2}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            onCancel();
+          } else if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onSave();
+          }
+        }}
+        className="message-edit-input"
+      />
+      <Frame direction="row" gap="2" align="center" justify="between" className="message-edit-bar">
+        <Text as="span" size="xs" hierarchy="tertiary" content="Asks it on a new branch; this one stays." />
+        <Frame direction="row" gap="1">
+          <Button hierarchy="tertiary" size="s" label="Cancel" onClick={onCancel} />
+          <Button hierarchy="primary" size="s" icon="call_split" showIcon label="Branch" onClick={onSave} disabled={!draft.trim()} />
+        </Frame>
+      </Frame>
+    </Panel>
   );
 }
 

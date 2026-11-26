@@ -41,9 +41,10 @@ type HistoryListProps = {
   canRetry: boolean;
   branch: (nodeId: string, seq: number) => void;
   retry: () => Promise<void>;
+  edit: (nodeId: string, seq: number, content: string) => void;
 };
 
-function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }: HistoryListProps) {
+function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, edit }: HistoryListProps) {
   return (
     <>
       {items.map((item, i) => {
@@ -66,6 +67,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
                           canRetry={canRetry}
                           branch={branch}
                           retry={retry}
+                          edit={edit}
                         />
                       </ol>
                     </details>
@@ -109,6 +111,8 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry }
                 onBranch={streaming !== null && isActive ? undefined : branch}
                 // only the newest reply on the card being written on can be asked again
                 onRetry={canRetry && isActive && j === all.length - 1 ? retry : undefined}
+                // any question but the case's very first can be reworded onto a new branch (not mid-reply)
+                onEdit={streaming === null && (item.node.parent_id || j > 0) ? edit : undefined}
               />
             ))}
             {/* only the card being written on needs the hint; an empty card above it is just its divider */}
@@ -301,6 +305,7 @@ export function Chat({ className }: ChatProps) {
                 canRetry={chat.canRetry}
                 branch={chat.branch}
                 retry={chat.retry}
+                edit={chat.edit}
               />
               {chat.streaming !== null && (
                 <MessageBubble

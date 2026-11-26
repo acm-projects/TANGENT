@@ -535,6 +535,38 @@
   box-shadow: var(--shadow-lift);
 }
 
+/* a question's Edit, under its slip on the right: quiet until the question is pointed at */
+.message-user-actions {
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+
+.message-user:is(:hover, :focus-within) .message-user-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .message-user-actions {
+    opacity: 1;
+  }
+}
+
+/* rewording a question: the slip straightens and widens into a field */
+.message-user-editing {
+  width: min(32rem, 100%);
+  rotate: 0deg;
+}
+
+.message-edit-input {
+  width: 100%;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-m);
+}
+
+.message-edit-bar {
+  padding-top: var(--space-2);
+}
+
 .message-meta {
   color: var(--color-text-muted);
 }

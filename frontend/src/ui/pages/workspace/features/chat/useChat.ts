@@ -317,6 +317,32 @@ export function useChat() {
     }
   }
 
+  /** Edit the question `seq` of `nodeId`: the original stays, and the edited question is asked on a new branch
+   * beside it (the conversation up to that question, then the new wording). A node's first question branches from
+   * its parent; anywhere later, the node is cut just before the question. The case's own first question can't be. */
+  async function edit(nodeId: string, seq: number, content: string) {
+    const text = content.trim();
+    const store = useTreeStore.getState();
+    const chats = store.chatsByNode[nodeId] ?? [];
+    const at = chats.findIndex((m) => m.seq === seq && m.role === "user");
+    if (!text || at < 0 || Object.keys(store.streaming).length) return;
+    setError(null);
+    try {
+      if (at > 0) await splitNode(nodeId, at - 1);
+      else {
+        const parent = store.nodesById[nodeId]?.parent_id;
+        if (!parent) return;
+        await forkNode(parent);
+      }
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, "Could not make the new branch."));
+      return;
+    }
+    // the new branch is selected once the server has made it (a placeholder id means it hasn't, or it moved to a copy)
+    const id = useTreeStore.getState().activeNodeId;
+    if (id && !isPending(id) && id !== nodeId) await ask(id, text, false);
+  }
+
   return {
     activeNodeId,
     activeNode,
@@ -346,6 +372,7 @@ export function useChat() {
     canRetry,
     retry,
     branch,
+    edit,
     /** A question card's last answer opened `nodeId`: the asking model continues its research there. */
     continueIn: (nodeId: string, prompt: string) => void ask(nodeId, prompt, false),
   };
