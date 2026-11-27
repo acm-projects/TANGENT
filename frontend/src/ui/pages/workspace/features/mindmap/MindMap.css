@@ -509,8 +509,11 @@
   height: 1.5rem;
 }
 
+/* the chosen shape is pressed into the paper, as a pressed button is elsewhere: no heavy black frame */
 .tag-picker-shape[aria-pressed="true"] {
-  border: 2px solid var(--color-text);
+  border-color: var(--color-border-emphasis);
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 1px 3px var(--color-string-shadow);
 }
 
 /* a tagged card says what its tag means, on a line under its title: the tag's dot, then its name */
