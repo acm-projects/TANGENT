@@ -7,6 +7,7 @@ import { tagColor, tagLabels, tagMark } from "@/api/types";
 import type { NodeTag } from "@/api/types";
 import { spring } from "@/ui/library/tokens/motion";
 import { nodeStation, useGentStation } from "@/store/gentStations";
+import { selectCardInCourt } from "@/store/debateStore";
 import { ROW_HEIGHT } from "@/store/layout";
 import { useTreeStore } from "@/store/treeStore";
 import { splitMatches } from "../../toolbar/highlight";
@@ -60,7 +61,9 @@ export const MindMapNode = memo(function MindMapNode({ id, data, positionAbsolut
   // a station Gent can visit: he inks the card's outline and perches on it (features/agent/travel)
   const gentStation = useGentStation<HTMLElement>(nodeStation(id));
   // a fork the server hasn't confirmed has nothing to fork from yet (deleting it is queued: nodeActions.ts)
-  const busy = isPending(id);
+  // a card still being made, or a debate's card while the court sits: nothing can come off it yet
+  const inCourt = useTreeStore(selectCardInCourt(id));
+  const busy = isPending(id) || inCourt;
   const [peeled, setPeeled] = useState(false);
   // the tray's fan menu (More)
   const [menu, setMenu] = useState<"more" | null>(null);

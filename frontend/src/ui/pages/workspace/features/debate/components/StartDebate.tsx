@@ -89,7 +89,7 @@ export function StartDebate({ projectId, nodeId, onClose }: StartDebateProps) {
       <Text
         size="s"
         hierarchy="tertiary"
-        content="State the motion. Counsel for and against argue it with papers to back them, the bench scores the case, and the judgment lands as a new card."
+        content="State the motion. Counsel for and against argue it with papers to back them, and the bench scores the case. Its card goes on the board under this one straight away, and the judgment fills it in."
       />
       <Frame gap="1">
         <Text

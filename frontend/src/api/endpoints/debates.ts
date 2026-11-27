@@ -22,6 +22,8 @@ export function createDebatesApi({ http }: ApiClient) {
       http.post(`${debate(id)}/control`, { action, side }).then(() => undefined),
     cancel: (id: string) => http.post(`${debate(id)}/cancel`).then(() => undefined),
 
+    /** The debate behind a debate card, still in session or done. */
+    debateOf: (nodeId: string) => http.get<{ debate_id: string }>(`${node(nodeId)}/debate`).then((r) => r.data.debate_id),
     result: (nodeId: string) => http.get<DebateResult>(node(nodeId)).then((r) => r.data),
     /** Every turn of the debate, both sides. Tens of KB: fetch only when the user asks to read it. */
     transcript: (nodeId: string) => http.get<DebateTranscript>(`${node(nodeId)}/transcript`).then((r) => r.data),

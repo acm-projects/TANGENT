@@ -104,6 +104,11 @@ def client(monkeypatch):
     monkeypatch.setattr(nodes_router, "_persist", fake_persist)
     monkeypatch.setattr(nodes_router, "_load_path", fake_path)
 
+    async def no_debate(db, node_id):  # debate.pg.store: not a live debate's card
+        return False
+
+    monkeypatch.setattr(nodes_router, "live_debate_on", no_debate)
+
     async def no_uploads(project_id):
         return ""
 
@@ -715,3 +720,14 @@ def test_following_replays_the_prompt_and_what_was_sent_so_far(client):
 
 def test_following_is_204_when_nothing_is_in_flight(client):
     assert client.get(f"/nodes/{uuid.uuid4()}/messages/live").status_code == 204
+
+
+def test_a_live_debates_card_takes_no_messages(client, monkeypatch):
+    """A debate's card is on the board from the start, but nothing is written on it until the verdict is in."""
+    async def in_court(db, node_id):
+        return True
+
+    monkeypatch.setattr(nodes_router, "live_debate_on", in_court)
+    r = client.post(f"/nodes/{NODE}/messages", json={"content": "hello"})
+    assert r.status_code == 409 and "still in court" in r.json()["detail"]
+    assert client.persisted == []

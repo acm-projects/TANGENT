@@ -164,12 +164,25 @@
   --pop-scale: 0.94;
 }
 
-/* a debate card's verdict rides the top of the thread while its chat scrolls under it */
-.chat-history > li.chat-verdict {
+/* A debate card's part of the thread: its "Enter the courtroom" bar sticks to the top of the sheet while you read
+ * that part, and goes with it when the next card's part scrolls up (sticky inside its own section). */
+.chat-history > li.chat-debate-section {
+  content-visibility: visible; /* a sticky child needs its section laid out */
+}
+
+.chat-court-bar {
   position: sticky;
   top: 0;
-  z-index: 2;
-  content-visibility: visible;
+  z-index: 3;
+  justify-content: center;
+  padding: var(--space-2) 0;
+  background: linear-gradient(var(--color-surface) 70%, transparent);
+}
+
+.chat-debate-thread {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .chat-title-kicker {

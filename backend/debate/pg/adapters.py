@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ..context import NodeRow, build_lineage_context
 from ..deps import Control
 from .db import js, tx
+from .store import insert_debate_node
 
 Factory = async_sessionmaker[AsyncSession]
 
@@ -85,44 +86,26 @@ class PgWriter:
             ).mappings().first()
             if d is None:
                 raise LookupError(f"debate {debate_id} not found")
-            if d["result_node_id"]:
-                return str(d["result_node_id"])
-            parent = (
-                await s.execute(
-                    text("SELECT id, tree_id, project_id FROM nodes WHERE id = :p"), {"p": d["parent_node_id"]}
-                )
-            ).mappings().first()
-            if parent is None:
-                raise LookupError("the node this debate started from no longer exists")
+            # done already (a retried finish): the result row says so
+            done = (
+                await s.execute(text("SELECT node_id FROM debate_results WHERE debate_id = CAST(:d AS uuid)"), {"d": debate_id})
+            ).scalar_one_or_none()
+            if done:
+                return str(done)
             chats = render_chats(d["topic"], payload, {"for": d["for_model"], "against": d["against_model"], "judge": d["judge_model"]})
             title = node_title(payload, d["topic"])
-            node_id = None
-            for _ in range(5):  # a concurrent fork can take the same index; the unique constraint picks the loser
-                fork = (
-                    await s.execute(
-                        text("SELECT COALESCE(MAX(fork_index), 0) + 1 FROM nodes WHERE parent_id = :p"), {"p": parent["id"]}
-                    )
-                ).scalar_one()
-                try:
-                    async with s.begin_nested():
-                        node_id = (
-                            await s.execute(
-                                text(
-                                    "INSERT INTO nodes (tree_id, project_id, parent_id, created_by_id, node_type, title, summary, "
-                                    "chats, fork_index) VALUES (:t, :pr, :pa, CAST(:u AS uuid), 'debate', :ti, :su, "
-                                    "CAST(:c AS jsonb), :f) RETURNING id"
-                                ),
-                                {
-                                    "t": parent["tree_id"], "pr": parent["project_id"], "pa": parent["id"], "u": self.owner,
-                                    "ti": title, "su": payload["summary"], "c": js(chats), "f": fork,
-                                },
-                            )
-                        ).scalar_one()
-                    break
-                except IntegrityError:
-                    continue
-            if node_id is None:
-                raise RuntimeError("could not allocate a branch slot for the debate node")
+            # The card made when the debate started gets the verdict. Without one (a debate started before cards came
+            # at the start, or its card deleted meanwhile), a new card goes where it would have.
+            node_id = d["result_node_id"]
+            filled = node_id is not None and (
+                await s.execute(
+                    text("UPDATE nodes SET title = :ti, summary = :su, chats = CAST(:c AS jsonb), status = 'active' WHERE id = :n RETURNING id"),
+                    {"ti": title, "su": payload["summary"], "c": js(chats), "n": node_id},
+                )
+            ).first() is not None
+            if not filled:
+                node_id = await insert_debate_node(s, str(d["parent_node_id"]), self.owner, title=title, summary=payload["summary"], chats=chats)
+            project_id = d["project_id"]
 
             active = int(d["active_ms"] or 0) + (now_ms - self.segment_started_ms if self.segment_started_ms else 0)
             wall = int(d["wall_ms"] or 0)
@@ -142,7 +125,7 @@ class PgWriter:
                     "CAST(:tms AS jsonb), :wall, :active, :waited, CAST(:br AS jsonb), CAST(:tr AS jsonb))"
                 ),
                 {
-                    "n": node_id, "d": debate_id, "pr": parent["project_id"], "prop": payload["proposition"],
+                    "n": node_id, "d": debate_id, "pr": project_id, "prop": payload["proposition"],
                     "w": payload["winner"], "wh": payload.get("judge_would_have_chosen"),
                     "conf": round(min(1.0, max(0.0, float(payload["confidence"]))), 2),
                     "sum": payload["summary"], "fo": payload["final_output"], "rat": payload["rationale"],

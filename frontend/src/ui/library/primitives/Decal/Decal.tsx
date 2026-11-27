@@ -2,11 +2,11 @@ import type { ComponentProps } from "react";
 import "./Decal.css";
 
 /* A decoration: empty and aria-hidden, positioned and sized by its consumer. Board marks (a newspaper scrap, a
- * coffee ring), a paperclip, or a plain `shape` (a rule, a dot, a page's edge) that the consumer's class styles.
+ * coffee ring, a strip of old tape, a ruled note, a loose pin), a paperclip, or a plain `shape` (a rule, a dot, a page's edge) that the consumer's class styles.
  * The way a feature draws something that isn't content without a raw tag (DESIGN.md Rule 2). */
 
 type DecalProps = Omit<ComponentProps<"span">, "children"> & {
-  kind: "scrap" | "coffee-ring" | "paperclip" | "shape";
+  kind: "scrap" | "coffee-ring" | "paperclip" | "tape" | "note" | "pin" | "shape";
 };
 
 export function Decal({ kind, ...rest }: DecalProps) {

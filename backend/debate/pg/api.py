@@ -231,6 +231,17 @@ def build_router(
             out["fork"] = target.fork
         return out
 
+    @router.get("/node/{node_id}/debate")
+    async def debate_of_node(node_id: str, user: str = Depends(current_user)) -> dict[str, str]:
+        """The debate behind a debate card, live or done: the way into its courtroom."""
+        if not _is_uuid(node_id):
+            raise HTTPException(404, "no debate for this node")
+        async with tx(factory, user_id=user) as s:
+            debate_id = await store.debate_for_node(s, node_id)
+        if debate_id is None:
+            raise HTTPException(404, "no debate for this node")
+        return {"debate_id": debate_id}
+
     @router.get("/node/{node_id}")
     async def by_node(node_id: str, user: str = Depends(current_user)) -> dict[str, Any]:
         """Structured verdict behind a debate node, for the card shown above its chat."""

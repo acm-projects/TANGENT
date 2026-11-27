@@ -68,9 +68,10 @@ export type DebateAction =
   | { type: "tick"; dt: number }
   | { type: "wrapUp" };
 
-/** Characters per second a buffered turn types out at, and the backlog beyond which it speeds up. */
+/** Characters per second a turn types out at, and how far behind (in seconds of what's waiting) playback lets itself
+ * fall: with more waiting (the other side's turn buffered too) it speeds up in proportion, so it never needs skipping. */
 const RATE = 400;
-const FAST_BACKLOG = 1500;
+const CATCH_UP = 1.5;
 
 export function emptyDebate(id: string): DebateView {
   return {
@@ -95,13 +96,16 @@ export const isTerminal = (status: string | undefined) =>
 /** Move the playhead: play out the speaking turn by `dt` seconds' worth, passing over entries already done. */
 function play(v: DebateView, dt: number): DebateView {
   let { stage, turns } = v;
+  // everything arrived but not yet shown, across the speaker and those waiting behind them
+  let waiting = 0;
+  for (const e of v.log.slice(stage)) if (e.kind === "turn") waiting += turns[e.id]!.text.length - turns[e.id]!.shown;
   for (; stage < v.log.length; stage++) {
     const entry = v.log[stage]!;
     if (entry.kind !== "turn") continue;
     const t = turns[entry.id]!;
     const backlog = t.text.length - t.shown;
     if (backlog > 0) {
-      const step = dt === Infinity ? backlog : Math.ceil(dt * RATE * Math.max(1, backlog / FAST_BACKLOG));
+      const step = dt === Infinity ? backlog : Math.ceil(dt * Math.max(RATE, waiting / CATCH_UP));
       turns = { ...turns, [t.id]: { ...t, shown: Math.min(t.text.length, t.shown + step) } };
       if (dt !== Infinity) break; // one speaker per tick; the next takes the floor on the next one
     }
@@ -205,6 +209,18 @@ export function reduceDebate(v: DebateView, a: DebateAction): DebateView {
 export const visibleEntries = (v: DebateView) => v.log.slice(0, v.stage + 1);
 
 /** The turn speaking now, if any. */
+/** The card `nodeId` belongs to the debate this tab is following, still in session: "Return to court" walks back in. */
+export const selectInCourt = (nodeId: string | null) => (s: { view: DebateView | null }) =>
+  Boolean(nodeId && s.view && !s.view.ended && s.view.nodeId === nodeId);
+
+/** Node status of a debate's card while its debate is in session (backend debate.pg.store.IN_COURT). */
+export const IN_COURT = "in_court";
+
+/** A tree-store selector: the card is a debate still in session, followed here or not. It's on the board from the
+ * start, but can't be branched, merged or written on until the verdict is in (the server refuses too). */
+export const selectCardInCourt = (nodeId: string | null) => (s: { nodesById: Record<string, { status: string } | undefined> }) =>
+  Boolean(nodeId && s.nodesById[nodeId]?.status === IN_COURT);
+
 export function speaking(v: DebateView): DebateTurn | null {
   const entry = v.log[v.stage];
   return entry?.kind === "turn" ? v.turns[entry.id]! : null;

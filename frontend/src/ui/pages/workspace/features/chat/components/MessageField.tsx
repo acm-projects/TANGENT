@@ -14,6 +14,7 @@ const PLACEHOLDER: Record<NonNullable<SendBlocker> | "ready", string> = {
   ready: "Message…",
   "no-selection": "Pick a card on the board to write here.",
   question: "Answer the question on its card to go on.",
+  debate: "The court is in session: this card opens once the verdict is in.",
   streaming: "Waiting for the reply…",
   pending: "Message…",
 };

@@ -8,6 +8,8 @@ import { UNTITLED, UNTITLED_MERGE } from "../mindmap/toFlow";
 import { useSearchHighlight } from "./searchHighlight";
 import { MergeChoices, MergeStack, mergeKey } from "./components/MergeStack";
 import { VerdictCard } from "../debate/components/VerdictCard";
+import { EnterCourtButton } from "../debate/components/EnterCourtButton";
+import { selectCardInCourt } from "@/store/debateStore";
 import { BranchDivider } from "./components/BranchDivider";
 import { MessageBubble } from "./components/MessageBubble";
 import { MessageField } from "./components/MessageField";
@@ -53,6 +55,7 @@ type HistoryListProps = {
 function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, edit }: HistoryListProps) {
   // "ask something" only where something can be asked: a card with branches takes no messages
   const writable = useTreeStore((s) => (activeNodeId ? selectIsLeaf(s, activeNodeId) : false));
+  const activeInCourt = useTreeStore(selectCardInCourt(activeNodeId));
   return (
     <>
       {items.map((item, i) => {
@@ -69,18 +72,16 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
         }
 
         const isActive = item.node.id === activeNodeId;
-        return (
-          <Fragment key={item.node.id}>
-            {i > 0 && (
-              <Frame as="li">
-                <BranchDivider exhibit={item.exhibit} title={item.node.title} />
-              </Frame>
-            )}
-            {/* the selected debate card's verdict, above its chat (not on cards further up the thread); it sticks to
-                the top of the thread as the debate's chat scrolls under it, so the way back to court is always there */}
+        const section = (
+          <>
+            {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
             {item.node.node_type === "debate" && isActive && (
-              <Frame as="li" className="chat-verdict">
-                <VerdictCard nodeId={item.node.id} />
+              <Frame as="li">
+                {activeInCourt ? (
+                  <Text hierarchy="tertiary" size="s" className="chat-hint" content="The court is in session. The verdict lands on this card when the judge rules." />
+                ) : (
+                  <VerdictCard nodeId={item.node.id} />
+                )}
               </Frame>
             )}
             {/* a question card: what was asked, and the answer that led on down this thread */}
@@ -121,6 +122,27 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
                   }
                 />
               </Frame>
+            )}
+          </>
+        );
+        return (
+          <Fragment key={item.node.id}>
+            {i > 0 && (
+              <Frame as="li">
+                <BranchDivider exhibit={item.exhibit} title={item.node.title} />
+              </Frame>
+            )}
+            {item.node.node_type === "debate" ? (
+              // a debate card's part of the thread, held together so its way back to court sticks to the top of the
+              // sheet while you read it, and lets go where the next card's part begins
+              <Frame as="li" gap="0" className="chat-debate-section">
+                <EnterCourtButton nodeId={item.node.id} className="chat-court-bar" />
+                <Frame as="ol" gap="2" className="chat-debate-thread">
+                  {section}
+                </Frame>
+              </Frame>
+            ) : (
+              section
             )}
           </Fragment>
         );

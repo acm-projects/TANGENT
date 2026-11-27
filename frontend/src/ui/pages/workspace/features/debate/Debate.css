@@ -11,39 +11,27 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   /* minmax(0, …): the dock's buttons must not widen the room past the screen (they scroll instead) */
   grid-template-columns: minmax(0, 1fr);
-  background: var(--board-vignette), var(--board-lamp), var(--texture-cork), var(--color-board);
-  animation: court-in var(--motion-slow) var(--ease-out) backwards;
+  /* The courtroom: a panelled wall to the rail, boards below it, lit from the bench. Wood from the board's own colour,
+   * so it follows Day and Night. */
+  --wood: color-mix(in srgb, var(--color-board) 82%, #2a160a);
+  --wood-light: color-mix(in srgb, var(--wood) 86%, #f5dcb4);
+  --wood-dark: color-mix(in srgb, var(--wood) 70%, #000);
+  --rail: 64%;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 18%, color-mix(in srgb, #ffd9a0 18%, transparent), transparent 70%),
+    var(--board-vignette),
+    linear-gradient(transparent calc(var(--rail) - 0.6rem), var(--wood-light) calc(var(--rail) - 0.6rem) calc(var(--rail) - 0.35rem), var(--wood-dark) calc(var(--rail) - 0.35rem) var(--rail), transparent var(--rail)),
+    repeating-linear-gradient(90deg, transparent 0 calc(9rem - 3px), var(--wood-dark) calc(9rem - 3px) 9rem) 0 0 / 100% var(--rail) no-repeat,
+    repeating-linear-gradient(180deg, color-mix(in srgb, var(--wood-dark) 70%, transparent) 0 1px, transparent 1px 2.4rem) 0 var(--rail) / 100% 100% no-repeat,
+    linear-gradient(var(--wood) var(--rail), var(--wood-dark) var(--rail)),
+    var(--texture-grain);
 }
 
-@keyframes court-in {
-  from {
-    opacity: 0;
-    scale: 0.985;
-  }
-}
-
-/* minimised: a button waiting on the board */
-.debate-minimised {
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  --pop-from: 0 2rem;
-}
-
-.debate-minimised [data-live] {
-  position: relative;
-}
-
-/* a graphite pin pulses on the button while the court sits (red is kept for what the user does) */
-.debate-minimised [data-live]::after {
-  content: "";
-  position: absolute;
-  top: -0.2rem;
-  right: -0.2rem;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: var(--radius-full);
-  background: var(--texture-pin), var(--color-text-secondary);
-  box-shadow: var(--shadow-pin);
-  animation: debate-pulse var(--motion-loop) var(--ease-in-out) infinite;
+/* the courtroom's frame for growing out of the debate's card and back into it (Debate.tsx); fixed over everything */
+.court-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
 }
 
 .debate-kicker {
@@ -173,9 +161,12 @@
 .debate-table {
   grid-area: for;
   align-self: stretch;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  padding: var(--space-4) var(--space-3);
-  overflow-y: auto;
+  padding: var(--space-4) var(--space-3) 0;
+  /* counsel stands at the foot; a long pad of notes gives way at its top rather than scrolling the column */
+  overflow: hidden;
   border-radius: var(--radius-lg);
   scrollbar-width: thin;
   transition: opacity var(--motion-slow) var(--ease-out);
@@ -187,12 +178,93 @@
   background: var(--spot-lamp);
 }
 
-.court-floor:has(.debate-table[data-floor]) .debate-table:not([data-floor]) {
+.court-floor:has(.debate-table[data-up]) .debate-table:not([data-up]) {
   opacity: 0.72;
+}
+
+.debate-table[data-up] {
+  background: var(--spot-lamp);
 }
 
 .debate-table[data-side="against"] {
   grid-area: against;
+}
+
+/* ── the people: cut-paper figures (components/CourtFigure) ── */
+
+.court-figure {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  --fig-paper: var(--color-surface);
+  --fig-suit: color-mix(in srgb, var(--color-text-on-paper) 78%, var(--wood));
+  --fig-robe: color-mix(in srgb, var(--color-text-on-paper) 90%, #000);
+}
+
+.court-figure-head { fill: color-mix(in srgb, var(--fig-paper) 80%, #d9a877); }
+.court-figure-suit { fill: var(--fig-suit); }
+.court-figure-robe { fill: var(--fig-robe); }
+.court-figure-shirt { fill: var(--fig-paper); }
+.court-figure-line { stroke: var(--fig-suit); stroke-width: 2; }
+.court-figure-wood { fill: var(--wood-light); }
+.court-figure-edge { fill: color-mix(in srgb, var(--wood-light) 70%, #fff); }
+.court-figure-shadow { fill: rgb(0 0 0 / 0.28); }
+
+/* counsel stands at the foot of their side, facing the room */
+.court-counsel {
+  display: block;
+  width: min(100%, 11rem);
+  aspect-ratio: 120 / 170;
+  margin: auto auto 0;
+  flex: none;
+}
+
+.debate-table[data-side="against"] .court-counsel {
+  scale: -1 1; /* the same figure, facing the other way */
+}
+
+.court-figure-body,
+.court-figure-arm,
+.court-figure-gavel {
+  transition:
+    rotate var(--motion-spring) var(--ease-spring),
+    translate var(--motion-spring) var(--ease-spring);
+}
+
+.court-figure-body {
+  transform-origin: 60px 150px;
+}
+
+.court-figure-arm {
+  transform-origin: 82px 80px;
+}
+
+/* speaking: leans toward the room and the arm comes up to make the point */
+.court-figure[data-role="counsel"][data-speaking] .court-figure-body {
+  rotate: 4deg;
+  translate: 0 -4px;
+}
+
+.court-figure[data-role="counsel"][data-speaking] .court-figure-arm {
+  rotate: -62deg;
+}
+
+/* the judge, raised behind the bench, the bench in front of the robe */
+.court-judge {
+  display: block;
+  width: 8.5rem;
+  aspect-ratio: 140 / 96;
+  margin-bottom: calc(-1 * var(--space-8));
+}
+
+.court-figure-gavel {
+  transform-origin: 104px 76px;
+}
+
+.court-figure[data-role="judge"][data-speaking] .court-figure-gavel {
+  rotate: -28deg;
+  translate: 0 -6px;
 }
 
 /* the placard on the table's front edge */
@@ -251,8 +323,9 @@
   translate: 0 -2px;
 }
 
+/* the gavel comes down once as the Court takes the floor, not over and over while it speaks */
 .debate-bench[data-floor] .debate-bench-gavel {
-  animation: debate-gavel var(--motion-loop) var(--ease-spring) infinite;
+  animation: debate-gavel calc(var(--motion-spring) * 1.5) var(--ease-spring) 1;
 }
 
 /* judgment entered: the gavel comes down once */
@@ -262,6 +335,8 @@
 
 /* counsel's working notes, each a scrap of card; older ones fade up the page */
 .debate-pad {
+  min-height: 0;
+  overflow: hidden;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -311,12 +386,27 @@
 
 /* ── the record: the court reporter's transcript, one sheet in the middle ── */
 
+/* The record has no sheet of its own: the points float in the room between counsel, on their own paper. The space
+ * under the last one lets it scroll fully into view, so its scroll-linked entrance finishes (Debate.tsx ScrollIn). */
 .court-record {
   grid-area: record;
+  /* the offset parent of the speeches, for reading whose point is on the reading line (Debate.tsx readFocus) */
+  position: relative;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-6) var(--space-8) var(--space-8) calc(var(--space-8) + var(--space-2));
+  padding: var(--space-6) var(--space-4) 32dvh;
   scrollbar-width: thin;
+}
+
+[data-ui="panel"].court-record {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* the line's top and bottom fade into the room instead of being cut */
+.court-record {
+  mask-image: linear-gradient(transparent, #000 var(--space-8), #000 calc(100% - var(--space-8)), transparent);
 }
 
 .debate-transcript {
@@ -325,34 +415,100 @@
   list-style: none;
 }
 
+/* a phase of the proceedings: a stamped paper label in the middle of the room */
 .debate-phase {
-  padding-top: var(--space-2);
+  align-self: center;
+  margin-top: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  list-style: none;
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-slip);
+  box-shadow: var(--shadow-floating);
 }
 
-.debate-phase::before,
-.debate-phase::after {
-  content: "";
-  flex: 1 1 0;
-  border-top: 1px solid var(--color-border);
+.debate-phase .debate-kicker {
+  color: var(--color-text-on-paper);
 }
 
 .debate-aside {
+  align-self: center;
+  max-width: 32rem;
+  padding: var(--space-2) var(--space-4);
+  list-style: none;
+  border-radius: var(--radius-sm);
+  background: var(--texture-grain), var(--color-slip);
+  color: var(--color-text-on-paper);
   font-style: italic;
   text-align: center;
 }
 
-/* each speech slides in from its side of the room */
+.debate-transcript {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Each point sits on its speaker's side of the room, toward their lectern: For on the left, Against on the right, the
+ * Court in the middle under the bench. The slip has a small tail toward its speaker. Scroll-linked (Debate.tsx). */
 .debate-turn {
-  animation: pop-in var(--motion-spring) var(--ease-spring) backwards;
-  --pop-from: -0.75rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  list-style: none;
 }
 
 .debate-turn[data-side="against"] {
-  --pop-from: 0.75rem 0;
+  flex-direction: row-reverse;
 }
 
 .debate-turn[data-side="judge"] {
-  --pop-from: 0 -0.5rem;
+  flex-direction: column;
+  align-items: center;
+  padding-block: var(--space-2);
+}
+
+/* the slip: most of the room's width, never all of it, so the back and forth reads at a glance */
+.debate-slip {
+  position: relative;
+  max-width: 80%;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.debate-turn[data-side="judge"] .debate-slip {
+  max-width: 92%;
+  padding-top: var(--space-6);
+  border: 3px double var(--color-border-strong);
+  text-align: center;
+}
+
+/* the tail toward its seat, in the slip's own paper */
+.debate-turn:not([data-side="judge"]) .debate-slip::before {
+  content: "";
+  position: absolute;
+  top: 0.85rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: inherit;
+  rotate: 45deg;
+}
+
+.debate-turn[data-side="for"] .debate-slip::before {
+  left: -0.35rem;
+  box-shadow: -1px 1px 1px color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
+.debate-turn[data-side="against"] .debate-slip::before {
+  right: -0.35rem;
+  box-shadow: 1px -1px 1px color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
+.debate-turn[data-side="against"] .debate-speaker {
+  flex-direction: row-reverse;
+}
+
+/* whoever has the floor: their seat in full ink, and their slip a touch lifted */
+.debate-turn[data-speaking] .debate-slip {
+  box-shadow: var(--shadow-lift);
 }
 
 .debate-speaker .debate-kicker {
@@ -360,10 +516,12 @@
   font-weight: var(--font-weight-medium);
 }
 
-.debate-speaker::after {
-  content: "";
-  flex: 1 1 auto;
-  border-top: 1px dotted var(--color-border);
+.debate-speaker {
+  margin-bottom: var(--space-1);
+}
+
+.debate-turn[data-side="judge"] .debate-speaker {
+  justify-content: center;
 }
 
 .debate-speech {
@@ -430,7 +588,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .court,
-  .debate-minimised [data-live]::after,
   .debate-table[data-floor] .debate-placard::before,
   .debate-bench[data-floor]::before,
   .debate-bench[data-floor] .debate-bench-gavel,
@@ -452,14 +609,13 @@
 
   .court-floor {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       "bench bench"
       "for against"
       "record record";
     gap: var(--space-3);
     padding: 0 var(--space-4);
-    overflow-y: auto;
   }
 
   .debate-title {
@@ -480,23 +636,42 @@
     padding: var(--space-1) var(--space-4) var(--space-2);
   }
 
-  .debate-table,
-  .court-record {
+  .court-judge {
+    width: 5.5rem;
+    margin-bottom: calc(-1 * var(--space-6));
+  }
+
+  /* counsel: the figure beside the placard, notes and exhibits left for the wide room */
+  .debate-table {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: var(--space-2);
     min-height: auto;
+    padding: var(--space-2) var(--space-2) 0;
     overflow: visible;
   }
 
-  .debate-table {
-    padding: var(--space-2);
+  .debate-table[data-side="against"] {
+    flex-direction: row-reverse;
+    text-align: right;
   }
 
-  .debate-pad-line:not([data-latest]),
-  .debate-exhibits-block {
+  .debate-table > :not(.debate-placard, .court-counsel) {
     display: none;
   }
 
+  .debate-placard {
+    flex: 1;
+    align-self: center;
+  }
+
+  .court-counsel {
+    width: 3.5rem;
+    margin: 0;
+  }
+
   .court-record {
-    padding: var(--space-4) var(--space-4) var(--space-6) var(--space-8);
+    padding: var(--space-4) var(--space-2) 32dvh;
   }
 
   /* the levers stay on one line and scroll sideways rather than stack */
@@ -640,11 +815,20 @@
   padding: var(--space-4);
 }
 
-/* in the courtroom the card is part of the record's sheet, not a sheet of its own */
-.verdict[data-in-court] {
-  width: 100%;
+/* in the courtroom the judgment is its own sheet in the middle of the room, as wide as a speech can be */
+.verdict[data-in-court],
+.debate-outcome-sheet {
+  width: min(100%, 40rem);
   text-align: left;
-  padding: 0;
+}
+
+.debate-outcome-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  text-align: center;
 }
 
 .verdict-head {

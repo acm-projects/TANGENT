@@ -70,7 +70,12 @@ seedTree("p-1", "Did drought end the Bronze Age?").chats.push(
 node("n-2", "p-1", "p-1-root", 0, "Drought records", [["What climate records cover 1200 BCE?", "Three kinds: pollen cores (lake and sea sediments), speleothems (cave formations) and oxygen isotopes in lake beds. The pollen record is the most cited."]]);
 node("n-3", "p-1", "n-2", 0, "Pollen cores, Sea of Galilee", [["Tell me about the Sea of Galilee pollen core.", "Langgut et al. (2013) drilled a core under the lake and dated it with radiocarbon. Oak, pine and olive pollen falls steeply from about 1250 BCE, a sign of drier conditions lasting roughly 150 years."]]);
 node("n-4", "p-1", "n-2", 1, "Cave records in Soreq", []);
-node("n-5", "p-1", "p-1-root", 1, "The Sea Peoples", [["Who were the Sea Peoples?", "A confederation of seafaring raiders named in Egyptian records, most famously Ramesses III's inscriptions at Medinet Habu. Their origins are still debated."]]);
+// a debate card: its chat carries the "Enter the courtroom" bar (its verdict isn't mocked, so the card says so)
+Object.assign(node("n-5", "p-1", "p-1-root", 1, "The Sea Peoples", [
+  ["Who were the Sea Peoples?", "A confederation of seafaring raiders named in Egyptian records, most famously Ramesses III's inscriptions at Medinet Habu. Their origins are still debated."],
+  ["Were they the main cause of the collapse?", "Probably not on their own. The raids look more like a symptom: displaced people moving as harvests failed and trade broke down, which is why most researchers fold them into a 'perfect storm' rather than blame them alone."],
+  ["What would settle it?", "Firm dates for the destruction layers against the drought record. If the raids come after the drought set in, they read as a consequence; before it, as a cause."],
+]), { node_type: "debate" });
 node("n-6", "p-1", "n-5", 0, "Medinet Habu inscriptions", []);
 node("n-7", "p-1", "p-1-root", 2, "Earthquake storm theory", []);
 seedTree("p-2", "Why do cats purr?");

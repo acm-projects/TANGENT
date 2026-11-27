@@ -1,6 +1,6 @@
 import { api, apiClient, apiErrorStatus, DebateGoneError, forkedProjectIdOf, getAccessToken, streamDebate } from "@/api";
 import type { DebateModels } from "@/api/types";
-import { isTerminal, useDebateStore } from "@/store/debateStore";
+import { IN_COURT, isTerminal, useDebateStore } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
 import { redirectToCopy, switchToFork } from "../mindmap/nodeActions";
 
@@ -59,7 +59,12 @@ function follow(debateId: string, quiet = false) {
     onEvent: (event) => {
       if (useDebateStore.getState().view?.id !== debateId) return;
       useDebateStore.getState().dispatch({ type: "event", event });
-      if (event.name === "completed") void landNode(useDebateStore.getState().view?.nodeId ?? null);
+      const nodeId = useDebateStore.getState().view?.nodeId ?? null;
+      // the card is made when the debate starts: it goes on the map as soon as we know it, and is read again
+      // when the verdict fills it in
+      if (event.name === "completed") void landNode(nodeId, true);
+      else if (event.name === "state") void landNode(nodeId);
+      else if (event.name === "done") dropCard(nodeId, (event.data as { status?: string }).status);
     },
   }).catch((e: unknown) => {
     if (controller.signal.aborted) return;
@@ -75,14 +80,30 @@ export function leaveDebate() {
   useDebateStore.getState().close();
 }
 
-/** Put a node the debate made onto the map, if this project's tree is the one loaded and it isn't there yet. */
-async function landNode(nodeId: string | null) {
-  if (!nodeId || useTreeStore.getState().nodesById[nodeId]) return;
-  const { chats, ...meta } = await api.nodes.get(nodeId);
+/** Put a node the debate made onto the map, if this project's tree is the one loaded. `fresh`: read it again even if
+ * it's there (the verdict has filled in the card made at the start). */
+const landing = new Set<string>();
+async function landNode(nodeId: string | null, fresh = false) {
+  if (!nodeId || landing.has(nodeId) || (!fresh && useTreeStore.getState().nodesById[nodeId])) return;
+  landing.add(nodeId);
+  try {
+    const { chats, ...meta } = await api.nodes.get(nodeId);
+    const s = useTreeStore.getState();
+    if (s.nodesById[nodeId]) s.updateNode(meta);
+    else if (meta.parent_id && s.nodesById[meta.parent_id]) s.addNode(meta);
+    else return;
+    s.setChats(nodeId, chats);
+  } finally {
+    landing.delete(nodeId);
+  }
+}
+
+/** Ended without a verdict (ended by the user, or failed): the server took its card off the board, so take it off
+ * here too. Only a card still marked in court: a finished one keeps its verdict. */
+function dropCard(nodeId: string | null, status: string | undefined) {
+  if (!nodeId || (status !== "cancelled" && status !== "failed")) return;
   const s = useTreeStore.getState();
-  if (s.nodesById[nodeId] || !meta.parent_id || !s.nodesById[meta.parent_id]) return;
-  s.addNode(meta);
-  s.setChats(nodeId, chats);
+  if (s.nodesById[nodeId]?.status === IN_COURT) s.removeNode(nodeId);
 }
 
 /** Start a debate from `nodeId`. A sharee's start runs in their new copy of the project, so go there; the
@@ -129,14 +150,14 @@ export async function resumeDebate(projectId: string, quiet = false) {
   store.dispatch({ type: "event", event: { name: "done", data: info } });
 }
 
-/** The courtroom behind a debate card. Its hearing replays if the server still has the events (they're
- * purged minutes after it ends); after that the court shows the judgment alone. `quiet` (picking the card
+/** The courtroom behind a debate card, in session or done. Its hearing replays if the server still has the events
+ * (they're purged minutes after it ends); after that the court reads it from the stored transcript (Debate.tsx). `quiet` (picking the card
  * on the map) only puts it on the board's court button, and leaves a live debate's button alone; otherwise
  * it walks straight in. Opening a past debate stops following a live one; stepping back out picks the
- * live one up again (Debate.tsx). Throws 404 for a card with no debate result behind it (one made before
+ * live one up again (Debate.tsx). Throws 404 for a card with no debate behind it (one made before
  * results were kept). */
 export async function openDebateNode(nodeId: string, quiet = false) {
-  const { debate_id } = await api.debates.result(nodeId);
+  const debate_id = await api.debates.debateOf(nodeId);
   const store = useDebateStore.getState();
   if (store.view?.id === debate_id) {
     if (!quiet) store.setMinimised(false);

@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from debate.pg.store import live_debate_on
 from app import questions, resolving
 from app.auth import get_current_user
 from app.branch_scope import require_visible
@@ -392,6 +393,17 @@ async def _persist(
             raise RuntimeError(f"chat save matched {result.rowcount} rows for node {write_node_id}")
 
 
+LIVE_DEBATE = "This debate is still in court: its card opens up once the verdict is in"
+
+
+async def _refuse_live_debate(db: AsyncSession, *node_ids) -> None:
+    """A debate's card exists from the moment it starts, but until the verdict is in it can't be branched, merged,
+    split or written on (debate.pg.store.live_debate_on)."""
+    for node_id in node_ids:
+        if await live_debate_on(db, node_id):
+            raise HTTPException(409, LIVE_DEBATE)
+
+
 async def _create_child(
     db: AsyncSession,
     *,
@@ -401,6 +413,7 @@ async def _create_child(
     user_id: UUID,
     chats: Optional[list] = None,
 ) -> Node:
+    await _refuse_live_debate(db, parent_id)  # every new card goes through here: forks, merges, Gent's branches
     for _ in range(3):  # two simultaneous forks race for the same index; the unique constraint picks the loser
         next_index = (
             await db.execute(
@@ -674,6 +687,7 @@ async def split_node(
         node = await db.get(Node, fork.node_map[node.id])
     # locked, so a reply being saved can't land on either half mid-split
     node = (await db.execute(select(Node).where(Node.id == node.id).with_for_update())).scalar_one()
+    await _refuse_live_debate(db, node.id)
     # shortcut: _stops is in-process, so this only sees streams on this worker; same limit as stop_message
     if any(streaming == node_id or streaming == node.id for _, streaming in _stops):
         raise HTTPException(409, "Wait for the reply to finish before splitting")
@@ -797,6 +811,7 @@ async def merge_nodes(
     ).scalars().all()
     if len(locked_nodes) != len(source_ids):
         raise HTTPException(404, "Node not found")
+    await _refuse_live_debate(db, *source_ids)
     if len({n.tree_id for n in locked_nodes}) != 1 or len({n.project_id for n in locked_nodes}) != 1:
         raise HTTPException(400, "All nodes must be in the same tree")
     tree_id, project_id = locked_nodes[0].tree_id, locked_nodes[0].project_id
@@ -1219,6 +1234,7 @@ async def send_message(
     A non-owner reads the original; before the model is called the project is forked for them (committed on
     its own) and the reply is saved into the copy. `done` (or `error`, if the model fails after the fork) carries
     `fork`. The pipeline runs detached from the request, so closing the tab does not lose the reply or the fork."""
+    await _refuse_live_debate(db, node_id)
     messages, project_id, prompt = await node_messages(db, node_id, user.id, req.content, req.model, req.retry)
     user_id = user.id
     await db.rollback()  # release the connection for the length of the stream; only plain values are used below

@@ -16,9 +16,9 @@ export function Dashboard({ slug }: DashboardProps) {
       <Decal kind="scrap" className="dashboard-decal dashboard-scrap" />
       <Decal kind="coffee-ring" className="dashboard-decal dashboard-ring" />
       <Decal kind="scrap" className="dashboard-decal dashboard-scrap-low" />
-      <Decal kind="shape" className="dashboard-decal dashboard-tape" />
-      <Decal kind="shape" className="dashboard-decal dashboard-note" />
-      <Decal kind="shape" className="dashboard-decal dashboard-pin" />
+      <Decal kind="tape" className="dashboard-decal dashboard-tape" />
+      <Decal kind="note" className="dashboard-decal dashboard-note" />
+      <Decal kind="pin" className="dashboard-decal dashboard-pin" />
       <Decal kind="paperclip" className="dashboard-decal dashboard-clip" />
       <Board slug={slug} />
     </Panel>

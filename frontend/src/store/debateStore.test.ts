@@ -33,6 +33,13 @@ describe("debate playback", () => {
     expect(visibleEntries(v)).toHaveLength(3);
   });
 
+  it("speeds up to catch up with a burst instead of needing a skip", () => {
+    // 6000 characters waiting: 15 s at the base rate, a few seconds caught up
+    let v = run(emptyDebate("d"), done("for", "a".repeat(3000)), done("against", "b".repeat(3000)));
+    for (let i = 0; i < 120; i++) v = tick(v, 0.05); // six seconds of frames
+    expect(speaking(v)).toBeNull();
+  });
+
   it("holds a later phase banner until the turns before it have been played", () => {
     let v = run(emptyDebate("d"), token("for", "a".repeat(100)), done("for", "a".repeat(100)), ev("phase_changed", { phase: "rebuttal", round: 1 }));
     expect(visibleEntries(v).map((e) => e.kind)).toEqual(["turn"]);

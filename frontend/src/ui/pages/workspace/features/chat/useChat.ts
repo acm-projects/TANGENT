@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, apiClient, apiErrorMessage, forkedProjectIdOf, getAccessToken, isNetworkError, OFFLINE, streamMessage } from "@/api";
 import type { AvailableModel, ChatMessage, ModelUsage, NodeMeta } from "@/api/types";
 import { selectExhibits, selectIsLeaf, selectThreadPlan, type ThreadPlanItem, useTreeStore } from "@/store/treeStore";
+import { selectCardInCourt } from "@/store/debateStore";
 import { forkNode, isPending, redirectToCopy, refreshTree, splitNode, switchToFork } from "../mindmap/nodeActions";
 import { uploadAttachments } from "./attachments";
 
@@ -59,7 +60,7 @@ function buildHistory(
 }
 
 /** Why the message box is disabled, or null when the user can send. */
-export type SendBlocker = "no-selection" | "question" | "streaming" | "pending" | null;
+export type SendBlocker = "no-selection" | "question" | "debate" | "streaming" | "pending" | null;
 
 export function useChat() {
   const activeNodeId = useTreeStore((s) => s.activeNodeId);
@@ -80,6 +81,7 @@ export function useChat() {
   const childrenByParent = useTreeStore((s) => s.childrenByParent);
   // The active node's partial reply, or null when it isn't streaming. Other nodes' streams don't re-render this.
   const streaming = useTreeStore((s) => (s.activeNodeId ? (s.streaming[s.activeNodeId] ?? null) : null));
+  const inCourt = useTreeStore((s) => selectCardInCourt(s.activeNodeId)(s));
   // ...and its tool calls and quick thinking so far
   const streamWork = useTreeStore((s) => (s.activeNodeId ? s.streamWork[s.activeNodeId] : undefined));
   const [localError, setError] = useState<string | null>(null);
@@ -154,7 +156,10 @@ export function useChat() {
       : // a question card is answered on its card, not written on
         nodesById[activeNodeId]?.node_type === "question"
         ? "question"
-        : null;
+        : // a debate's card takes nothing until its verdict is in
+          inCourt
+          ? "debate"
+          : null;
   // A card with branches takes no more messages of its own (the server enforces it, ARCHITECTURE.md §8): a message
   // sent there goes on a new branch from its last reply instead, so the user can always just ask.
   const branchesOnSend = blocker === null && !isLeaf;

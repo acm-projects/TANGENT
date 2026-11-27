@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -10,6 +10,80 @@ from .db import js, tx
 
 Factory = async_sessionmaker[AsyncSession]
 TERMINAL = ("completed", "failed", "cancelled")
+LIVE = ("queued", "running", "awaiting_input", "finalizing")
+# a debate card's node status while its debate is in session; the verdict sets it back to 'active'
+IN_COURT = "in_court"
+
+
+async def insert_debate_node(
+    s: AsyncSession, parent_node_id: str, owner_id: str, *, title: str, summary: Optional[str] = None, chats: Any = (),
+    status: str = "active",
+) -> str:
+    """A debate's card, the next branch under the card it was started from. Retries the branch slot: a concurrent fork
+    can take the same index, and the unique constraint picks the loser."""
+    parent = (
+        await s.execute(text("SELECT id, tree_id, project_id FROM nodes WHERE id = CAST(:p AS uuid)"), {"p": parent_node_id})
+    ).mappings().first()
+    if parent is None:
+        raise LookupError("the node this debate started from no longer exists")
+    for _ in range(5):
+        fork = (
+            await s.execute(text("SELECT COALESCE(MAX(fork_index), 0) + 1 FROM nodes WHERE parent_id = :p"), {"p": parent["id"]})
+        ).scalar_one()
+        try:
+            async with s.begin_nested():
+                return str((
+                    await s.execute(
+                        text(
+                            "INSERT INTO nodes (tree_id, project_id, parent_id, created_by_id, node_type, title, summary, "
+                            "chats, fork_index, status) VALUES (:t, :pr, :pa, CAST(:u AS uuid), 'debate', :ti, :su, "
+                            "CAST(:c AS jsonb), :f, :st) RETURNING id"
+                        ),
+                        {"t": parent["tree_id"], "pr": parent["project_id"], "pa": parent["id"], "u": owner_id,
+                         "ti": title, "su": summary, "c": js(list(chats)), "f": fork, "st": status},
+                    )
+                ).scalar_one())
+        except IntegrityError:
+            continue
+    raise RuntimeError("could not allocate a branch slot for the debate node")
+
+
+async def debate_for_node(s: AsyncSession, node_id: str) -> Optional[str]:
+    """The debate behind a debate card, whether it's still in session (its card made at the start) or done."""
+    return (
+        await s.execute(
+            text(
+                "SELECT id::text FROM debates WHERE result_node_id = CAST(:n AS uuid) "
+                "UNION ALL SELECT debate_id::text FROM debate_results WHERE node_id = CAST(:n AS uuid) LIMIT 1"
+            ),
+            {"n": node_id},
+        )
+    ).scalar()
+
+
+async def drop_unfinished_card(s: AsyncSession, debate_id: str) -> None:
+    """A debate that ended without a verdict (cancelled, failed) takes its card off the board: nothing is kept. Only
+    a card with no result and nothing under it (branching is refused while the debate sits, but be safe)."""
+    await s.execute(
+        text(
+            "DELETE FROM nodes n USING debates d WHERE d.id = CAST(:d AS uuid) AND n.id = d.result_node_id "
+            "AND NOT EXISTS (SELECT 1 FROM debate_results r WHERE r.node_id = n.id) "
+            "AND NOT EXISTS (SELECT 1 FROM nodes c WHERE c.parent_id = n.id)"
+        ),
+        {"d": debate_id},
+    )
+
+
+async def live_debate_on(s: AsyncSession, node_id: Any) -> bool:
+    """The card belongs to a debate still in session: it can't be branched, merged or written on until it's done."""
+    return (
+        await s.execute(
+            text("SELECT 1 FROM debates WHERE result_node_id = CAST(:n AS uuid) AND status::text IN :live LIMIT 1").bindparams(
+                bindparam("live", expanding=True)
+            ),
+            {"n": str(node_id), "live": list(LIVE)},
+        )
+    ).first() is not None
 
 
 class StateError(Exception):
@@ -42,7 +116,13 @@ async def create_debate(
         {"p": project_id, "o": owner_id, "n": parent_node_id, "t": topic, "f": for_model, "a": against_model,
          "j": judge_model, "r": rounds, "ret": retain_artifacts},
     )
-    return str(row.scalar_one())
+    debate_id = str(row.scalar_one())
+    # its card goes on the board now, titled with the motion; the verdict fills it in when the debate is done
+    node_id = await insert_debate_node(s, parent_node_id, owner_id, title=topic, status=IN_COURT)
+    await s.execute(
+        text("UPDATE debates SET result_node_id = CAST(:n AS uuid) WHERE id = CAST(:d AS uuid)"), {"n": node_id, "d": debate_id}
+    )
+    return debate_id
 
 
 async def submit_answer(s: AsyncSession, debate_id: str, answers: Optional[dict[str, Any]], skip: bool = False) -> dict[str, Any]:
@@ -122,6 +202,7 @@ async def cancel_debate(s: AsyncSession, debate_id: str) -> bool:
             text("INSERT INTO debate_events (debate_id, event_type, payload) VALUES (CAST(:d AS uuid), 'cancelled', '{}'::jsonb)"),
             {"d": debate_id},
         )
+        await drop_unfinished_card(s, debate_id)
     return row is not None
 
 
@@ -249,6 +330,7 @@ async def mark_failed(factory: Factory, debate_id: str, code: str) -> None:
                 text("INSERT INTO debate_events (debate_id, event_type, payload) VALUES (CAST(:d AS uuid), 'failed', CAST(:p AS jsonb))"),
                 {"d": debate_id, "p": js({"error_code": code})},
             )
+            await drop_unfinished_card(s, debate_id)
 
 
 async def get_transcript_by_node(s: AsyncSession, node_id: str) -> Optional[dict[str, Any]]:

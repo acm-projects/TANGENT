@@ -22,6 +22,61 @@
   min-height: 0;
 }
 
+/* Decals on the cork, under the map (first in the cell): fixed to the board, not the map, as the cork is. Kept clear
+ * of the toolbar on the left, the chat sheet on the right and Gent's dock at the bottom centre, where the tree
+ * usually isn't. */
+.workspace-decals {
+  position: relative;
+  pointer-events: none;
+  /* faded into the cork: background texture, never competing with the cards */
+  opacity: 0.45;
+  filter: saturate(0.6);
+}
+
+.workspace-decals > * {
+  position: absolute;
+}
+
+.workspace-scrap {
+  top: 9%;
+  left: 7rem;
+  rotate: -6deg;
+  scale: 0.85;
+}
+
+.workspace-ring {
+  bottom: 14%;
+  left: 34%;
+}
+
+.workspace-note {
+  bottom: 9rem;
+  left: 8rem;
+  rotate: 4deg;
+}
+
+.workspace-tape {
+  top: 5rem;
+  left: 52%;
+  rotate: -14deg;
+}
+
+.workspace-pin {
+  top: 38%;
+  left: 6.5rem;
+}
+
+.workspace-pin-2 {
+  bottom: 22%;
+  left: 58%;
+}
+
+.workspace-clip {
+  top: 62%;
+  left: 24%;
+  rotate: -38deg;
+}
+
 /* the toolbar, Gent's layer and the chat, side by side over the map. The row itself lets clicks through to
  * the map; only what's drawn in it takes them. */
 .workspace-row {
@@ -42,14 +97,6 @@
   min-width: 0;
   z-index: 3;
   pointer-events: auto;
-}
-
-/* the debate in session: bottom of the board, clear of the toolbar rail (88px, as the chat leaves it) */
-.workspace-debate {
-  justify-self: start;
-  align-self: end;
-  z-index: 2;
-  margin: 0 0 var(--space-4) 88px;
 }
 
 /* Gent's layer: the board between the toolbar and the chat. Its own box lets everything through; only the

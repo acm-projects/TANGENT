@@ -6,7 +6,7 @@ import type { DebateBranch, DebateResult, DebateTranscriptTurn } from "@/api/typ
 import { useDebateStore } from "@/store/debateStore";
 import { useTreeStore } from "@/store/treeStore";
 import { Button, Frame, Icon, Input, Link, Loading, Panel, Text } from "@/ui/library";
-import { createBranches, openDebateNode } from "../debateActions";
+import { createBranches } from "../debateActions";
 import { phaseLabel, REPORTED } from "../debateLabels";
 import "../Debate.css";
 
@@ -38,8 +38,6 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
   const [result, setResult] = useState<DebateResult | null | undefined>(undefined);
   const [reads, setReads] = useState(0);
   const [open, setOpen] = useState(false);
-  const [entering, setEntering] = useState(false);
-  const [enterError, setEnterError] = useState<string | null>(null);
   const rev = useDebateStore((s) => s.branchesRev);
 
   // Re-read on a deleted branch card too (rev): the server frees its direction, so the row must come from it
@@ -82,7 +80,7 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
   ) : null;
 
   return (
-    <Panel as="section" stock="card" edge={inCourt ? "clean" : "torn"} hierarchy={inCourt ? "tertiary" : "secondary"} elevation={inCourt ? "flat" : "floating"} className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
+    <Panel as="section" stock="card" edge="torn" hierarchy="secondary" elevation="floating" className="verdict" data-winner={result.winner} data-in-court={inCourt || undefined} aria-label="Verdict">
       <Frame gap="3">
         {warning && (
           <Panel className="verdict-warning" role="note">
@@ -99,23 +97,6 @@ export function VerdictCard({ nodeId, inCourt = false }: { nodeId: string; inCou
           </Frame>
           <Text size="s" hierarchy="tertiary" className="verdict-subline" content={subline} />
           {inCourt && result.summary && <Text className="debate-summary" content={result.summary} />}
-          {!inCourt && (
-            <Button
-              size="s"
-              icon="balance"
-              showIcon
-              label={entering ? "Entering…" : "Enter the courtroom"}
-              disabled={entering}
-              onClick={() => {
-                setEntering(true);
-                setEnterError(null);
-                openDebateNode(nodeId)
-                  .catch((e: unknown) => setEnterError(apiErrorMessage(e, "Could not open the courtroom.")))
-                  .finally(() => setEntering(false));
-              }}
-            />
-          )}
-          {enterError && <Text role="alert" size="s" className="debate-error" content={enterError} />}
         </Frame>
 
         {contested && branches}
