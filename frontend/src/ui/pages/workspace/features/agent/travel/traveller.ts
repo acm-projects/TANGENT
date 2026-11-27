@@ -216,14 +216,21 @@ const norm = (x: number, y: number) => {
   return { x: x / l, y: y / l };
 };
 
+/** the area last frame's trail covered (CSS px): only that is cleared, not the whole screen-sized canvas */
+let dirty: { x0: number; y0: number; x1: number; y1: number } | null = null;
+
 function draw(trail: { p: Pt }[], color: string) {
   const target = canvas();
   if (!target) return;
   const { c, dpr } = target;
   const ctx = c.getContext("2d")!;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, c.width, c.height);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (dirty) ctx.clearRect(dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0);
+  const m = 8; // the dot's radius and the trail's width, with room
+  dirty = trail.reduce(
+    (b, { p }) => ({ x0: Math.min(b.x0, p.x - m), y0: Math.min(b.y0, p.y - m), x1: Math.max(b.x1, p.x + m), y1: Math.max(b.y1, p.y + m) }),
+    { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity },
+  );
   ctx.fillStyle = ctx.strokeStyle = color;
   ctx.lineCap = "round";
   // the trail thins and fades behind the dot
@@ -244,6 +251,7 @@ function draw(trail: { p: Pt }[], color: string) {
 }
 
 function clear() {
+  dirty = null;
   const ctx = overlay?.getContext("2d");
   if (overlay && ctx) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);

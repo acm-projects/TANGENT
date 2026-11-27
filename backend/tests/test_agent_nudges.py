@@ -98,7 +98,7 @@ def test_shallow_research_is_told_to_go_deeper_and_cant_finish_until_three_gener
 
     def row(id, parent, fork, messages=2):
         return SimpleNamespace(id=id, parent_id=parent, title=id, summary=None, model=None, fork_index=fork,
-                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None, resolved=None)
+                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None)
 
     def snap(*rows):
         return tools.build_snapshot({x.id: x for x in rows}, [])
@@ -129,7 +129,7 @@ def test_unanswered_question_cards_send_him_back_to_wait_for_the_user():
 
     def row(id, parent, fork, node_type=None):
         return SimpleNamespace(id=id, parent_id=parent, title=id, summary=None, model=None, fork_index=fork,
-                               created_at=f"t{fork}", messages=0, gent_asks=0, node_type=node_type, resolved=None)
+                               created_at=f"t{fork}", messages=0, gent_asks=0, node_type=node_type)
 
     snap = tools.build_snapshot({x.id: x for x in [row("r", None, 0), row("q", "r", 1, "question")]}, [])
     r, n = run(), nudges.Nudges(snap=snap)
@@ -145,7 +145,7 @@ def test_a_merge_never_asked_sends_him_back():
 
     def row(id, parent, fork, messages=2):
         return SimpleNamespace(id=id, parent_id=parent, title=id, summary=None, model=None, fork_index=fork,
-                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None, resolved=None)
+                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None)
 
     rows = [row("r", None, 0), row("a", "r", 1), row("b", "r", 2), row("m", "a", 3, messages=0)]
     snap = tools.build_snapshot({x.id: x for x in rows}, [("m", "a"), ("m", "b")])
@@ -157,7 +157,7 @@ def test_survey_branches_left_bare_are_named_at_the_finish():
 
     def row(id, parent, fork, messages=2):
         return SimpleNamespace(id=id, parent_id=parent, title=id, summary=None, model=None, fork_index=fork,
-                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None, resolved=None)
+                               created_at=f"t{fork}", messages=messages, gent_asks=0, node_type=None)
 
     rows = [row("r", None, 0, 0), row("a", "r", 1), row("b", "r", 2), row("a1", "a", 1)]
     r, n = run(), nudges.Nudges(snap=tools.build_snapshot({x.id: x for x in rows}, []))

@@ -85,11 +85,10 @@ aged(node("t-2", "p-4", "p-4-root", 1, "Malaria and bone disease", []), august(3
 aged(node("t-3", "p-4", "t-2", 0, "The 2010 DNA study", []), august(4)).tag = { color: "ochre", shape: "flag" };
 aged(node("t-4", "p-4", "t-1", 0, "Injury plus infection"), august(6)).merge_source_ids = ["t-1", "t-3"];
 
-// a closed case: every branch has ended
+// an older case, a few branches deep
 aged(seedTree("p-5", "Who built Göbekli Tepe?"), "2026-11-10T10:00:00Z");
 for (const [id, parent, fork, title] of [["g-1", "p-5-root", 0, "Hunter-gatherers"], ["g-2", "p-5-root", 1, "An early farming village"], ["g-3", "g-1", 0, "Dating the enclosures"]] as const) {
-  const n = aged(node(id, "p-5", parent, fork, title), "2026-11-12T10:00:00Z");
-  if (id !== "g-1") n.resolved = { by: "user", at: "2026-11-20T10:00:00Z", kind: id === "g-2" ? "dead_lead" : undefined };
+  aged(node(id, "p-5", parent, fork, title), "2026-11-12T10:00:00Z");
 }
 
 const sources: Source[] = [
@@ -284,8 +283,6 @@ export async function mock(request: Request, path: string[]): Promise<Response> 
       n.chats = [];
       return json({ ...meta(n), fork: null });
     }
-    if (c === "resolve") return (n.resolved = { by: "user", at: now(), kind: body.kind ?? "resolved" }), json({ node: meta(n), fork: null });
-    if (c === "reopen") return (n.resolved = null), json({ node: meta(n), fork: null });
     if (c === "tag" && method === "PUT") return (n.tag = body), json({ node: meta(n), fork: null });
     if (c === "tag" && method === "DELETE") return (n.tag = null), json({ node: meta(n), fork: null });
   }

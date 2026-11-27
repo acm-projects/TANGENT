@@ -1,5 +1,5 @@
 import type { ApiClient } from "../client";
-import type { AnswerResult, CompactResult, Ending, ForkedNode, Node, NodeTag, ResolveResult, SplitResult } from "../types";
+import type { AnswerResult, CompactResult, ForkedNode, Node, NodeTag, ResolveResult, SplitResult } from "../types";
 
 /** /nodes/* -- a single node with its chats, plus forking and merging. */
 export function createNodesApi({ http }: ApiClient) {
@@ -27,11 +27,6 @@ export function createNodesApi({ http }: ApiClient) {
     /** Compact: the card's model summarises its thread into a new compact card under it, where the context starts
      * afresh from the summary. A sharee's first write forks, as for fork. */
     compact: (nodeId: string) => http.post<CompactResult>(`/nodes/${nodeId}/compact`).then((r) => r.data),
-    /** Stamp how the card's branch ended (resolved, a dead lead, ...): a marker that it is settled. */
-    resolve: (nodeId: string, kind: Ending = "resolved") =>
-      http.post<ResolveResult>(`/nodes/${nodeId}/resolve`, { kind }).then((r) => r.data),
-    /** Reopen a resolved card: the stamp comes off. */
-    reopen: (nodeId: string) => http.post<ResolveResult>(`/nodes/${nodeId}/reopen`).then((r) => r.data),
     /** Pin a coloured tag on the card. */
     tag: (nodeId: string, tag: NodeTag) => http.put<ResolveResult>(`/nodes/${nodeId}/tag`, tag).then((r) => r.data),
     /** Take the card's tag off. */

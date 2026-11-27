@@ -28,6 +28,14 @@
   --pop-from: -5rem 0;
 }
 
+/* the seam down the rail's right side stops short of its rounded ends, where real stitching would be tied off,
+ * instead of running off the top and bottom of the screen */
+.toolbar-rail::before {
+  top: var(--radius-xxl);
+  bottom: var(--radius-xxl);
+  border-radius: 0;
+}
+
 /* the panel's wrapper, which Motion swings out from the rail */
 .toolbar-slot {
   display: flex;

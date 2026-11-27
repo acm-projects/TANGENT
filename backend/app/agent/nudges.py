@@ -8,7 +8,7 @@ Rules are plain functions over `Nudges` (the per-run counters), so a new nudge i
 nudge also goes to the client as a `nudge` event, which the user can choose to see (Settings: Show Gent's nudges).
 
 A third kind rides on a tool's result (its "nudges" list): asking a card again (tools.SAME_CARD), a card with too many
-branches (tools.CROWDED), arriving in a resolved branch (tools.RESOLVED_VISIT), and splitting the question again
+branches (tools.CROWDED), and splitting the question again
 from where he started (`after_move`, BACK_UP)."""
 
 from dataclasses import dataclass, field

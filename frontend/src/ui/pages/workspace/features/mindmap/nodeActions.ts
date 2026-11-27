@@ -1,6 +1,6 @@
 import { api, forkedProjectIdOf } from "@/api";
 import type { ForkInfo } from "@/api";
-import type { Ending, NodeMeta, NodeTag } from "@/api/types";
+import type { NodeMeta, NodeTag } from "@/api/types";
 import { useDebateStore } from "@/store/debateStore";
 import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
 
@@ -426,7 +426,7 @@ export async function deleteNode(nodeId: string) {
   }
 }
 
-/** The map after a compact or resolve: the server's new compact card joins it (re-read with the rest of the tree). */
+/** The map after a compact: the server's new compact card joins it (re-read with the rest of the tree). */
 async function withCompactCard(compact: NodeMeta) {
   const projectId = useTreeStore.getState().project?.id;
   if (projectId) await refreshTree(projectId).catch(() => {});
@@ -442,21 +442,6 @@ export async function compactNode(nodeId: string) {
   useTreeStore.getState().setActive(res.node.id);
 }
 
-/** End a card's branch as `kind`: a marker that it is settled. Stamped at once (optimistic, put back on failure). */
-export async function resolveNode(nodeId: string, kind: Ending = "resolved") {
-  const before = useTreeStore.getState().nodesById[nodeId];
-  if (!before) return;
-  useTreeStore.getState().updateNode({ ...before, resolved: { by: "user", at: new Date().toISOString(), kind } });
-  try {
-    const res = await api.nodes.resolve(nodeId, kind);
-    if (res.fork) return switchToFork(res.fork, res.node.id);
-    useTreeStore.getState().updateNode(res.node);
-  } catch (e) {
-    if (useTreeStore.getState().nodesById[nodeId]) useTreeStore.getState().updateNode(before);
-    throw e;
-  }
-}
-
 /** Pin a coloured tag on a card, or take it off (null). At once (optimistic, put back on failure). */
 export async function tagNode(nodeId: string, tag: NodeTag | null) {
   const before = useTreeStore.getState().nodesById[nodeId];
@@ -464,21 +449,6 @@ export async function tagNode(nodeId: string, tag: NodeTag | null) {
   useTreeStore.getState().updateNode({ ...before, tag });
   try {
     const res = await (tag ? api.nodes.tag(nodeId, tag) : api.nodes.untag(nodeId));
-    if (res.fork) return switchToFork(res.fork, res.node.id);
-    useTreeStore.getState().updateNode(res.node);
-  } catch (e) {
-    if (useTreeStore.getState().nodesById[nodeId]) useTreeStore.getState().updateNode(before);
-    throw e;
-  }
-}
-
-/** Reopen a resolved card: the stamp comes off at once (back on failure). */
-export async function reopenNode(nodeId: string) {
-  const before = useTreeStore.getState().nodesById[nodeId];
-  if (!before?.resolved) return;
-  useTreeStore.getState().updateNode({ ...before, resolved: null });
-  try {
-    const res = await api.nodes.reopen(nodeId);
     if (res.fork) return switchToFork(res.fork, res.node.id);
     useTreeStore.getState().updateNode(res.node);
   } catch (e) {

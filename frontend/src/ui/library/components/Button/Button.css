@@ -36,11 +36,6 @@
     transition-duration: var(--motion-fast);
   }
 
-  /* an icon button lifts off the board on hover, straight up */
-  [data-ui="panel"][data-component="button"][data-icon-only]:hover:not(:disabled, :active) {
-    translate: 0 -3px;
-  }
-
   /* sizes — padding follows the TextSize handed to Text and Icon */
   [data-ui="panel"][data-component="button"]:is([data-size="xxs"], [data-size="xs"], [data-size="s"]):not([data-icon-only]) {
     gap: var(--space-1);
@@ -65,6 +60,23 @@
   /* tertiary tints from its own text colour, so it reads on paper, cork and ink alike */
   [data-ui="panel"][data-component="button"][data-hierarchy="tertiary"]:hover:not(:disabled) {
     background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  /* an icon-only tertiary button has no box and doesn't move on hover: the icon answers on its own, its muted ink
+   * coming up to full strength as it grows a touch. Outranks the tint above (0,5,0). */
+  [data-ui="panel"][data-component="button"][data-hierarchy="tertiary"][data-icon-only]:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  [data-ui="panel"][data-component="button"][data-icon-only] [data-ui="icon"] {
+    transition:
+      color var(--motion-fast) var(--ease-out),
+      scale var(--motion-spring) var(--ease-spring);
+  }
+
+  [data-ui="panel"][data-component="button"][data-hierarchy="tertiary"][data-icon-only]:hover:not(:disabled) [data-ui="icon"] {
+    color: var(--color-text);
+    scale: 1.18;
   }
 
   [data-ui="panel"][data-component="button"][data-hierarchy="primary"]:hover:not(:disabled) {

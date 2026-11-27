@@ -104,11 +104,6 @@ def client(monkeypatch):
     monkeypatch.setattr(nodes_router, "_persist", fake_persist)
     monkeypatch.setattr(nodes_router, "_load_path", fake_path)
 
-    async def nothing_resolved(user_id, node_id):  # app/resolving.py: no resolved card above the prompted one
-        return []
-
-    monkeypatch.setattr(nodes_router, "_reopen_for_work", nothing_resolved)
-
     async def no_uploads(project_id):
         return ""
 

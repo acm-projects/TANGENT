@@ -160,7 +160,6 @@ async def _copy_project(
                 tokens=n.tokens,
                 chats=n.chats,
                 question=questions.remap(n.question, node_map),
-                resolved=n.resolved,
                 tag=n.tag,
                 created_by_id=new_owner_id,
                 created_at=n.created_at,

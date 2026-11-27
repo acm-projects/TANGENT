@@ -3,10 +3,7 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useChatLayout } from "@/store/chatLayout";
 import { selectIsLeaf, useTreeStore } from "@/store/treeStore";
-import { Button, Frame, Loading, Panel, Popup, Text } from "@/ui/library";
-import { useDebateStore } from "@/store/debateStore";
-import { StartDebate } from "../debate/components/StartDebate";
-import { putCardBack } from "../mindmap/nodeActions";
+import { Button, Frame, Icon, Loading, Panel, Text } from "@/ui/library";
 import { UNTITLED, UNTITLED_MERGE } from "../mindmap/toFlow";
 import { useSearchHighlight } from "./searchHighlight";
 import { MergeChoices, MergeStack, mergeKey } from "./components/MergeStack";
@@ -25,10 +22,10 @@ const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumF
  * Two layouts, both owned here:
  *   docked     the default: floats over the right half of the map; its left
  *              edge drags to resize (pointer, or arrow keys when focused).
- *              With no card picked it slides off the right edge (data-idle) and
- *              gives the board back: the map is the subject until you pick a card.
  *   expanded   full screen (the top-left button)
- * Closing (the header's ×, Esc, or a click on the board) puts the card back, and the sheet leaves with it.
+ * It is never closed, only collapsed (the header's last button) to a tab on the board's right edge, which opens it
+ * again; picking a card opens it too. With no card picked it says how to start. Esc or a click on the board puts the
+ * card back (the sheet stays, saying how to pick another).
  *
  * Only the history scrolls (.chat-scroll); the error, token usage and the
  * message box sit fixed below it, the box a ruled line on the sheet.
@@ -79,9 +76,10 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
                 <BranchDivider exhibit={item.exhibit} title={item.node.title} />
               </Frame>
             )}
-            {/* the selected debate card's verdict, above its chat (not on cards further up the thread) */}
+            {/* the selected debate card's verdict, above its chat (not on cards further up the thread); it sticks to
+                the top of the thread as the debate's chat scrolls under it, so the way back to court is always there */}
             {item.node.node_type === "debate" && isActive && (
-              <Frame as="li">
+              <Frame as="li" className="chat-verdict">
                 <VerdictCard nodeId={item.node.id} />
               </Frame>
             )}
@@ -133,7 +131,7 @@ function HistoryList({ items, activeNodeId, streaming, canRetry, branch, retry, 
 
 export function Chat({ className }: ChatProps) {
   const chat = useChat();
-  const { layout, setLayout } = useChatLayout();
+  const { layout, setLayout, collapsed, setCollapsed } = useChatLayout();
   // a question card answered on the map continues its research through this chat's send
   const continueIn = useRef(chat.continueIn);
   useEffect(() => {
@@ -210,9 +208,15 @@ export function Chat({ className }: ChatProps) {
     if (!activeNode && layout === "expanded") setLayout("docked");
   }, [activeNode, layout, setLayout]);
 
-  // No card picked: the sheet waits off the board's right edge. Still mounted (and inert), so a half-written
-  // draft survives, and it comes back along the same path it left by.
-  const idle = layout === "docked" && !activeNode;
+  // picking a card opens a collapsed sheet: you asked to read it
+  const activeId = chat.activeNodeId;
+  useEffect(() => {
+    if (activeId) setCollapsed(false);
+  }, [activeId, setCollapsed]);
+  const collapse = () => {
+    setLayout("docked");
+    setCollapsed(true);
+  };
 
   return (
     <Panel
@@ -220,8 +224,7 @@ export function Chat({ className }: ChatProps) {
       ref={sheetRef}
       className={classes}
       data-layout={layout}
-      data-idle={idle || undefined}
-      inert={idle}
+      data-collapsed={collapsed || undefined}
       data-resizing={resizing || undefined}
       style={layout === "docked" && width ? ({ "--chat-width": `${width}px` } as CSSProperties) : undefined}
       aria-label="Chat"
@@ -229,7 +232,14 @@ export function Chat({ className }: ChatProps) {
       edge="torn"
       elevation="floating"
     >
-      {layout === "docked" && (
+      {/* collapsed: a tab on the board's edge that opens the sheet again (the sheet stays mounted, so a draft survives) */}
+      {collapsed && (
+        <button type="button" className="chat-tab" aria-label="Open the chat" title="Open the chat" onClick={() => setCollapsed(false)}>
+          <Icon icon="left_panel_open" size="m" />
+          <Text as="span" face="stamp" size="xxs" className="chat-tab-label" content={activeNode ? `Case notes · ${chat.activeExhibit}` : "Case notes"} />
+        </button>
+      )}
+      {layout === "docked" && !collapsed && (
         <Frame
           gap="0"
           className="chat-resize"
@@ -257,7 +267,7 @@ export function Chat({ className }: ChatProps) {
         />
       )}
       <MergeChoices value={choices}>
-      <Frame gap="2" className="chat-inner">
+      <Frame gap="2" className="chat-inner" inert={collapsed}>
         <Frame as="header" direction="row" justify="between" align="center">
           <Button
             hierarchy="tertiary"
@@ -266,10 +276,11 @@ export function Chat({ className }: ChatProps) {
             icon={layout === "expanded" ? "fullscreen_exit" : "fullscreen"}
             showIcon
             showLabel={false}
+            disabled={!activeNode}
             onClick={() => setLayout(layout === "expanded" ? "docked" : "expanded")}
             className="chat-fold-button"
           />
-          {activeNode && <CourtButton nodeId={activeNode.id} projectId={activeNode.project_id} />}
+          {!activeNode && <Text as="span" face="stamp" size="xxs" className="chat-title-kicker" content="Case notes" />}
           {activeNode && (
             // keyed, so picking another card swaps the heading in
             <Text
@@ -281,15 +292,15 @@ export function Chat({ className }: ChatProps) {
               content={`Case notes · ${(activeNode.merge_source_ids?.length ?? 0) > 0 ? "Merge" : "Card"} ${chat.activeExhibit}`}
             />
           )}
-          {/* Put the card back: the sheet slides off the way it came, as with Esc or a click on the board. */}
+          {/* Fold the sheet to its tab on the board's edge; the card stays picked */}
           <Button
             hierarchy="tertiary"
             size="l"
-            label="Close (Esc)"
-            icon="close"
+            label="Collapse chat"
+            icon="right_panel_close"
             showIcon
             showLabel={false}
-            onClick={putCardBack}
+            onClick={collapse}
           />
         </Frame>
 
@@ -309,7 +320,18 @@ export function Chat({ className }: ChatProps) {
           className="chat-scroll"
         >
 
-          {chat.history.length === 0 ? (
+          {!activeNode ? (
+            // no card picked: how to start
+            <Frame justify="center" align="center" gap="3" className="chat-empty chat-start">
+              <Icon icon="touch_app" size="xl" className="chat-start-icon" />
+              <Text as="h2" face="heading" size="l" hierarchy="primary" content="Pick a card to start" />
+              <Text
+                hierarchy="secondary"
+                content="Click any card on the board to read its thread here and ask about it. A new case starts on its first card: ask your question there."
+              />
+              <Text size="s" hierarchy="tertiary" content="Esc puts the card back · drag a card down to branch it" />
+            </Frame>
+          ) : chat.history.length === 0 ? (
             // a card with nothing on it yet: say so quietly, and point at the field below
             <Frame justify="center" align="center" gap="1" className="chat-empty">
               <Text hierarchy="secondary" content="Nothing on this card yet." />
@@ -379,34 +401,6 @@ export function Chat({ className }: ChatProps) {
       </Frame>
       </MergeChoices>
     </Panel>
-  );
-}
-
-/** The court, one click from the sheet's header: back into a debate under way (or this card's finished one), or a
- * new debate on this card. Always in the same place, unlike the button on the board. */
-function CourtButton({ nodeId, projectId }: { nodeId: string; projectId: string }) {
-  const view = useDebateStore((s) => s.view);
-  const minimised = useDebateStore((s) => s.minimised);
-  const [starting, setStarting] = useState(false);
-  const live = Boolean(view && !view.ended);
-  const back = Boolean(view && minimised && (live || view.nodeId === nodeId));
-  return (
-    <>
-      <Button
-        hierarchy={live ? "secondary" : "tertiary"}
-        size="s"
-        icon="gavel"
-        showIcon
-        label={back ? (live ? "Return to court" : "Courtroom") : "Debate"}
-        title={back ? undefined : "Bring this card to court: two models argue it, a judge rules"}
-        data-live={live || undefined}
-        className="chat-court-button"
-        onClick={() => (back ? useDebateStore.getState().setMinimised(false) : setStarting(true))}
-      />
-      <Popup open={starting} onClose={() => setStarting(false)} title="Bring this card to court">
-        {starting && <StartDebate projectId={projectId} nodeId={nodeId} onClose={() => setStarting(false)} />}
-      </Popup>
-    </>
   );
 }
 

@@ -86,9 +86,6 @@ export interface NodeMeta {
   branch_of_debate_id?: string | null;
   /** A question card's question (node_type "question"; backend app/questions.py). */
   question?: QuestionCardData | null;
-  /** How the card's branch ended: a marker that it is settled, who set it and how (no kind: resolved; backend
-   * app/resolving.py). */
-  resolved?: { by: "user" | "gent"; at: string; kind?: Ending } | null;
   /** The card's coloured tag (backend nodes.tag); the colours carry no fixed meaning. */
   tag?: NodeTag | null;
 }
@@ -112,11 +109,6 @@ export const DEFAULT_TAG_LABELS: Record<TagColor, string> = {
   plum: "Open question", teal: "", rose: "", graphite: "",
 };
 
-/** How a branch can end (backend ENDINGS): only "resolved" found something. */
-export type Ending = "resolved" | "dead_lead" | "off_topic";
-export const ENDING_LABELS: Record<Ending, string> = {
-  resolved: "Resolved", dead_lead: "Dead lead", off_topic: "Off topic",
-};
 
 /** One multiple-choice question an AI asked the user, on its own card. Each answer opens a branch: the chain's next
  * question card, or after the last, the card where the research continues with the whole trail. */
@@ -156,9 +148,9 @@ export interface CompactResult {
   fork: ForkInfo | null;
 }
 
-/** POST /nodes/:id/resolve and /reopen */
+/** PUT and DELETE /nodes/:id/tag */
 export interface ResolveResult {
-  /** the card, stamped resolved (or no longer) */
+  /** the card, with its tag put on or taken off */
   node: NodeMeta;
   fork: ForkInfo | null;
 }
@@ -210,8 +202,6 @@ export type StreamEvent =
   | { type: "reasoning"; text: string }
   /** the model asked the user: a question card was made under this one (the map re-reads the tree) */
   | { type: "question"; id: string }
-  /** the message was work under resolved cards, which it reopened (the map re-reads the tree) */
-  | { type: "reopened"; ids: string[] }
   // `stopped`: the user pressed Stop; what arrived so far was saved (nothing, if no token had).
   | { type: "done"; usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }
   // `fork`: the copy was made before the model failed. `forkedProjectId`: a copy already existed (race with the 409 pre-check).

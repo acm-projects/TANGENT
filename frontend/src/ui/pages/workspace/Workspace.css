@@ -92,7 +92,3 @@
   visibility: hidden;
 }
 
-/* with the sheet on the board, the court is its header's button (Chat CourtButton): the one on the board steps away */
-.workspace:has(.chat:not([data-idle])) .workspace-debate.debate-minimised {
-  display: none;
-}

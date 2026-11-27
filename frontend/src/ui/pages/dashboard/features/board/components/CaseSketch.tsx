@@ -2,7 +2,7 @@ import { tagColor } from "@/api/types";
 import type { Sketch } from "../sketch";
 
 /* A case's photo: its board in miniature (../sketch.ts). Paper cards on string, the case card in its double frame,
- * the newest card ringed in red, the thread to it strung in red, a tagged card's flag, an ended branch faded. Two
+ * the newest card ringed in red, the thread to it strung in red, a tagged card's flag. Two
  * ruled strokes stand in for each card's title. Drawn in board units, so it is the map's shape, shrunk.
  * Decorative: the card's text says what matters. */
 
@@ -14,7 +14,7 @@ export function CaseSketch({ sketch }: { sketch: Sketch }) {
         <path key={i} d={s.d} className="case-sketch-string" data-path={s.onPath || undefined} />
       ))}
       {cards.map((c, i) => (
-        <g key={i} className="case-sketch-card" data-path={c.onPath || undefined} data-latest={c.latest || undefined} data-ended={c.ended || undefined}>
+        <g key={i} className="case-sketch-card" data-path={c.onPath || undefined} data-latest={c.latest || undefined}>
           <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={6} className="case-sketch-paper" />
           {c.root && <rect x={c.x + 10} y={c.y + 10} width={c.w - 20} height={c.h - 20} rx={3} className="case-sketch-frame" />}
           {/* the title, as two ruled strokes */}

@@ -8,7 +8,7 @@ import { CaseSketch } from "./CaseSketch";
 
 /* The look of a project card, shared by the grid and the folder it tucks into:
  * a paper case card pinned to the board, its picture the project's tree, the
- * name written underneath, and when it was last worked on. A closed case is stamped so. Sized in em off its slot's width
+ * name written underneath, and when it was last worked on. A shared case is stamped so. Sized in em off its slot's width
  * (Board.css), so a card in a folder is the grid card, smaller: the flight
  * between them is a clean zoom. */
 
@@ -19,7 +19,7 @@ export function CardFace({ project }: { project: ProjectSummary }) {
   const meta = facts ? `${facts.cards} ${facts.cards === 1 ? "card" : "cards"} · worked ${worked}` : "";
   // a one-card case has no tree to photograph yet: its photo says so instead of showing a lone card
   const fresh = facts !== null && facts !== undefined && facts.cards < 2;
-  const stamp = facts?.status === "closed" ? "Closed" : project.role === "shared" ? "Shared" : null;
+  const stamp = project.role === "shared" ? "Shared" : null;
   return (
     <Panel
       material="paper"

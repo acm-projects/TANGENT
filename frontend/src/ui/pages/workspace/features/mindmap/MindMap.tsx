@@ -44,7 +44,7 @@ function clearArea(): Box | null {
   const pane = document.querySelector(".mindmap")?.getBoundingClientRect();
   if (!pane) return null;
   const tools = document.querySelector(".workspace-toolbar")?.getBoundingClientRect();
-  const sheet = document.querySelector<HTMLElement>(".chat[data-layout='docked']:not([data-idle])");
+  const sheet = document.querySelector<HTMLElement>(".chat[data-layout='docked']");
   const left = (tools ? tools.right - pane.left : 0) + MARGIN;
   // the sheet may still be sliding in: its width is already final, so measure that, not where it is now
   const right = pane.width - (sheet ? sheet.offsetWidth + 16 : 0) - MARGIN;

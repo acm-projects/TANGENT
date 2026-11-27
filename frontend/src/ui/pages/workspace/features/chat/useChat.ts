@@ -252,11 +252,6 @@ export function useChat() {
           if (e.type === "token") s.appendToken(nodeId, e.text);
           else if (e.type === "tool") s.addStreamTool(nodeId, { name: e.name, brief: e.brief, ok: e.ok });
           else if (e.type === "reasoning") s.appendReasoning(nodeId, e.text);
-          else if (e.type === "reopened") {
-            // the message was work under resolved cards: their stamps come off (and untouched compact cards go)
-            const projectId = s.nodesById[nodeId]?.project_id;
-            if (projectId) void refreshTree(projectId).catch(() => {});
-          }
           else if (e.type === "question") {
             // the model asked instead of answering: its question card goes on the map now, not at the next reload
             const projectId = s.nodesById[nodeId]?.project_id;

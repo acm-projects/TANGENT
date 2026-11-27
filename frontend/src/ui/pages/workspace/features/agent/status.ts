@@ -84,17 +84,5 @@ function waitingOn(steps: GentStep[], args: Record<string, unknown>): string {
   return `Waiting on ${named}${open.length > 3 ? ` and ${open.length - 3} more` : ""}…`;
 }
 
-type Phase = { note?: Extract<GentStep, { kind: "note" }>; steps: GentStep[] };
-
-/** His moves cut into phases at each of his notes (the moves before his first note are a phase of their own). */
-export function phases(steps: GentStep[]): Phase[] {
-  const out: Phase[] = [{ steps: [] }];
-  for (const step of steps) {
-    if (step.kind === "note") out.push({ note: step, steps: [] });
-    else out[out.length - 1].steps.push(step);
-  }
-  return out.filter((part) => part.note || part.steps.length);
-}
-
 /** The card at an address ("1.2", "J1"), from the tree's exhibit numbers (id → address); undefined if there's none. */
 export const cardAt = (exhibits: Record<string, string>, address: string) => Object.keys(exhibits).find((id) => exhibits[id] === address);

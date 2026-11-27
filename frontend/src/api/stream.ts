@@ -82,7 +82,6 @@ async function relayMessage(body: ReadableStream<Uint8Array>, onEvent: (e: Strea
     else if (event === "tool") onEvent({ type: "tool", ...(JSON.parse(data) as ToolCallRow) });
     else if (event === "reasoning") onEvent({ type: "reasoning", text: (JSON.parse(data) as { text: string }).text });
     else if (event === "question") onEvent({ type: "question", id: (JSON.parse(data) as { id: string }).id });
-    else if (event === "reopened") onEvent({ type: "reopened", ids: (JSON.parse(data) as { ids: string[] }).ids });
     else if (event === "done") return void onEvent({ type: "done", ...(JSON.parse(data) as { usage?: ModelUsage; model?: string; fork?: ForkInfo; stopped?: boolean; content?: string; citations?: Citation[] }) });
     else if (event === "error") {
       const { message, fork, forked_project_id } = JSON.parse(data) as { message: string; fork?: ForkInfo; forked_project_id?: string };

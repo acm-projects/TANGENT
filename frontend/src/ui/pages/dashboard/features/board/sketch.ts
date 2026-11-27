@@ -6,10 +6,10 @@ import { selectThread } from "@/store/treeStore";
  *
  * The photo is the case's board in miniature, laid out by the map's own layout (caseLayout: merged cards below
  * what they join, their strings from each source), so the two always have the same shape: paper cards, the case
- * card in its double frame, strings between them, tags as little flags, branches that ended faded, and the thread
+ * card in its double frame, strings between them, tags as little flags, and the thread
  * to the newest card strung in red, where the case left off. Drawn by CaseSketch.
  *
- * It also files the case: open, cold (nothing new for COLD_DAYS) or closed (every branch has ended). */
+ * It also files the case: open, or cold (nothing new for COLD_DAYS). */
 
 export type SketchCard = {
   /** top-left corner and size, in board units (px at zoom 1) */
@@ -22,19 +22,18 @@ export type SketchCard = {
   /** the newest card: where the case left off */
   latest: boolean;
   tag: TagColor | null;
-  ended: boolean;
 };
 
 export type SketchString = { d: string; onPath: boolean };
 
 export type Sketch = { box: { x: number; y: number; w: number; h: number }; cards: SketchCard[]; strings: SketchString[] };
 
-export type CaseStatus = "open" | "cold" | "closed";
+export type CaseStatus = "open" | "cold";
 
 export type CaseFacts = {
   sketch: Sketch;
   cards: number;
-  /** the latest thing that happened in it: a card made or a branch ended */
+  /** the latest thing that happened in it: a card made */
   lastActive: string;
   status: CaseStatus;
 };
@@ -73,7 +72,6 @@ export function caseFacts({ tree, nodes }: TreeResponse, now = Date.now()): Case
       onPath: path.has(id),
       latest: id === newest?.id,
       tag: n.tag?.color ?? null,
-      ended: Boolean(n.resolved),
     };
   });
   const card = new Map(ids.map((id, i) => [id, cards[i]!]));
@@ -105,17 +103,13 @@ export function caseFacts({ tree, nodes }: TreeResponse, now = Date.now()): Case
   const h = Math.max(maxY + 2 * PAD, MIN_BOX.h, w * 0.5);
   const box = { x: (minX + maxX) / 2 - w / 2, y: maxY / 2 - h / 2, w, h };
 
-  // the case's latest move: a card made, or a branch ended
-  const times = nodes.flatMap((n) => [n.created_at, n.resolved?.at ?? ""]).filter(Boolean);
+  // the case's latest move: a card made
+  const times = nodes.map((n) => n.created_at).filter(Boolean);
   const lastActive = times.reduce((a, b) => (b > a ? b : a), "") || tree.created_at;
 
-  // closed: it has branches, and every one has ended (a card with no branches, and no merge it feeds, is an end)
-  const feeding = new Set([...merges.values()].flat());
-  const ends = ids.filter((id) => id !== tree.root_node_id && !(childrenByParent[id]?.length) && !feeding.has(id));
-  const closed = ends.length > 0 && ends.every((id) => nodesById[id]!.resolved);
   const cold = now - Date.parse(lastActive) > COLD_DAYS * 86_400_000;
 
-  return { sketch: { box, cards, strings }, cards: ids.length, lastActive, status: closed ? "closed" : cold ? "cold" : "open" };
+  return { sketch: { box, cards, strings }, cards: ids.length, lastActive, status: cold ? "cold" : "open" };
 }
 
 /** When a case was last worked on, the way a note on a file says it: today, yesterday, 4 days ago, Nov 1. */

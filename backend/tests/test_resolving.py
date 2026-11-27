@@ -1,7 +1,4 @@
-import asyncio
-import uuid
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 
 from app import resolving
 from app.context.flatten import flatten, to_provider_messages
@@ -31,50 +28,3 @@ def test_a_compact_card_on_the_thread_is_a_fresh_start():
 def test_without_a_compact_card_the_whole_thread_is_read():
     path = [card("root"), card("a", "root", 1)]
     assert resolving.thread_plan(path, "a") == ["root", "a"]
-
-
-class FakeDB:
-    """Just enough of an AsyncSession for reopen / reopen_for_work."""
-
-    def __init__(self, nodes, used=False, chain=()):
-        self.nodes, self.used, self.chain, self.deleted = nodes, used, list(chain), []
-
-    async def get(self, _model, id):
-        return self.nodes.get(id)
-
-    async def execute(self, statement, params):
-        if "WITH RECURSIVE up" in str(statement):
-            return SimpleNamespace(all=lambda: self.chain)
-        return SimpleNamespace(scalar_one=lambda: self.used)
-
-    async def delete(self, obj):
-        self.deleted.append(obj.id)
-
-    async def flush(self):
-        pass
-
-
-def node(id, resolved=None, chats=None):
-    return SimpleNamespace(id=id, resolved=resolved, chats=chats or [{"role": "assistant", "content": "s"}])
-
-
-def test_resolve_stamps_and_reopen_unstamps():
-    a = uuid.uuid4()
-    nodes = {a: node(a)}
-    db = FakeDB(nodes)
-    assert asyncio.run(resolving.resolve(db, nodes[a], uuid.uuid4(), "gent")) is nodes[a]
-    assert nodes[a].resolved["by"] == "gent" and db.deleted == []
-    asyncio.run(resolving.reopen(db, nodes[a], uuid.uuid4()))
-    assert nodes[a].resolved is None
-
-
-def test_any_work_on_or_under_a_resolved_card_reopens_it():
-    root, a, kid = (uuid.uuid4() for _ in range(3))
-    stamp = {"by": "user", "at": "t"}
-    row = lambda id, resolved=None: SimpleNamespace(id=id, resolved=resolved)  # noqa: E731
-    under_nodes = {a: node(a, dict(stamp))}
-    under = FakeDB(under_nodes, chain=[row(kid), row(a, stamp), row(root)])
-    assert asyncio.run(resolving.reopen_for_work(under, kid, uuid.uuid4())) == [a]
-    assert under_nodes[a].resolved is None
-    clear = FakeDB({}, chain=[row(kid), row(root)])
-    assert asyncio.run(resolving.reopen_for_work(clear, kid, uuid.uuid4())) == []

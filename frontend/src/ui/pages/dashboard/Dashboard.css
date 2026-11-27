@@ -23,6 +23,58 @@
   left: 55%;
 }
 
+/* a second clipping, half under the drawer's reach */
+.dashboard-scrap-low {
+  bottom: 9rem;
+  left: -2.5rem;
+  rotate: -7deg;
+  scale: 0.8;
+  opacity: 0.85;
+}
+
+/* an old strip of masking tape, left where a card was pulled off */
+.dashboard-tape {
+  top: 56%;
+  right: 3rem;
+  width: 5.5rem;
+  height: 1.4rem;
+  rotate: 24deg;
+  background: var(--texture-grain), color-mix(in srgb, var(--color-slip) 70%, transparent);
+  box-shadow: var(--shadow-floating);
+  clip-path: polygon(0 10%, 4% 0, 100% 6%, 97% 50%, 100% 94%, 3% 100%, 0 60%, 2% 30%);
+}
+
+/* a small ruled note, nothing legible on it */
+.dashboard-note {
+  bottom: 13rem;
+  right: 9%;
+  width: 6.5rem;
+  height: 5.5rem;
+  rotate: -5deg;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 0.8rem, var(--color-scrap-line) 0.8rem calc(0.8rem + 1px)) 0.6rem 1.2rem / calc(100% - 1.2rem) calc(100% - 1.8rem) no-repeat,
+    var(--texture-grain), var(--color-card-alt);
+  box-shadow: var(--shadow-floating);
+  opacity: 0.9;
+}
+
+/* a pushpin stuck in the cork with nothing on it */
+.dashboard-pin {
+  top: 64%;
+  left: 41%;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--texture-pin), var(--color-pin);
+  box-shadow: var(--shadow-pin);
+}
+
+.dashboard-clip {
+  top: 58%;
+  left: 2rem;
+  rotate: 62deg;
+}
+
 .dashboard > .board {
   position: relative;
   z-index: 1;

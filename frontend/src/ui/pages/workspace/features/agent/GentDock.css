@@ -42,8 +42,18 @@
   --dock-alert: color-mix(in srgb, var(--color-danger) 55%, var(--color-text-on-gent));
 }
 
+/* Out of his ink, the dock is paper: its writing is paper's dark ink, not the board's pale text it sits on */
 .gent-dock[data-inked="false"] {
-  border: 1px solid var(--color-border);
+  --color-text: var(--color-text-on-paper);
+  --color-text-secondary: var(--color-text-on-paper);
+  --color-text-muted: var(--color-text-on-paper-muted);
+  --color-border: var(--color-border-on-paper);
+  --dock-fg: var(--color-text-on-paper);
+  --dock-soft: var(--color-text-on-paper-muted);
+  --dock-rule: var(--color-border-on-paper);
+  --dock-wash: color-mix(in srgb, var(--color-text-on-paper) 8%, transparent);
+  color: var(--color-text-on-paper);
+  border: 1px solid var(--color-border-on-paper);
   background: var(--texture-grain), var(--color-surface);
   box-shadow: var(--shadow-floating);
 }
@@ -53,7 +63,7 @@
   color: var(--dock-fg);
 }
 
-.gent-dock [data-component="button"][data-hierarchy="tertiary"]:hover:not(:disabled) {
+.gent-dock [data-component="button"][data-hierarchy="tertiary"]:not([data-icon-only]):hover:not(:disabled) {
   background: var(--dock-wash);
 }
 
@@ -104,7 +114,9 @@
 }
 
 .gent-socket .gent-avatar {
-  transition: scale var(--motion-spring) var(--ease-spring);
+  transition:
+    scale var(--motion-spring) var(--ease-spring),
+    rotate var(--motion-spring) var(--ease-spring);
 }
 
 /* landing home: the drop splashes in the socket, and he pops up out of it */
@@ -174,15 +186,45 @@
     translate var(--motion-spring) var(--ease-spring);
 }
 
-/* At rest he waits half under the board's bottom edge (past the layer's bottom padding too), so the board's edge
- * is clean; pointed at, he rises a little; clicked, the pill comes all the way up. */
+/* at rest he sits whole on the board; clicked, the pill opens */
 .gent-dock[data-mode="circle"] {
-  translate: 0 calc(50% + var(--space-4));
   cursor: pointer;
 }
 
-.gent-dock[data-mode="circle"][data-peek] {
-  translate: 0 calc(15% + var(--space-4));
+/* Magnetic (GentDock.tsx useMagnet): a pointer nearby tugs the dock toward it, Gent leaning further than his dock,
+ * and the dock swells a touch; pressed, it gives. Springs back when the pointer goes. */
+.gent-dock {
+  translate: var(--magnet-x, 0) var(--magnet-y, 0);
+  scale: 1;
+  transition:
+    border-radius var(--motion-spring) var(--ease-spring),
+    background-color var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    translate var(--motion-spring) var(--ease-spring),
+    scale var(--motion-spring) var(--ease-spring);
+}
+
+.gent-dock[data-magnet]:not([data-mode="chat"]) {
+  scale: 1.05;
+  transition-duration: var(--motion-base), var(--motion-base), var(--motion-base), var(--motion-base), 120ms,
+    var(--motion-spring);
+}
+
+.gent-dock[data-magnet] .gent-socket {
+  translate: calc(var(--magnet-x, 0) * 0.6) calc(var(--magnet-y, 0) * 0.6);
+}
+
+.gent-dock[data-magnet] .gent-socket .gent-avatar {
+  rotate: var(--magnet-tilt, 0deg);
+}
+
+.gent-dock:not([data-mode="chat"]):active {
+  scale: 0.96;
+}
+
+.gent-socket {
+  transition: translate var(--motion-spring) var(--ease-spring);
 }
 
 /* the pill hugs what's in it: his status, or what you type */
@@ -229,7 +271,7 @@
   flex: none;
   gap: var(--space-2);
   min-height: 3rem;
-  margin: var(--space-1) var(--space-3) 0 var(--space-4);
+  margin: var(--space-1) var(--dock-gutter) 0;
   padding: var(--space-2) 0;
   border-bottom: 3px double var(--dock-rule);
 }
@@ -314,9 +356,15 @@
 .gent-dock-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-height: 2.5rem;
   padding: 0.3125rem;
+}
+
+/* the pill's text keeps clear of the socket on its left and the dock's rounded end on its right */
+.gent-dock[data-mode="pill"] .gent-dock-bar,
+.gent-dock[data-mode="chat"] .gent-dock-bar {
+  padding-right: var(--space-3);
 }
 
 .gent-status {
@@ -334,7 +382,7 @@
   min-width: 8ch;
   max-width: 26rem;
   align-self: center;
-  padding: 0.3rem 0;
+  padding: 0.3rem var(--space-1);
   border: 0;
   background: none;
   text-overflow: ellipsis;
@@ -367,11 +415,17 @@
   --color-surface-raised: color-mix(in srgb, var(--color-text-on-paper) 18%, transparent);
 }
 
-.gent-chat-history {
+/* one gutter for the head and the conversation, clear of the ink's edge. `.gent-dock` in front: the list also
+ * carries the card chat's .chat-history, whose padding (Chat.css) would otherwise win */
+.gent-dock {
+  --dock-gutter: var(--space-4);
+}
+
+.gent-dock .gent-chat-history {
   flex: 0 1 auto;
   min-height: 0;
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--dock-gutter) var(--space-3);
   overflow-y: auto;
   list-style: none;
   display: flex;
@@ -570,73 +624,76 @@
 
 /* ── the open conversation as a story: your task (your slip, red), his case notes (his ink), his report (paper) ── */
 
-/* his case notes: a phase per note of his, headed by the note in his type */
-.gent-phase {
+/* A finished run's work, folded to one quiet line between your task and his answer. Opened, it's one flat log. */
+.gent-work {
   list-style: none;
 }
 
-.gent-phase-box > summary {
+.gent-work-box > summary {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1);
-  border-radius: var(--radius-sm);
+  padding: var(--space-1) 0;
+  color: var(--dock-soft);
+  font-size: var(--font-size-xs);
   list-style: none;
   cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-out);
 }
 
-.gent-phase-box > summary::-webkit-details-marker {
+.gent-work-box > summary::-webkit-details-marker {
   display: none;
 }
 
-.gent-phase-box > summary:hover {
-  background: var(--dock-wash);
+.gent-work-box > summary:hover {
+  color: var(--dock-fg);
 }
 
-.gent-phase-box > summary:focus-visible {
+.gent-work-box > summary:focus-visible {
   outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
-.gent-dock .gent-phase-note {
+.gent-work-title {
   flex: 1;
-  min-width: 0;
-  margin: 0;
+}
+
+.gent-work-count {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: var(--font-size-xxs);
+  font-variant-numeric: tabular-nums;
+}
+
+.gent-dock .gent-work-chevron {
+  color: inherit;
+  transition: rotate var(--motion-spring) var(--ease-spring);
+}
+
+.gent-work-box[open] > summary .gent-work-chevron {
+  rotate: 180deg;
+}
+
+.gent-work-box > .gent-log {
+  margin-top: var(--space-1);
+}
+
+/* one of his notes, heading the moves it led to: his type, two lines (the whole note on hover) */
+.gent-log-note {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: var(--space-2) 0 var(--space-1) calc(-1 * var(--space-3));
   color: var(--dock-fg);
   font-family: var(--font-heading);
   font-size: var(--font-size-s);
   line-height: 1.35;
 }
 
-/* how many moves the phase took: its weight at a glance, folded or not */
-.gent-phase-count {
-  flex: none;
-  color: var(--dock-soft);
-  font-size: var(--font-size-xxs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-variant-numeric: tabular-nums;
-}
-
-.gent-dock .gent-phase-chevron {
-  flex: none;
-  align-self: center;
-  color: var(--dock-soft);
-  transition: rotate var(--motion-spring) var(--ease-spring);
-}
-
-.gent-phase-box[open] > summary .gent-phase-chevron {
-  rotate: 180deg;
-}
-
-/* the moves hang off his margin under the note */
-.gent-phase-box > .gent-log {
-  margin: var(--space-1) 0 var(--space-2) var(--space-2);
-}
-
-/* the phase he's in: his margin in full ink, the rest are history */
-.gent-phase[data-current] .gent-log {
-  border-inline-start-color: var(--dock-fg);
+.gent-log-note:first-child {
+  margin-top: 0;
 }
 
 /* card addresses in his log stand out, so the cards can be picked out of a long run */
@@ -651,7 +708,6 @@
 .gent-chat-history .message-assistant {
   --color-text: var(--color-text-on-paper);
   --color-text-muted: var(--color-text-on-paper-muted);
-  margin-inline-end: var(--space-2);
   padding: var(--space-3) var(--space-4) var(--space-2) var(--space-6);
   border-radius: var(--radius-sm);
   background:
@@ -710,9 +766,9 @@
   }
 }
 
-/* the earlier moves of a long phase, one click away, on his margin above the latest ones */
-.gent-dock .gent-phase-more {
-  margin: var(--space-1) 0 0 var(--space-2);
+/* the earlier moves of a long run, one click away, above the latest ones */
+.gent-dock .gent-log-more {
+  margin-bottom: var(--space-1);
   color: var(--dock-soft);
   font-size: var(--font-size-xs);
 }

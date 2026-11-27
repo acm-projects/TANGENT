@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { InkSpill } from "@/ui/library";
 import { InkSurface, onInkFrame, reducedMotion } from "@/ui/library/primitives/Ink/ink";
+import { cancelIdle, whenIdle } from "@/ui/library/primitives/Ink/InkLayer";
 import { useGentStore } from "@/store/gentStore";
 import { GentAvatar } from "../avatar/GentAvatar";
 import { avatarState } from "../avatar/avatarState";
@@ -10,7 +12,10 @@ import { HOME, stationEl, subscribeStations } from "@/store/gentStations";
 import { ARRIVE_MS, LEAVE_MS, usePresence, type Phase } from "./traveller";
 import "./travel.css";
 
-/* Gent at a station: his ink outline round it and his avatar perched on its top centre. Rendered into the
+/* Gent at a station: his ink outline round it, his avatar perched on its top centre, and once he has landed his ink
+ * spilling over it (InkSpill) until he moves on. Any station gets this, whatever it is: the station's element takes
+ * `data-gent-ink` while the ink covers it, and travel.css turns its writing pale for it. A station that is his ink
+ * already (an ink Panel) gets no spill. Rendered into the
  * station's own element (a portal), so it pans, zooms and stacks with whatever it surrounds, under the station's
  * own content. When the station is off the board (or under the chat) a small blue arrow on the board's edge
  * points to him (the map never pans to follow). */
@@ -53,12 +58,20 @@ function Outline({ host, layer, seed, phase, since, state }: OutlineProps) {
     // the ink goes under the station's own content (a card's New stamp), so the host gets its own stacking context
     const restore = isolate(host);
     const surface = new InkSurface(canvas, "outline", seed);
-    const build = () => {
+    // the solid outline at once (cheap), its fibres when the browser is idle: a full build is tens of ms, and doing
+    // it the moment he lands dropped frames (InkLayer does the same)
+    let idle = 0;
+    const build = (lite: boolean) => {
       const scale = host.getBoundingClientRect().width / (host.offsetWidth || 1); // the map's zoom
-      surface.build(host.offsetWidth, host.offsetHeight, parseFloat(getComputedStyle(host).borderTopLeftRadius) || 8, scale);
+      surface.build(host.offsetWidth, host.offsetHeight, parseFloat(getComputedStyle(host).borderTopLeftRadius) || 8, scale, lite);
     };
-    build();
-    const resize = new ResizeObserver(build);
+    const rebuild = () => {
+      build(true);
+      if (idle) cancelIdle(idle);
+      idle = whenIdle(() => ((idle = 0), build(false)));
+    };
+    rebuild();
+    const resize = new ResizeObserver(rebuild);
     resize.observe(host);
     const tick = (ms: number) => {
       const { phase: p, since: t0 } = timing.current;
@@ -80,14 +93,28 @@ function Outline({ host, layer, seed, phase, since, state }: OutlineProps) {
     const stop = onInkFrame(tick);
     return () => {
       stop();
+      if (idle) cancelIdle(idle);
       resize.disconnect();
       Object.assign(host.style, restore);
+      host.removeAttribute("data-gent-ink");
     };
   }, [host, layer, seed]);
+  const alreadyInk = host.matches('[data-material="ink"], [data-component="ink-panel"]');
 
   return (
     <>
       <span className="gent-presence" aria-hidden>
+        {!alreadyInk && (
+          // spills as the outline draws on, in the same time, and draws back with it as he leaves
+          <InkSpill
+            on={phase === "arriving" || phase === "here"}
+            inMs={ARRIVE_MS}
+            outMs={LEAVE_MS}
+            seed={seed}
+            from={{ x: 50, y: 0 }}
+            onCovered={(c) => host.toggleAttribute("data-gent-ink", c)}
+          />
+        )}
         <canvas ref={canvasRef} className="gent-outline" />
         <span ref={perchRef} className="gent-perch" data-phase={phase}>
           <GentAvatar state={state} size={24} />

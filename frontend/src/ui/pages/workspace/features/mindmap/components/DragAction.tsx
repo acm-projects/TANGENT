@@ -7,8 +7,7 @@ import { Icon, Panel, Text } from "@/ui/library";
  * it to the pointer, with a tip beside the pointer saying what letting go will
  * do. Over another card: merge with it (that card gets a dotted outline too).
  * Otherwise below the card: a new tangent; above it: delete (for the root: reset the project); left of it: compact
- * its thread into a new card; right of it: mark how its branch ended, from a menu where the pointer let go (reopen, if
- * it is marked).
+ * its thread into a new card; right of it: nothing.
  * Anywhere else cancels, as does Escape; back inside the card the string goes
  * away too. A press that barely moves is still a click.
  *
@@ -40,22 +39,20 @@ function outlineBox(card: HTMLElement, zoom: number): DOMRect {
   return new DOMRect(r.x + r.width / 2 - w / 2, r.y + r.height / 2 - h / 2, w, h);
 }
 
-export type DragAction = "branch" | "delete" | "merge" | "compact" | "resolve" | "reopen" | null;
+export type DragAction = "branch" | "delete" | "merge" | "compact" | null;
 
 const TIP = {
   branch: { icon: "call_split", label: "New branch" },
   delete: { icon: "delete", label: "Delete" },
   merge: { icon: "merge", label: "Merge" },
   compact: { icon: "compress", label: "Compact" },
-  resolve: { icon: "task_alt", label: "Mark as…" },
-  reopen: { icon: "undo", label: "Reopen" },
   cancel: { icon: "close", label: "Cancel" },
   root: { icon: "block", label: "Nothing to reset" },
   reset: { icon: "restart_alt", label: "Reset case" },
 };
 
-/** What the card allows besides branching: up deletes, left compacts, right resolves or reopens (absent: nothing). */
-export type DragSides = { canDelete: boolean; canCompact?: boolean; right?: "resolve" | "reopen" };
+/** What the card allows besides branching: up deletes, left compacts. */
+export type DragSides = { canDelete: boolean; canCompact?: boolean };
 
 type Edges = { top: number; bottom: number; left: number; right: number };
 
@@ -65,7 +62,6 @@ export function dragAction(card: Edges, p: { x: number; y: number }, sides: Drag
   if (p.y > card.bottom + arm) return "branch";
   if (p.y < card.top - arm) return sides.canDelete ? "delete" : null;
   if (p.x < card.left - arm) return sides.canCompact ? "compact" : null;
-  if (p.x > card.right + arm) return sides.right ?? null;
   return null;
 }
 
@@ -110,17 +106,14 @@ function anchor(card: DOMRect, to: Point): { from: Point; side: Position } {
 
 /** `resets`: the card is the root, where dragging up starts the project over rather than deleting a branch.
  * Each side's handler, when given, turns its zone on. */
-export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolve, onReopen, resets = false }: {
+export function useDragAction({ onBranch, onDelete, onMerge, onCompact, resets = false }: {
   onBranch(): void;
   onDelete?: () => void;
   onMerge(id: string): void;
   onCompact?: () => void;
-  /** gets where the pointer let go, in screen px: the "Mark as" menu opens there */
-  onResolve?: (at: { x: number; y: number }) => void;
-  onReopen?: () => void;
   resets?: boolean;
 }) {
-  const sides: DragSides = { canDelete: Boolean(onDelete), canCompact: Boolean(onCompact), right: onReopen ? "reopen" : onResolve ? "resolve" : undefined };
+  const sides: DragSides = { canDelete: Boolean(onDelete), canCompact: Boolean(onCompact) };
   const { getZoom } = useReactFlow();
   // the press, with the card's zones measured when it became a drag (null until then)
   const press = useRef<{ start: Point; card: HTMLElement; pointerId: number; box: DOMRect | null } | null>(null);
@@ -207,8 +200,6 @@ export function useDragAction({ onBranch, onDelete, onMerge, onCompact, onResolv
       case "branch": onBranch(); break;
       case "delete": onDelete?.(); break;
       case "compact": onCompact?.(); break;
-      case "resolve": onResolve?.({ x: e.clientX, y: e.clientY }); break;
-      case "reopen": onReopen?.(); break;
     }
   }
 

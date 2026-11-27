@@ -26,26 +26,24 @@ export function InkLayer({ seed, calm, radius, inked = true }: InkLayerProps) {
     let stop: (() => void) | null = null;
     surface.mottle = calm ? 0.45 : 1;
     const radiusNow = () => radius ?? (parseFloat(getComputedStyle(host).borderTopLeftRadius) || 0);
-    // While the host is resizing (the dock morphing) the ink is rebuilt every frame as its solid shape only, which
-    // is cheap; the full edge with its fibres is built once the size has held still, and fades in.
+    // On mount and while the host is resizing (the dock morphing) the ink is built as its solid shape only, which is
+    // cheap; the full edge with its fibres (tens of ms) is built once the size has held still and the browser is
+    // idle, and fades in. Building it at once made every new ink surface (a spill as Gent lands) drop frames.
     let settle = 0;
-    let built = false;
+    let idle = 0;
+    const full = () => {
+      idle = 0;
+      surface.build(host.offsetWidth, host.offsetHeight, radiusNow());
+      surface.render(performance.now());
+    };
     const rebuild = () => {
       const t0 = performance.now();
-      const [w, h] = [host.offsetWidth, host.offsetHeight];
-      if (!built) {
-        built = true;
-        surface.build(w, h, radiusNow());
-        return surface.render(t0);
-      }
-      surface.build(w, h, radiusNow(), 1, true);
+      surface.build(host.offsetWidth, host.offsetHeight, radiusNow(), 1, true);
       surface.render(t0);
       performance.measure("ink:resize-frame", { start: t0 }); // devtools / harness: what a morph frame costs
       clearTimeout(settle);
-      settle = window.setTimeout(() => {
-        surface.build(host.offsetWidth, host.offsetHeight, radiusNow());
-        surface.render(performance.now());
-      }, 140);
+      if (idle) cancelIdle(idle);
+      settle = window.setTimeout(() => (idle = whenIdle(full)), 140);
     };
     const resize = new ResizeObserver(rebuild);
     resize.observe(host);
@@ -56,6 +54,7 @@ export function InkLayer({ seed, calm, radius, inked = true }: InkLayerProps) {
     seen.observe(host);
     return () => {
       clearTimeout(settle);
+      if (idle) cancelIdle(idle);
       resize.disconnect();
       seen.disconnect();
       stop?.();
@@ -64,3 +63,8 @@ export function InkLayer({ seed, calm, radius, inked = true }: InkLayerProps) {
 
   return <canvas ref={canvasRef} data-ui="ink-layer" aria-hidden />;
 }
+
+/** Run `fn` when the browser is idle (at the latest after 400ms); Safari has no requestIdleCallback. */
+const hasIdle = () => typeof requestIdleCallback === "function";
+export const whenIdle = (fn: () => void): number => (hasIdle() ? requestIdleCallback(fn, { timeout: 400 }) : window.setTimeout(fn, 60));
+export const cancelIdle = (id: number) => (hasIdle() ? cancelIdleCallback(id) : clearTimeout(id));

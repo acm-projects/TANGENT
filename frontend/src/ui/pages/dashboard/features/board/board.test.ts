@@ -42,12 +42,9 @@ describe("caseFacts", () => {
     expect(sketch.strings.filter((s) => s.onPath)).toHaveLength(4);
   });
 
-  it("files a case: open while worked on, cold after three quiet weeks, closed once every branch has ended", () => {
-    const ended = { by: "user" as const, at: ago(1) };
+  it("files a case: open while worked on, cold after three quiet weeks", () => {
     expect(caseFacts(tree("r", [node("r", null, 0, ago(2)), node("a", "r", 0, ago(1))]), NOW).status).toBe("open");
     expect(caseFacts(tree("r", [node("r", null, 0, ago(40)), node("a", "r", 0, ago(30))]), NOW).status).toBe("cold");
-    expect(caseFacts(tree("r", [node("r", null, 0, ago(40)), { ...node("a", "r", 0, ago(30)), resolved: ended }]), NOW).status).toBe("closed");
-    // a case with only its first card is never closed
     expect(caseFacts(tree("r", [node("r", null, 0, ago(1))]), NOW).status).toBe("open");
   });
 

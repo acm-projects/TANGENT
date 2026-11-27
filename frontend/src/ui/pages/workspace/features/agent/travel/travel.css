@@ -14,7 +14,23 @@
 .gent-presence {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
+}
+
+/* Gent's ink has spilled over a station (GentPresence): its writing turns to the pale on-ink colours, as on any
+ * ink panel, whatever the station is. */
+[data-gent-ink] {
+  color: var(--color-text-on-gent);
+  --color-text: var(--color-text-on-gent);
+  --color-text-secondary: var(--color-text-on-gent);
+  --color-text-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+  --color-text-on-paper: var(--color-text-on-gent);
+  --color-text-on-paper-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+  --color-text-on-leather: var(--color-text-on-gent);
+  --color-text-on-leather-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
+  --color-border: color-mix(in srgb, var(--color-text-on-gent) 30%, transparent);
+  --color-border-strong: color-mix(in srgb, var(--color-text-on-gent) 55%, transparent);
 }
 
 .gent-outline {

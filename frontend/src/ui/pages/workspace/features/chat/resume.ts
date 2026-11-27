@@ -34,7 +34,7 @@ async function follow(nodeId: string, signal: AbortSignal): Promise<void> {
       if (e.type === "token") s().appendToken(nodeId, e.text);
       else if (e.type === "tool") s().addStreamTool(nodeId, { name: e.name, brief: e.brief, ok: e.ok });
       else if (e.type === "reasoning") s().appendReasoning(nodeId, e.text);
-      else if (e.type === "question" || e.type === "reopened" || (e.type === "done" && e.fork)) {
+      else if (e.type === "question" || (e.type === "done" && e.fork)) {
         const id = projectId();
         if (id) void refreshTree(id).catch(() => {});
         if (e.type === "done") s().abortStream(nodeId);

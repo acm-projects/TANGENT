@@ -79,7 +79,6 @@ export function MessageField({ blocker, branching = false, models, selectedModel
     <Panel
       as="footer"
       stock="composer"
-      ruled="lines"
       elevation="floating"
       className={["message-field", className].filter(Boolean).join(" ")}
       data-disabled={disabled || undefined}

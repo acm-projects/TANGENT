@@ -1,11 +1,8 @@
-"""Compact, resolve and reopen a card.
+"""Compact a card.
 
 Compact: the card's own model summarises its thread (everything that card's model sees: the root down to it, merged
 sources included) into a new child card, node_type "compact", titled "Compacted". It is a fresh start: a card at or
 below a compact card is sent the summary and the messages from the compact card down, nothing above it.
-Resolve: a marker: the card is stamped with how its branch ended (`nodes.resolved = {by, at, kind}`, kind one of
-ENDINGS; a stamp without one is "resolved"); nothing else changes.
-Reopen: the stamp comes off. Any work on a resolved card or under it reopens it (reopen_for_work).
 """
 
 from datetime import datetime, timezone
@@ -18,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.flatten import flatten, to_provider_messages
 from app.context.plan import PlanItem, build_plan
-from app.context.schemas import ENDINGS, PathNode
+from app.context.schemas import PathNode
 from app.core.openrouter import DEFAULT_MODEL_ID, get_model_or_400, stream_openrouter
 from app.models import Node
 
@@ -29,16 +26,6 @@ COMPACT_PROMPT = (
     "and evidence ids exactly as they appear), what was ruled out and why, and the open questions. No preamble; "
     "plain markdown, as short as the content allows."
 )
-
-_CHAIN_SQL = text("""
-    WITH RECURSIVE up(id, depth) AS (
-      SELECT CAST(:node_id AS uuid), 0
-      UNION ALL
-      SELECT n.parent_id, up.depth + 1 FROM nodes n JOIN up ON n.id = up.id WHERE n.parent_id IS NOT NULL
-    )
-    SELECT n.id, n.resolved FROM up JOIN nodes n USING (id) ORDER BY up.depth
-""")
-
 
 def cut_at_compact(plan: Sequence[PlanItem], nodes: Mapping[str, PathNode]) -> list[PlanItem]:
     """The thread from its last compact card on: the summary stands in for everything above it.
@@ -102,34 +89,6 @@ async def compact(db: AsyncSession, node: Node, user_id: UUID, *, model: str | N
     child.node_type, child.title, child.model, child.tokens = "compact", TITLE, model, tokens
     await db.flush()
     return child
-
-
-async def resolve(db: AsyncSession, node: Node, user_id: UUID, by: str, kind: str = "resolved") -> Node:
-    """Stamp how node's branch ended, `kind` (ENDINGS), by `by` ("user" | "gent"). Stamped already: returns it as is."""
-    if kind not in ENDINGS:
-        raise ValueError(f"unknown ending: {kind}")
-    if not node.resolved:
-        node.resolved = {"by": by, "at": datetime.now(timezone.utc).isoformat(), "kind": kind}
-        await db.flush()
-    return node
-
-
-async def reopen(db: AsyncSession, node: Node, user_id: UUID) -> None:
-    """Take a resolved card's stamp off."""
-    if node.resolved:
-        node.resolved = None
-        await db.flush()
-
-
-async def reopen_for_work(db: AsyncSession, node_id: UUID, user_id: UUID) -> list[UUID]:
-    """Work is about to happen on `node_id`: reopen every resolved card at or above it. Returns their ids.
-    shortcut: walks the main parent link only, so work under a merge of a resolved branch doesn't reopen it."""
-    reopened = []
-    for row in (await db.execute(_CHAIN_SQL, {"node_id": node_id})).all():
-        if row.resolved:
-            await reopen(db, await db.get(Node, row.id), user_id)
-            reopened.append(row.id)
-    return reopened
 
 
 def conclusion(compact_node: Node, limit: int = 400) -> str:

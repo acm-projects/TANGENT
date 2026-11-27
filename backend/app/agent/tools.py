@@ -24,7 +24,7 @@ from sqlalchemy import text, update
 from sqlalchemy.future import select
 
 from app import database
-from app.context.schemas import ENDINGS, TAG_COLORS
+from app.context.schemas import TAG_COLORS
 from app.papers import service as paper_service
 from app import questions as qmod
 from app.branch_scope import visible_to
@@ -160,9 +160,6 @@ GENT_TOOLS = [
            "color": {"type": "string", "enum": [*TAG_COLORS, "none"],
                      "description": "The colour word; \"none\" takes the tag off"}},
           ["color"]),
-    _tool("reopen", "Reopen a resolved branch to work in it again: the Resolved stamp comes off. (Working in it "
-                           "reopens it too.)",
-          {"card": {**_WHERE, "description": 'The resolved card (default ".", where you are)'}}),
     _tool("sources", "List the project's sources: the papers the user uploaded, the ones cards cited, and the ones "
                      "kept with add_source, each with its id (p12), title and whether its full text is searchable."),
     _tool("search_sources", "Find passages in the project's sources (full text). Use it to see what the sources say "
@@ -222,7 +219,7 @@ class Snapshot:
 
 
 _TREE_SQL = text("""
-    SELECT n.id, n.parent_id, n.title, n.summary, n.model, n.fork_index, n.created_at, n.node_type, n.resolved, n.tag,
+    SELECT n.id, n.parent_id, n.title, n.summary, n.model, n.fork_index, n.created_at, n.node_type, n.tag,
            CASE WHEN jsonb_typeof(n.chats) = 'array' THEN jsonb_array_length(n.chats) ELSE 0 END AS messages,
            CASE WHEN jsonb_typeof(n.chats) = 'array' THEN (SELECT count(*) FROM jsonb_array_elements(n.chats) m
                 WHERE m->>'author' = 'gent') ELSE 0 END AS gent_asks
@@ -303,39 +300,9 @@ def _ref(snap: Snapshot, node_id: UUID) -> dict:
     return {"address": snap.address.get(node_id), "id": str(node_id), "title": snap.rows[node_id].title or "Untitled"}
 
 
-# --- resolved branches (app/resolving.py) --------------------------------------------------------------------------
-
-RESOLVED_VISIT = ("{at} is in a resolved branch: {top} is marked resolved, so treat it as settled: read what it found "
-                  "instead of digging further. Working here (ask, branch) reopens {top}; reopen() it first only if "
-                  "its answer needs revisiting.")
-DEAD_VISIT = ("{at} is in a branch that ended as {label}: {top} is stamped {label}, so there is nothing to dig for "
-              "here; leave it out of merges. Working here reopens {top}; do that only with a reason it's worth more.")
-
-
 def _resolving():
-    # imported at call time: app.resolving imports the node routes, which import half the app
+    # compact lives there; imported at call time: app.resolving imports the node routes, which import half the app
     return importlib.import_module("app.resolving")
-
-
-def _resolution(snap: Snapshot, node_id) -> Optional[dict]:
-    """The card's ending stamp {by, at, kind}, if it has one (kind filled in for stamps made before endings)."""
-    stamp = getattr(snap.rows[node_id], "resolved", None)
-    return {"kind": "resolved", **stamp} if isinstance(stamp, dict) and stamp.get("by") else None
-
-
-def resolved_over(snap: Snapshot, node_id) -> Optional[UUID]:
-    """The resolved card whose branch this card is in (itself included), the nearest one up."""
-    cur = node_id
-    while cur in snap.rows:
-        if _resolution(snap, cur):
-            return cur
-        cur = snap.rows[cur].parent_id
-    return None
-
-
-def settled(snap: Snapshot, node_id) -> bool:
-    """The card is resolved or under a resolved card."""
-    return resolved_over(snap, node_id) is not None
 
 
 def _tag_color(snap: Snapshot, node_id) -> Optional[str]:
@@ -347,35 +314,7 @@ def _tag_color(snap: Snapshot, node_id) -> Optional[str]:
 def waiting_questions(snap: Snapshot) -> list[str]:
     """Addresses of the question cards nobody has answered yet (an answer opens a branch, so these are leaves)."""
     return [snap.address[n] for n, row in snap.rows.items()
-            if getattr(row, "node_type", None) == "question" and not snap.children.get(n) and not settled(snap, n)
-            and n in snap.address]
-
-
-def _visit_nudge(snap: Snapshot, node_id) -> list[dict]:
-    top = resolved_over(snap, node_id)
-    if top is None:
-        return []
-    at, top_at, kind = snap.address.get(node_id), snap.address.get(top), _resolution(snap, top)["kind"]
-    text = RESOLVED_VISIT.format(at=at, top=top_at) if kind == "resolved" else \
-        DEAD_VISIT.format(at=at, top=top_at, label=ENDINGS.get(kind, kind).lower())
-    return [{"name": "resolved_branch", "text": text}]
-
-
-async def _conclusions(db, snap: Snapshot, ids) -> dict:
-    """card id -> {"by", "kind"} for the stamped ones among `ids` (a stamp is a marker: the answer is the card's own)."""
-    return {n: {"by": stamp["by"], "kind": stamp["kind"]} for n in ids if (stamp := _resolution(snap, n))}
-
-
-async def _reopen_for_work(run: Run, snap: Snapshot, node_id) -> list[str]:
-    """Work at `node_id` reopens the resolved branch it's in (resolving.reopen_for_work): the addresses reopened."""
-    if resolved_over(snap, node_id) is None:
-        return []
-    async with database.AsyncSessionLocal() as db, db.begin():
-        await _as_user(db, run.user_id)
-        ids = await _resolving().reopen_for_work(db, node_id, run.user_id)
-    if ids:
-        run.emit("tree", {})
-    return [snap.address.get(i) or str(i) for i in ids]
+            if getattr(row, "node_type", None) == "question" and not snap.children.get(n) and n in snap.address]
 
 
 def _resolve(snap: Snapshot, run: Run, where) -> UUID:
@@ -468,11 +407,7 @@ def _clamp(value, default: int, lo: int, hi: int) -> int:
 
 async def cd(run: Run, to) -> dict:
     snap, _ = await _here(run)
-    out = _arrive(run, snap, _resolve(snap, run, to))
-    if _resolution(snap, run.cwd):
-        async with _session(run.user_id) as db:
-            out["resolved"] = (await _conclusions(db, snap, [run.cwd]))[run.cwd]
-    return out
+    return _arrive(run, snap, _resolve(snap, run, to))
 
 
 def _arrive(run: Run, snap: Snapshot, node: UUID) -> dict:
@@ -484,8 +419,6 @@ def _arrive(run: Run, snap: Snapshot, node: UUID) -> dict:
     out = {"cwd": _ref(snap, node), "messages": row.messages, "branches": len(snap.children.get(node, []))}
     if node in snap.sources:
         out["merged_from"] = [_ref(snap, s) for s in snap.sources[node]]
-    if told := _visit_nudge(snap, node):
-        out["nudges"] = told
     if color := _tag_color(snap, node):
         out["tag"] = color
     return out
@@ -506,8 +439,6 @@ async def tree(run: Run, under="/") -> dict:
         bits = ["answering…" if n in run.asking else
                 ("question, unanswered" if not kids else "question") if getattr(row, "node_type", None) == "question" else
                 "answered" if row.messages else "empty"]
-        if stamp := _resolution(snap, n):
-            bits.append(ENDINGS.get(stamp["kind"], stamp["kind"]).lower())
         if color := _tag_color(snap, n):
             bits.append(f"tagged {color}")
         if n in snap.sources:
@@ -550,14 +481,6 @@ async def ls(run: Run) -> dict:
 
     kids = snap.children.get(here, [])
     out = {"cwd": _ref(snap, here), "branches": [line(c) for c in kids]}
-    if any(_resolution(snap, n) for n in [here, *kids]):  # resolved: their conclusions stand in for their branches
-        async with _session(run.user_id) as db:
-            done = await _conclusions(db, snap, [here, *kids])
-        for kid, item in zip(kids, out["branches"]):
-            if kid in done:
-                item["resolved"] = done[kid]
-        if here in done:
-            out["resolved"] = done[here]
     if here in snap.sources:
         out["merged_from"] = [_ref(snap, s) for s in snap.sources[here]]
     return out
@@ -604,9 +527,7 @@ async def search(run: Run, query, limit=8) -> dict:
         snap = await snapshot(db, run.project_id, run.user_id)
         rows = [r for r in (await db.execute(_SEARCH_SQL, {"pid": run.project_id, "pat": pattern})).all()
                 if r.id in snap.rows][:limit]
-        done = await _conclusions(db, snap, [r.id for r in rows])
-    return {"results": [{**_ref(snap, r.id), "snippet": _excerpt(query, r.title, r.summary, r.body),
-                         **({"resolved": done[r.id]} if r.id in done else {})} for r in rows]}
+    return {"results": [{**_ref(snap, r.id), "snippet": _excerpt(query, r.title, r.summary, r.body)} for r in rows]}
 
 
 # --- research ---------------------------------------------------------------------------------------------------
@@ -710,13 +631,10 @@ async def ask(run: Run, question, card=None) -> dict:
                          "told you (ask_user() them first if you don't know)."}
     if getattr(snap.rows[here], "gent_asks", 0):  # it already holds one of his answers (the user's own don't count)
         return {"error": SAME_CARD.format(at=snap.address[here])}
-    reopened = await _reopen_for_work(run, snap, here)
     _start_ask(run, here, snap.address[here], _briefed(run, snap, here, question), _model_for(snap, here))
     run.asked.add(here)
     out = {"cwd": _ref(snap, here), "asking": True,
            "message": "Asked. The answer comes to you as an update when it is saved; carry on, or wait() for it."}
-    if reopened:
-        out["reopened"] = reopened
     return out
 
 
@@ -756,13 +674,13 @@ async def wait(run: Run, timeout=WAIT_SECONDS, **kind) -> dict:
 
 async def _open_cards(run: Run) -> list[str]:
     """Cards he asked this run whose answers are in but which he hasn't taken further: answered, still leaves, not
-    resolved or tagged and not answering. Work he could do instead of waiting."""
+    tagged and not answering. Work he could do instead of waiting."""
     if not run.asked:
         return []
     snap, _ = await _here(run)
     return sorted(snap.address[c] for c in run.asked
                   if c in snap.rows and c in snap.address and snap.rows[c].messages and not snap.children.get(c)
-                  and c not in run.asking and not settled(snap, c) and not _tag_color(snap, c))
+                  and c not in run.asking and not _tag_color(snap, c))
 
 
 async def _name_cards(run: Run, updates: list[dict]) -> None:
@@ -861,14 +779,11 @@ async def branch(run: Run, node=".", title=None, _fan=False) -> dict:
         at = snap.address[parent]
         return {"error": f"{at} is empty: you just opened it. Ask here first, or cd .. and open its siblings there "
                          "(better: bulk_ask them all at once)."}
-    reopened = await _reopen_for_work(run, snap, parent)
     child = await _new_branch(run, parent, title)
     run.opened.add(child)
     run.emit("tree", {})
     snap, _ = await _here(run)
     out = _arrive(run, snap, child)
-    if reopened:
-        out["reopened"] = reopened
     if (n := len(snap.children.get(parent, []))) > MAX_BRANCHES:
         out["nudges"] = [*out.get("nudges", []), {"name": "crowded", "text": CROWDED.format(at=snap.address[parent], n=n)}]
     return out
@@ -975,20 +890,6 @@ async def tag(run: Run, card=".", color="") -> dict:
     run.emit("tree", {})
     snap, here = await _here(run)
     return {"cwd": _ref(snap, here), "tagged": {**_ref(snap, node), "color": color}}
-
-
-async def reopen(run: Run, card=".") -> dict:
-    await _writable(run)
-    snap, _ = await _here(run)
-    node = _resolve(snap, run, card)
-    if not _resolution(snap, node):
-        return {"error": f"{snap.address[node]} isn't resolved"}
-    async with database.AsyncSessionLocal() as db, db.begin():
-        await _as_user(db, run.user_id)
-        await _resolving().reopen(db, await db.get(Node, node), run.user_id)
-    run.emit("tree", {})
-    snap, here = await _here(run)
-    return {"cwd": _ref(snap, here), "reopened": _ref(snap, node)}
 
 
 async def think(run: Run, depth="quick") -> dict:
@@ -1108,7 +1009,7 @@ async def get_todo(run: Run) -> dict:
 
 
 _HANDLERS = {f.__name__: f for f in (cd, ls, cat, tree, search, ask, wait, branch, merge, rm, compact, tag,
-                                     reopen, selected, sources, search_sources, add_source,
+                                     selected, sources, search_sources, add_source,
                                      think,
                                      todo_add, todo_tick, todo_edit, todo_delete, get_todo, ask_user, answer_question)}
 

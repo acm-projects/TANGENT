@@ -33,7 +33,7 @@ def rows_of(nodes: list[dict]) -> tuple[dict, list]:
     rows = {n["id"]: SimpleNamespace(
         id=n["id"], parent_id=n["parent"], title=n.get("title", n["id"].upper()), summary=n.get("summary"),
         model=n.get("model"), fork_index=n["fork"], created_at=n.get("created_at", ""), messages=n.get("messages", 0),
-        gent_asks=n.get("gent_asks", 0), node_type=n.get("node_type"), resolved=n.get("resolved"),
+        gent_asks=n.get("gent_asks", 0), node_type=n.get("node_type"),
         tag=n.get("tag"),
     ) for n in nodes}
     links = [(n["id"], s) for n in nodes for s in n.get("merge_source_ids", [])]
@@ -327,40 +327,27 @@ def test_ask_user_refused_until_gent_has_read_the_case():
     assert out == {"error": tools.READ_FIRST}
 
 
-# --- resolved branches -----------------------------------------------------------------------------------------
+# --- compact ---------------------------------------------------------------------------------------------------
 
-# r -> (a -> (a1, k: a compact card), b -> (q: a question card)); a is resolved
-RESOLVED = [N("r", None, 0), N("a", "r", 1, resolved={"by": "gent", "at": "t"}),
-            N("a1", "a", 1), N("k", "a", 2, node_type="compact"), N("b", "r", 2), N("q", "b", 1, node_type="question")]
+# r -> (a -> (a1, k: a compact card), b -> (q: a question card))
+CASE = [N("r", None, 0), N("a", "r", 1), N("a1", "a", 1), N("k", "a", 2, node_type="compact"), N("b", "r", 2),
+        N("q", "b", 1, node_type="question")]
 
 
-def test_which_resolved_branch_a_card_is_in():
-    snap = tree(*RESOLVED)
-    assert tools.resolved_over(snap, "a") == "a" and tools.resolved_over(snap, "a1") == "a"
-    assert tools.resolved_over(snap, "k") == "a"  # resolve is a marker: everything under a is in its branch
-    assert tools.resolved_over(snap, "b") is None
-    assert tools.settled(snap, "k") and tools.settled(snap, "a1") and not tools.settled(snap, "b")
-    assert tools.waiting_questions(snap) == ["1.2.1"]  # a1 and k are under a; q is an unanswered question
+def test_waiting_questions_are_the_unanswered_question_cards():
+    assert tools.waiting_questions(tree(*CASE)) == ["1.2.1"]
 
 
 @pytest.fixture
 def resolving(monkeypatch):
-    """A fake app.resolving: what the tools called, and conclusions by compact card."""
+    """A fake app.resolving: what the tools called."""
     calls = []
 
     async def compact(db, node, user_id, model=None):
         calls.append(("compact", node, model))
         return SimpleNamespace(id="k")
 
-    async def reopen(db, node, user_id):
-        calls.append(("reopen", node))
-
-    async def reopen_for_work(db, node_id, user_id):
-        calls.append(("reopen_for_work", node_id))
-        return ["a"]
-
-    fake = SimpleNamespace(compact=compact, reopen=reopen, reopen_for_work=reopen_for_work,
-                           conclusion=lambda node, limit=400: "the conclusion")
+    fake = SimpleNamespace(compact=compact, conclusion=lambda node, limit=400: "the conclusion")
     monkeypatch.setattr(tools, "_resolving", lambda: fake)
 
     class Tx:
@@ -383,39 +370,13 @@ def resolving(monkeypatch):
     return calls
 
 
-def test_resolved_cards_show_their_conclusion_and_visiting_one_nudges(gent, resolving):
+def test_compact_calls_the_service(gent, resolving):
     run, state = gent.run, gent.state
-    state["snap"] = tree(*RESOLVED)
-    listed = asyncio.run(tools.call_tool(run, "ls", {}))
-    a = next(b for b in listed["branches"] if b["address"] == "1.1")
-    assert a["resolved"] == {"by": "gent", "kind": "resolved"}  # an old stamp without a kind reads as resolved
-    went = asyncio.run(tools.call_tool(run, "cd", {"to": "1.1.1"}))
-    assert [n["name"] for n in went["nudges"]] == ["resolved_branch"] and "1.1" in went["nudges"][0]["text"]
-    assert "nudges" not in asyncio.run(tools.call_tool(run, "cd", {"to": "1.2"}))
-    assert asyncio.run(tools.call_tool(run, "cd", {"to": "1.1"}))["resolved"] == {"by": "gent", "kind": "resolved"}
-
-
-def test_compact_and_reopen_call_the_service(gent, resolving):
-    run, state = gent.run, gent.state
-    state["snap"] = tree(*RESOLVED)
+    state["snap"] = tree(*CASE)
     run.notes = [{"id": "n1", "text": "dig", "done": False}]
     made = asyncio.run(tools.call_tool(run, "compact", {"card": "1.2"}))
     assert made["cwd"]["address"] == "1.1.2" and made["compacted"]["address"] == "1.2"
-    back = asyncio.run(tools.call_tool(run, "reopen", {"card": "1.1"}))
-    assert back["reopened"]["address"] == "1.1" and ("reopen", "a") in resolving
-
-
-def test_asking_inside_a_resolved_branch_reopens_it(gent, resolving):
-    run, state = gent.run, gent.state
-    state["snap"] = tree(*RESOLVED)
-    run.notes = [{"id": "n1", "text": "dig", "done": False}]
-    run.cwd = "a1"
-    out = asyncio.run(tools.call_tool(run, "ask", {"card": ".", "question": "more?"}))
-    assert out["reopened"] == ["1.1"] and ("reopen_for_work", "a1") in resolving
-    run.cwd = "b"
-    resolving.clear()
-    asyncio.run(tools.call_tool(run, "ask", {"card": ".", "question": "go on"}))
-    assert not any(c[0] == "reopen_for_work" for c in resolving)  # outside any resolved branch: no reopen
+    assert resolving[0][:2] == ("compact", "b")
 
 
 def test_selected_reports_the_users_card(monkeypatch):
@@ -448,13 +409,6 @@ def test_a_question_card_is_answered_not_asked(gent):
     gent.state["snap"].rows["a"].node_type = "question"
     out = gent.call("ask", card="1.1", question="what?")
     assert "is a question card" in out["error"] and not gent.asked
-
-
-def test_visiting_a_dead_lead_the_user_stamped_says_so(gent):
-    gent.state["snap"] = tree(*BASIC[:2], N("b", "r", 2, resolved={"by": "user", "at": "t", "kind": "dead_lead"}),
-                              BASIC[3])
-    went = gent.call("cd", to="1.2.1")
-    assert "dead lead" in went["nudges"][0]["text"]
 
 
 @pytest.fixture
@@ -604,15 +558,14 @@ def test_splitting_the_start_card_again_is_refused(gent):
 
 def test_tree_outlines_every_card_with_its_state(gent):
     gent.state["snap"] = tree(N("r", None, 0), N("a", "r", 1, messages=2, title="Speakers"),
-                              N("b", "r", 2, resolved={"by": "gent", "at": "t", "kind": "dead_lead"}),
-                              N("c", "b", 1, messages=2), N("d", "r", 3), N("m", "a", 4, merge_source_ids=["a", "d"]))
+                              N("b", "r", 2), N("c", "b", 1, messages=2), N("d", "r", 3), N("m", "a", 4, merge_source_ids=["a", "d"]))
     gent.run.asking["d"] = "1.3"
     out = gent.call("tree")
     lines = out["tree"].split("\n")
     assert lines[0].startswith("1 R [empty, you are here]")
     assert "  1.1 Speakers [answered]" in lines
-    assert "  1.2 B [empty, dead lead]" in lines and "    1.2.1 C [answered]" in lines
+    assert "  1.2 B [empty]" in lines and "    1.2.1 C [answered]" in lines
     assert "  1.3 D [answering…]" in lines
     assert "    J1 M [empty, merges 1.1 + 1.3]" in lines and out["tree"].count("J1") == 1  # listed once
     assert out["cards"] == 6
-    assert gent.call("tree", under="1.2")["tree"].split("\n")[0] == "1.2 B [empty, dead lead]"
+    assert gent.call("tree", under="1.2")["tree"].split("\n")[0] == "1.2 B [empty]"

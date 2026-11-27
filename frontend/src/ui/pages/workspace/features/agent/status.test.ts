@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GentState } from "@/store/gentStore";
 import { avatarState } from "./avatar/avatarState";
-import { cardAt, doing, phases, statusLine } from "./status";
+import { cardAt, doing, statusLine } from "./status";
 
 const working = (steps: Extract<GentState["turns"][number], { role: "gent" }>["steps"]): Pick<GentState, "busy" | "turns" | "cwd"> => ({
   busy: true,
@@ -39,15 +39,6 @@ describe("Gent's status and avatar", () => {
     expect(statusLine(working([asked, { kind: "answer", address: "1.2" }, waiting({ for: "answer" })]))).toBe("Waiting on 1.1, 1.3, 1.4 and 1 more…");
     expect(statusLine(working([waiting({})]))).toBe("Waiting on the graph…");
     expect(statusLine(working([waiting({ for: "question" })]))).toBe("Waiting on a card's question…");
-  });
-
-  it("cuts his moves into phases at his notes", () => {
-    const tool = (id: string) => ({ kind: "tool" as const, id, turn: 1, name: "ls", args: {}, ok: true });
-    const note = (text: string) => ({ kind: "note" as const, turn: 1, text });
-    const parts = phases([tool("a"), note("Splitting it"), tool("b"), tool("c"), note("Wrapping up")]);
-    expect(parts.map((p) => [p.note?.text ?? null, p.steps.length])).toEqual([[null, 1], ["Splitting it", 2], ["Wrapping up", 0]]);
-    expect(phases([note("First")]).map((p) => p.note?.text)).toEqual(["First"]);
-    expect(phases([])).toEqual([]);
   });
 
   it("is travelling whenever he's between stations", () => {

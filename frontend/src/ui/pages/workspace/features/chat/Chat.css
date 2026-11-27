@@ -16,7 +16,8 @@
   /* a dragged width never covers the toolbar column */
   max-width: calc(100% - var(--toolbar-room));
   margin: var(--space-2);
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-8);
+  /* one gutter on both sides: the heading, the thread and the composer line up under each other */
+  padding: var(--space-2) var(--space-6);
   /* width springs between docked and full screen; the margin is the sheet leaving and coming back (below) */
   transition:
     translate var(--motion-slow) var(--ease-out),
@@ -26,13 +27,58 @@
     visibility 0s linear;
 }
 
-/* No card picked: the sheet slides off the right edge, and its room goes back to the board (a negative margin
- * as wide as the sheet takes it out of the row, so Gent's layer and the map widen as it goes). It leaves and
- * returns along the same path, and once it's off the board it's hidden as well as inert. */
-.chat[data-idle] {
-  margin-right: calc(-1 * var(--chat-width) - var(--space-4));
-  visibility: hidden;
-  transition-delay: 0s, 0s, 0s, 0s, var(--motion-spring);
+/* Collapsed: the sheet folds into a slim tab on the board's right edge (width springs, as between docked and full
+ * screen). Only the tab shows; the rest stays mounted, so a draft survives. */
+.chat[data-collapsed] {
+  width: 3rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chat[data-collapsed] .chat-inner {
+  display: none;
+}
+
+.chat-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-4) 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+
+.chat-tab:is(:hover, :focus-visible) {
+  color: var(--color-text);
+}
+
+.chat-tab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -4px;
+}
+
+/* the tab's name, written up the spine */
+.chat-tab-label {
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+/* no card picked: how to start, centred on the sheet */
+.chat-start {
+  max-width: 22rem;
+  margin: auto;
+}
+
+.chat-start-icon {
+  color: var(--color-string);
 }
 
 /* the sheet swings in from the right edge when it opens */
@@ -118,9 +164,12 @@
   --pop-scale: 0.94;
 }
 
-/* the court button, beside full screen: a live debate's is filled, so it reads from across the board */
-.chat-court-button {
-  flex: none;
+/* a debate card's verdict rides the top of the thread while its chat scrolls under it */
+.chat-history > li.chat-verdict {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  content-visibility: visible;
 }
 
 .chat-title-kicker {
@@ -161,6 +210,8 @@
   /* never sideways: tilted slips and their slide-in poke past the edge (wide code, tables and maths scroll on their own) */
   overflow-x: hidden;
   overscroll-behavior: contain;
+  /* the scrollbar's room on both sides, so the thread stays centred under the heading */
+  scrollbar-gutter: stable both-edges;
   /* text fades as it scrolls under the heading or down to the field, not cut off */
   mask-image: linear-gradient(transparent, #000 var(--space-6), #000 calc(100% - var(--space-4)), transparent);
 }
@@ -184,7 +235,7 @@
  * overflowing list unreachable by scrolling. */
 .chat-history {
   margin-top: auto;
-  padding: var(--space-4) var(--space-2);
+  padding: var(--space-4) 0;
 }
 
 .chat-field,
@@ -626,6 +677,22 @@
     box-shadow var(--motion-fast) var(--ease-out);
 }
 
+/* The user's own question is filled in their red (red is the user's), paper-coloured writing on it. Darkened a
+ * touch so the writing keeps 4.5:1 on the dark theme's brighter red. */
+.message-user-bubble:not([data-author], .message-answers) {
+  background: var(--texture-grain), color-mix(in srgb, var(--color-string) 90%, black);
+  color: var(--slip-light);
+  padding-left: var(--space-4);
+}
+
+.message-user-bubble:not([data-author], .message-answers)::after {
+  content: none;
+}
+
+.message-user-bubble:not([data-author], .message-answers) [data-ui="text"] {
+  color: inherit;
+}
+
 /* a question Gent asked: his ink note on the sheet (InkPanel draws it), not a slip of the user's paper */
 .message-user-bubble[data-author="gent"] {
   padding: var(--space-3) var(--space-4);
@@ -955,12 +1022,15 @@
   padding-top: var(--space-1);
 }
 
-/* written on the card's ruled lines (the Panel draws them) */
+/* written on the card's ruled lines: drawn on the field itself, one per line of text, so the writing always sits
+ * on them (and they scroll with it) */
 .message-field-input {
   flex: 1;
   min-height: calc(var(--rule) * 2);
   max-height: calc(var(--rule) * 7);
-  padding-inline: var(--space-1);
+  padding: 0 var(--space-1);
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--rule) - 1px), var(--color-ruling) calc(var(--rule) - 1px) var(--rule));
+  background-attachment: local;
   /* written in the slip's face, so the card reads as the slip it becomes */
   font-family: var(--font-heading);
   font-size: var(--font-size-m);
@@ -991,12 +1061,12 @@
   box-shadow: none;
 }
 
-/* Red, like every action the user takes. The icon is a graphic on it (3:1 is
- * enough), so the card's own paper works on the red in both themes. */
+/* Red, like every action the user takes, with the arrow in paper on it. */
 [data-ui="panel"][data-component="button"].message-field-send:not(:disabled, [data-stop]) {
   border-color: transparent;
   background: var(--color-string);
-  color: var(--color-composer);
+  /* solid paper: the composer's own colour is see-through, and vanished on the red */
+  color: var(--slip-light);
   box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--color-string) 55%, transparent);
   animation: send-armed var(--motion-slow) var(--ease-out);
 }

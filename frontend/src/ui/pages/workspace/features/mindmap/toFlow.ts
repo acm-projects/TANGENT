@@ -1,5 +1,5 @@
 import type { Edge, Node as FlowNode } from "@xyflow/react";
-import type { AttachmentKind, Ending, NodeMeta, NodeTag } from "@/api/types";
+import type { AttachmentKind, NodeMeta, NodeTag } from "@/api/types";
 import type { TreeState } from "@/store/treeStore";
 import { selectExhibits, selectThread } from "@/store/treeStore";
 import { caseLayout } from "@/store/layout";
@@ -37,10 +37,6 @@ export interface MindMapNodeData extends Record<string, unknown> {
   question: boolean;
   /** A compact card (node_type "compact"): a thread's summary, where the context starts afresh. */
   compact: boolean;
-  /** Resolved, and by whom (the stamp's colour). */
-  resolvedBy: "user" | "gent" | null;
-  /** How its branch ended (the stamp's words), when it did. */
-  ending: Ending | null;
   /** Its coloured tag, if it has one. */
   tag: NodeTag | null;
 }
@@ -92,8 +88,6 @@ export function toFlow(s: StructureSlice): { nodes: MindMapFlowNode[]; edges: Ed
         debate: meta.node_type === "debate",
         question: meta.node_type === "question",
         compact: meta.node_type === "compact",
-        resolvedBy: meta.resolved?.by ?? null,
-        ending: meta.resolved ? (meta.resolved.kind ?? "resolved") : null,
         tag: meta.tag ?? null,
       },
     });

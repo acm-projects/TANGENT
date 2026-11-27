@@ -542,42 +542,6 @@
 }
 
 
-/* A resolved card: a rubber stamp pressed across its foot, in the hand that resolved it (the user's red, Gent's blue). */
-.mindmap-node-resolved {
-  position: absolute;
-  bottom: -0.7rem;
-  right: var(--space-4);
-  z-index: 1;
-  --stamp-ink: var(--color-string);
-  padding: 0.1em 0.6em;
-  border: 2px solid var(--stamp-ink);
-  border-radius: var(--radius-sm);
-  background: var(--texture-grain), var(--color-slip);
-  box-shadow: 1px 2px 2px var(--color-string-shadow);
-  color: var(--stamp-ink);
-  pointer-events: none;
-}
-
-/* an ended card keeps a strip clear along its foot for the stamp, so it never lands on the title */
-.mindmap-node[data-ending] {
-  padding-bottom: var(--space-6);
-}
-
-.mindmap-node-resolved[data-by="gent"] {
-  --stamp-ink: var(--color-gent);
-}
-
-/* A branch that ended without finding anything (a dead lead, a duplicate, off topic): a struck-through stamp, and the
-   card itself fades back so the eye goes to the lines that held. */
-.mindmap-node-resolved:not([data-ending="resolved"]) {
-  text-decoration: line-through;
-  border-style: dashed;
-}
-
-.mindmap-node:is([data-ending="dead_lead"], [data-ending="duplicate"], [data-ending="off_topic"]) {
-  opacity: 0.6;
-}
-
 /* A compact card is manila stock (the Panel's stock, MindMapNode.tsx) with a seal like the verdict's. */
 
 /* ── the hover actions ────────────────────────────────────── */
@@ -821,29 +785,13 @@
   --drag-ink: var(--color-danger);
 }
 
-/* compact, resolve, reopen: the user's own moves on the card, in their red */
+/* compact: the user's own move on the card, in their red */
 .mindmap-node[data-drag-action="compact"],
-.drag-action[data-action="compact"],
-.mindmap-node:is([data-drag-action="resolve"], [data-drag-action="reopen"]),
-.drag-action:is([data-action="resolve"], [data-action="reopen"]) {
+.drag-action[data-action="compact"] {
   --drag-ink: var(--color-string);
 }
 
 /* the string to the pointer and the tip beside it, over everything */
-/* The "Mark as" menu a drag to the right drops at the pointer (MarkMenu.tsx): a short column of choices. */
-.mark-menu {
-  position: fixed;
-  z-index: 50;
-  translate: var(--space-2) -50%;
-  padding: var(--space-1);
-  box-shadow: var(--shadow-lift);
-}
-
-/* options ruled apart like an index card */
-.mark-menu > * + * {
-  border-top: 1px solid var(--color-border);
-}
-
 .drag-action {
   --drag-ink: var(--color-border-emphasis);
   position: fixed;
@@ -1029,17 +977,9 @@
   color: inherit;
 }
 
-/* Gent working on a card: his ink has spilled over it (InkSpill), so its writing turns to the pale on-ink colours, as
- * on any ink panel, fading across as the pool runs under it. */
+/* Gent working on a card: his ink spills over it (GentPresence), its writing fading to the pale on-ink colours
+ * (travel.css [data-gent-ink]) as the pool runs under it. */
 .mindmap-node {
   transition: color var(--motion-base) var(--ease-out);
 }
 
-.mindmap-node[data-gent-ink] {
-  color: var(--color-text-on-gent);
-  --color-text: var(--color-text-on-gent);
-  --color-text-secondary: var(--color-text-on-gent);
-  --color-text-muted: color-mix(in srgb, var(--color-text-on-gent) 82%, transparent);
-  --color-border: color-mix(in srgb, var(--color-text-on-gent) 30%, transparent);
-  --color-border-strong: color-mix(in srgb, var(--color-text-on-gent) 55%, transparent);
-}

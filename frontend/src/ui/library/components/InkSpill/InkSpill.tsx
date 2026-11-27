@@ -21,17 +21,22 @@ type InkSpillProps = {
   /** where the spill starts, in percent of the host: the point Gent landed on */
   from?: { x: number; y: number };
   onCovered?(covered: boolean): void;
+  /** how long spreading and drawing back take, ms (GentPresence passes the outline's own times, so they move together) */
+  inMs?: number;
+  outMs?: number;
 };
 
-const IN_MS = 1400;
-const OUT_MS = 900;
+// quick: a takeover, not a show
+const IN_MS = 420;
+const OUT_MS = 280;
 const POINTS = 56;
 
-export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered }: InkSpillProps) {
+export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered, inMs = IN_MS, outMs = OUT_MS }: InkSpillProps) {
   const ref = useRef<HTMLSpanElement>(null);
   // mounted while on, and while it draws back
   const [shown, setShown] = useState(on);
   const [covered, setCovered] = useState(false);
+  const coveredRef = useRef(false);
   const progress = useRef(0);
   const covering = useRef(onCovered);
   useEffect(() => {
@@ -43,8 +48,12 @@ export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered }: In
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // from the animation frame, never inside a state updater (that would set the host's state mid-render)
     const report = (c: boolean) => {
-      setCovered((was) => (was === c ? was : (covering.current?.(c), c)));
+      if (coveredRef.current === c) return;
+      coveredRef.current = c;
+      setCovered(c);
+      covering.current?.(c);
     };
     const target = on ? 1 : 0;
     // the rim's wobble: three waves with phases fixed by the seed
@@ -52,8 +61,11 @@ export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered }: In
     const start = performance.now();
     const p0 = progress.current;
     // reduced motion: done on the first frame
-    const span = reducedMotion() ? 0 : on ? IN_MS : OUT_MS;
+    const span = reducedMotion() ? 0 : on ? inMs : outMs;
     let frame = 0;
+    // the host's own size, read once: a per-frame getBoundingClientRect cost a layout read every frame, and on the
+    // zoomed map it gave the scaled size where the clip wants the element's own px
+    const [w, h] = [el.offsetWidth, el.offsetHeight];
     const tick = (now: number) => {
       // a spill turned back halfway takes only the time its remaining distance needs
       const t = span ? Math.min(1, (now - start) / (span * Math.max(0.25, Math.abs(target - p0)))) : 1;
@@ -61,7 +73,6 @@ export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered }: In
       const eased = on ? 1 - (1 - t) ** 2.2 : t ** 1.6;
       const p = p0 + (target - p0) * eased;
       progress.current = p;
-      const { width: w, height: h } = el.getBoundingClientRect();
       const ox = (from.x / 100) * w;
       const oy = (from.y / 100) * h;
       const reach = Math.hypot(Math.max(ox, w - ox), Math.max(oy, h - oy)) * 1.3;
@@ -82,7 +93,7 @@ export function InkSpill({ on, seed = 7, from = { x: 50, y: 0 }, onCovered }: In
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [on, shown, seed, from.x, from.y]);
+  }, [on, shown, seed, from.x, from.y, inMs, outMs]);
 
   if (!shown) return null;
   return (

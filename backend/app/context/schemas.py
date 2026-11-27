@@ -4,9 +4,6 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-# How a branch can end (a card's `resolved` stamp): kind -> the stamp's label. Every ending settles the branch; only
-# "resolved" found something. A stamp without a kind is "resolved".
-ENDINGS = {"resolved": "Resolved", "dead_lead": "Dead lead", "off_topic": "Off topic"}
 
 # A card's coloured tag (`nodes.tag` = {shape, color}); the colours carry no fixed meaning.
 TAG_COLORS = ("ochre", "sage", "rust", "slate", "plum", "teal", "rose", "graphite")
@@ -72,8 +69,6 @@ class NodeMeta(BaseModel):
     merge_source_ids: list[UUID] = []
     # a question card's question (app/questions.py)
     question: Optional[dict] = None
-    # how a card's branch ended: {by, at, kind}, kind one of ENDINGS (app/resolving.py)
-    resolved: Optional[dict] = None
     # the card's coloured tag: {shape, color} (TAG_SHAPES, TAG_COLORS)
     tag: Optional[dict] = None
 

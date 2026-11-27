@@ -120,10 +120,12 @@ _ADDED_COLUMNS = [
     # Question cards (app/questions.py): their node type, and the question each holds
     "ALTER TYPE node_type ADD VALUE IF NOT EXISTS 'question'",
     "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS question jsonb",
-    # Compact and resolve (app/resolving.py): the Compacted card's type, and a resolved card's stamp
+    # Compact (app/resolving.py): the Compacted card's type. (nodes.resolved, from the removed resolve stamp, is left
+    # in place unused rather than dropped.)
     "ALTER TYPE node_type ADD VALUE IF NOT EXISTS 'compact'",
-    "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS resolved jsonb",
     "ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tag jsonb",
+    # What each tag colour means in a case (migrations/2026-11-tag-labels.sql)
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS tag_labels jsonb",
     # Gent's conversations (app/agent/thread.py): one thread per user per project, its Field Notes, and the
     # events of every run in order (notes, tools, answers, replies), replayed by the client to rebuild the chat.
     """CREATE TABLE IF NOT EXISTS gent_threads (

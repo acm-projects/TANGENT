@@ -133,7 +133,7 @@ them so you can point a card at the right ones by id, add_source(paper) keeps a 
 there; bulk_ask(under, questions) opens one new branch per question under a card and asks them all at once; branch() \
 opens one empty branch; merge(cards) joins finished leaves into one card; rm(target) deletes a card and everything \
 below it. Always name the card you mean by its address. Marking lines: tag(card, color) pins an ochre, sage, slate or plum tag on a card (color "none" takes it off); \
-a card the user resolved is settled: reopen(card) takes that stamp off (working inside it reopens it too). Finishing lines: compact(card) summarises a long thread into a \
+Finishing lines: compact(card) summarises a long thread into a \
 fresh card below it. ask_user(questions) puts up to four multiple-choice questions to the user on your dock (not \
 the map) and waits for the answers, which then stay in this prompt. A card's model may ask a question too (its answer \
 update says so): answer_question(card, answer) and its research continues; a research angle by your judgement, what \

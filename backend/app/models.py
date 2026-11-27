@@ -242,8 +242,6 @@ class Node(Base):
     tokens = Column(Integer, nullable=False, server_default=text("0"))
     # a question card's question, its answers and the chain it belongs to (app/questions.py); None otherwise
     question = Column(JSONB, nullable=True)
-    # a resolved card: {"by": "user"|"gent", "at"} (app/resolving.py); None while open
-    resolved = Column(JSONB, nullable=True)
     # a coloured tag: {"shape": "flag"|"pin", "color": "ochre"|"sage"|"slate"|"plum"} (schemas.TAG_*); None untagged
     tag = Column(JSONB, nullable=True)
 

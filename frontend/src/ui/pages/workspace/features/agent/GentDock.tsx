@@ -18,7 +18,7 @@ import { GentAsk } from "./GentAsk";
 import { GentAvatar } from "./avatar/GentAvatar";
 import { avatarState } from "./avatar/avatarState";
 import { clearThread, openThread, stopTask, talkToGent } from "./gentActions";
-import { cardAt, doing, phases, statusLine, stepIcon } from "./status";
+import { cardAt, doing, statusLine, stepIcon } from "./status";
 import { usePresence } from "./travel/traveller";
 import "./GentDock.css";
 
@@ -65,6 +65,8 @@ export function GentDock() {
   // the bar's buttons are there only while the dock is hovered or focused: at rest the pill shrinks to Gent and his status
   const controls = hovered || focused;
   useSpringWidth(panelRef, `${mode}:${status}:${controls}:${showing}`);
+  // the closed dock leans toward a pointer that comes near it (not the open chat: you're reading that)
+  useMagnet(panelRef, mode !== "chat");
 
   // the project's thread with Gent, from the server (and him, live, if he's mid-task)
   const projectId = project?.id;
@@ -150,7 +152,6 @@ export function GentDock() {
         seed={5}
         className="gent-dock"
         data-mode={mode}
-        data-peek={(mode === "circle" && hovered) || undefined}
         data-state={asking ? "waiting" : busy ? "working" : outcome ? outcome.kind : "idle"}
         aria-label="Gent"
         onPointerEnter={(e: PointerEvent) => e.pointerType === "mouse" && setHovered(true)}
@@ -276,6 +277,55 @@ function NowLine({ status }: { status: string }) {
 /** Spring the element's width from where it is to its natural width whenever `key` changes (its size mode, or
  * the status that sizes the pill): CSS can't animate to fit-content everywhere. Between changes the width is
  * left to CSS, so typing hugs at once. */
+/** Magnetic pull: while `on`, a mouse within MAGNET_RANGE px of the element's edge tugs it toward the pointer (up to
+ * MAGNET_PULL px), harder the closer it gets; it springs back when the pointer goes. Written as CSS custom properties
+ * (--magnet-x/-y, read by GentDock.css), so React doesn't re-render per pointer move. Mice only; none with reduced motion. */
+const MAGNET_RANGE = 110;
+const MAGNET_PULL = 14;
+
+function useMagnet(ref: React.RefObject<HTMLElement | null>, on: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !on || reducedMotion() || !matchMedia("(pointer: fine)").matches) return;
+    let frame = 0;
+    let last: { x: number; y: number } | null = null;
+    const apply = () => {
+      frame = 0;
+      if (!last) return;
+      const r = el.getBoundingClientRect();
+      // how far outside the box the pointer is (0 inside), and its offset from the centre
+      const out = Math.hypot(Math.max(r.left - last.x, 0, last.x - r.right), Math.max(r.top - last.y, 0, last.y - r.bottom));
+      const k = Math.max(0, 1 - out / MAGNET_RANGE);
+      const dx = (last.x - (r.left + r.width / 2)) / (r.width / 2 + MAGNET_RANGE);
+      const dy = (last.y - (r.top + r.height / 2)) / (r.height / 2 + MAGNET_RANGE);
+      el.style.setProperty("--magnet-x", `${(dx * k * MAGNET_PULL).toFixed(1)}px`);
+      el.style.setProperty("--magnet-y", `${(dy * k * MAGNET_PULL).toFixed(1)}px`);
+      el.style.setProperty("--magnet-tilt", `${(dx * k * 12).toFixed(1)}deg`);
+      el.toggleAttribute("data-magnet", k > 0);
+    };
+    const move = (e: globalThis.PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      last = { x: e.clientX, y: e.clientY };
+      frame ||= requestAnimationFrame(apply);
+    };
+    const leave = () => {
+      last = null;
+      el.style.removeProperty("--magnet-x");
+      el.style.removeProperty("--magnet-y");
+      el.style.removeProperty("--magnet-tilt");
+      el.removeAttribute("data-magnet");
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    document.documentElement.addEventListener("pointerleave", leave);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", move);
+      document.documentElement.removeEventListener("pointerleave", leave);
+      leave();
+    };
+  }, [ref, on]);
+}
+
 function useSpringWidth(ref: React.RefObject<HTMLElement | null>, key: string) {
   const rest = useRef<number | null>(null);
   const running = useRef<AnimationPlaybackControls | null>(null);
@@ -349,32 +399,26 @@ function Conversation({ turns, busy, open }: { turns: GentTurn[]; busy: boolean;
 function GentTurnRows({ turn, index, live }: { turn: Extract<GentTurn, { role: "gent" }>; index: number; live: boolean }) {
   const showNudges = useGentStore((s) => s.showNudges);
   const steps = turn.steps.filter((step) => step.kind !== "nudge" || showNudges);
-  const parts = phases(steps);
+  const moves = steps.filter((step) => step.kind !== "note").length;
   return (
     <>
-      {/* his case notes: each of his notes heads the moves that follow it; done phases fold to the note and a count,
-       * the one he's working in stays open (a long run is dozens to hundreds of moves) */}
-      {parts.map((part, p) => {
-        const current = live && p === parts.length - 1;
-        const title = part.note?.text ?? "Getting started";
-        const count = `${part.steps.length} ${part.steps.length === 1 ? "move" : "moves"}`;
-        return (
-          <li key={p} className="gent-phase" data-current={current || undefined}>
-            {part.steps.length === 0 ? (
-              <Text as="p" size="s" className="gent-phase-note" content={title} />
-            ) : (
-              <details open={current} className="gent-phase-box">
-                <summary>
-                  <span className="gent-phase-note">{title}</span>
-                  <span className="gent-phase-count">{count}</span>
-                  <Icon icon="expand_more" size="xs" className="gent-phase-chevron" />
-                </summary>
-                <PhaseMoves steps={part.steps} phase={p} title={title} />
-              </details>
-            )}
+      {/* One flat log, his notes heading the moves they led to. While he works it's in view (the latest moves); once
+       * he's done it folds into one line between your task and his answer: the answer is what you came for. */}
+      {steps.length > 0 &&
+        (live ? (
+          <RunLog steps={steps} recent />
+        ) : (
+          <li className="gent-work">
+            <details className="gent-work-box">
+              <summary>
+                <span className="gent-work-title">How I got there</span>
+                <span className="gent-work-count">{`${moves} ${moves === 1 ? "move" : "moves"}`}</span>
+                <Icon icon="expand_more" size="xs" className="gent-work-chevron" />
+              </summary>
+              <RunLog steps={steps} />
+            </details>
           </li>
-        );
-      })}
+        ))}
       {turn.reply && <MessageBubble message={{ role: "assistant", content: turn.reply, seq: index, created_at: "" }} markdown={REPORT_MARKDOWN} />}
       {/* how the run ended, stamped as on the pill, with the why beside it */}
       {turn.stopped && (
@@ -395,19 +439,26 @@ function GentTurnRows({ turn, index, live }: { turn: Extract<GentTurn, { role: "
   );
 }
 
-/** A phase's moves: the latest few, with the rest one click away (a phase can run to a hundred moves or more). */
-function PhaseMoves({ steps, phase, title }: { steps: GentStep[]; phase: number; title: string }) {
+/** A run's log, flat: each of his notes as a heading in his type, the moves after it hung off his margin.
+ * `recent`: only the latest rows, the rest one click away (a run can reach hundreds of moves). */
+function RunLog({ steps, recent = false }: { steps: GentStep[]; recent?: boolean }) {
   const [all, setAll] = useState(false);
-  const hidden = all ? 0 : Math.max(0, steps.length - RECENT_MOVES);
+  const hidden = recent && !all ? Math.max(0, steps.length - RECENT_MOVES) : 0;
   return (
     <>
       {hidden > 0 && (
-        <Button hierarchy="tertiary" size="s" label={`Show ${hidden} earlier ${hidden === 1 ? "move" : "moves"}`} onClick={() => setAll(true)} className="gent-phase-more" />
+        <Button hierarchy="tertiary" size="s" label={`Show ${hidden} earlier`} onClick={() => setAll(true)} className="gent-log-more" />
       )}
-      <ol className="gent-log" aria-label={`What Gent did: ${title}`}>
-        {steps.slice(hidden).map((step, i) => (
-          <Step key={step.kind === "tool" ? step.id : `${step.kind}-${phase}-${hidden + i}`} step={step} />
-        ))}
+      <ol className="gent-log" aria-label="What Gent did">
+        {steps.slice(hidden).map((step, i) =>
+          step.kind === "note" ? (
+            <li key={`note-${hidden + i}`} className="gent-log-note" title={step.text}>
+              {step.text}
+            </li>
+          ) : (
+            <Step key={step.kind === "tool" ? step.id : `${step.kind}-${hidden + i}`} step={step} />
+          ),
+        )}
       </ol>
     </>
   );

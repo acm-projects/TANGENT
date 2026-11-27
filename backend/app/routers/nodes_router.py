@@ -306,14 +306,6 @@ async def _load_path(
 _background_tasks: set = set()
 
 
-async def _reopen_for_work(user_id: UUID, node_id: UUID) -> list[str]:
-    """Work is about to happen on node_id: reopen the resolved cards it falls under (app/resolving.py), in a session
-    of its own and committed. Returns their ids."""
-    async with AsyncSessionLocal() as session, session.begin():
-        await session.execute(text("SELECT set_config('app.current_user_id', :uid, true)"), {"uid": str(user_id)})
-        return [str(i) for i in await resolving.reopen_for_work(session, node_id, user_id)]
-
-
 async def _prepare_write(user_id: UUID, project_id: UUID, node_id: UUID) -> tuple[UUID, Optional[dict]]:
     """Resolve where this write goes. Owner: the node itself. Sharee: fork the project first (own session,
     committed on its own so the copy exists whatever happens to the model call) and map the node into the copy.
@@ -478,7 +470,6 @@ async def fork_node(
         parent_id = fork.node_map[parent_id]
         tree_id = fork.tree_map[tree_id]
 
-    await resolving.reopen_for_work(db, parent_id, user.id)
     child = await _create_child(
         db, tree_id=tree_id, project_id=project_id, parent_id=parent_id, user_id=user.id
     )
@@ -493,17 +484,13 @@ class CompactOut(BaseModel):
     fork: Optional[ForkInfo] = None
 
 
-class ResolveIn(BaseModel):
-    kind: Literal["resolved", "dead_lead", "off_topic"] = "resolved"  # resolving.ENDINGS
-
-
 class ResolveOut(BaseModel):
-    node: NodeMeta  # the card, stamped resolved (or no longer)
+    node: NodeMeta  # the card, as it is after the write (a tag put on or taken off)
     fork: Optional[ForkInfo] = None
 
 
 async def _write_card(db: AsyncSession, node_id: UUID, user_id: UUID) -> tuple[Node, Optional[ForkInfo]]:
-    """The card a compact/resolve/reopen writes to: the node itself, or (a sharee's first write) its copy in their
+    """The card a compact or tag writes to: the node itself, or (a sharee's first write) its copy in their
     fork. 404 if invisible, 409 while a reply streams on it."""
     node = await db.get(Node, node_id)
     if node is None:
@@ -526,27 +513,6 @@ async def compact_node(node_id: UUID, db: AsyncSession = Depends(get_db_session)
     await db.commit()
     await db.refresh(card)
     return CompactOut(node=NodeMeta.model_validate(card), fork=info)
-
-
-@router.post("/{node_id}/resolve", response_model=ResolveOut)
-async def resolve_node(node_id: UUID, body: Optional[ResolveIn] = None, db: AsyncSession = Depends(get_db_session),
-                       user: User = Depends(get_current_user)):
-    """Stamp how the card's branch ended (resolved, a dead lead, ...): a marker that it is settled."""
-    node, info = await _write_card(db, node_id, user.id)
-    node = await resolving.resolve(db, node, user.id, "user", (body or ResolveIn()).kind)
-    await db.commit()
-    await db.refresh(node)
-    return ResolveOut(node=NodeMeta.model_validate(node), fork=info)
-
-
-@router.post("/{node_id}/reopen", response_model=ResolveOut)
-async def reopen_node(node_id: UUID, db: AsyncSession = Depends(get_db_session), user: User = Depends(get_current_user)):
-    """Take the resolved stamp off."""
-    node, info = await _write_card(db, node_id, user.id)
-    await resolving.reopen(db, node, user.id)
-    await db.commit()
-    await db.refresh(node)
-    return ResolveOut(node=NodeMeta.model_validate(node), fork=info)
 
 
 class TagIn(BaseModel):
@@ -621,7 +587,6 @@ async def answer_question(
     project_id, fork = await get_write_target(db, card.project_id, user_id)
     if fork is not None:
         card = await db.get(Node, fork.node_map[card.id])
-    await resolving.reopen_for_work(db, card.id, user_id)
     out = await questions.answer(db, card, user_id, req.answer)
     update = question_update(card, out, "user")
     info = await build_fork_info(db, fork) if fork is not None else None
@@ -719,7 +684,6 @@ async def split_node(
     if chats[req.after_seq].get("role") != "assistant":
         raise HTTPException(400, "A node can only be split after a reply")
 
-    await resolving.reopen_for_work(db, node.id, user.id)
     head, rest = chats[: req.after_seq + 1], chats[req.after_seq + 1 :]
     rest = [{**m, "seq": i} for i, m in enumerate(rest)]
     first_question = next((m["content"] for m in rest if m.get("role") == "user"), None)
@@ -793,7 +757,6 @@ async def join_child(
         raise HTTPException(409, "Wait for the reply to finish before merging")
     if node.model and child.model and node.model != child.model:
         raise HTTPException(409, "These two use different models, so they can't become one node")
-    await resolving.reopen_for_work(db, node.id, user.id)
     node.model = node.model or child.model
     node.tokens += child.tokens
 
@@ -866,8 +829,6 @@ async def merge_nodes(
         tree_id = fork.tree_map[tree_id]
         source_ids = [fork.node_map[source_id] for source_id in source_ids]
 
-    for source_id in source_ids:
-        await resolving.reopen_for_work(db, source_id, user.id)
     child = await _create_child(
         db, tree_id=tree_id, project_id=project_id, parent_id=source_ids[0], user_id=user.id
     )
@@ -1002,8 +963,6 @@ async def _answer(user_id, project_id, node_id, messages, prompt, model, emit, r
             log.exception("forking project %s for user %s failed", project_id, user_id)
             emit("error", {"message": "The project could not be copied."})
             return
-        if reopened := await _reopen_for_work(user_id, write_node_id):
-            emit("reopened", {"ids": reopened})
 
         reply: list[str] = []
         done: dict = {}

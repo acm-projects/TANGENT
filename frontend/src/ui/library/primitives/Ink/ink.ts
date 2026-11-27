@@ -307,17 +307,23 @@ function inkTexture(seed: number, cell: number, period: number, light: number, d
   return c;
 }
 
-let tiles: { blotch: HTMLCanvasElement; grain: HTMLCanvasElement; dpr: number } | null = null;
+/* One pair of tiles per pixel density, kept. Surfaces draw at different densities (an outline on the zoomed map is
+ * the screen's density times the zoom), and a single cached pair was rebuilt every time the next surface's density
+ * differed: tens of ms of per-pixel noise, several times a frame, while Gent worked. Densities are rounded to a
+ * quarter so zooming makes only a handful; the grain is noise, so a tile a few % off scale doesn't show. */
+const tileSets = new Map<number, { blotch: HTMLCanvasElement; grain: HTMLCanvasElement }>();
 function textures(dpr: number) {
-  if (!tiles || tiles.dpr !== dpr) {
+  const key = Math.max(0.25, Math.round(dpr * 4) / 4);
+  let set = tileSets.get(key);
+  if (!set) {
     const paper = inkColors().paper;
-    tiles = {
-      dpr,
-      blotch: inkTexture(11, 18, 24, J.mottle * 1.6, J.mottle * 1.2, J.pores, paper, dpr), // the big uneven patches
-      grain: inkTexture(29, 6, 48, J.mottle * 0.9, J.mottle * 0.7, 0, paper, dpr), // finer streaks over them
+    set = {
+      blotch: inkTexture(11, 18, 24, J.mottle * 1.6, J.mottle * 1.2, J.pores, paper, key), // the big uneven patches
+      grain: inkTexture(29, 6, 48, J.mottle * 0.9, J.mottle * 0.7, 0, paper, key), // finer streaks over them
     };
+    tileSets.set(key, set);
   }
-  return tiles;
+  return set;
 }
 
 /** Gent's inks (colors.css), one pair for both themes like the red */

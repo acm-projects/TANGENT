@@ -21,34 +21,20 @@ import { NewProjectTile } from "./components/NewProjectTile";
 import { ProjectCard } from "./components/ProjectCard";
 import { useBoard } from "./useBoard";
 import { TreePreviews, useCaseFiling, type TreeCache } from "./useTreePreview";
-import type { CaseFacts, CaseStatus } from "./sketch";
+import type { CaseFacts } from "./sketch";
 import "./Board.css";
 
-/* The dashboard board: the open workspace's name, its cases filed the way a detective files them (open cases, then
- * cold ones nobody has touched in weeks, then the closed), each pile under a strip of masking tape and the most
- * recently worked on first, and the drawer of workspace folders along the bottom. The board lands with every folder
- * shut, then the open one empties its cards out onto their piles, so even the first view shows where they live. */
+/* The dashboard board: the open workspace's name, its cases most recently worked on first, and the drawer of workspace folders along the bottom. The board lands with every folder
+ * shut, then the open one deals its cards out onto the board, so even the first view shows where they live. */
 
-const PILES: { status: CaseStatus; label: string; note: string }[] = [
-  { status: "open", label: "Open cases", note: "" },
-  { status: "cold", label: "Cold cases", note: "Nothing new in three weeks" },
-  { status: "closed", label: "Closed", note: "Every branch has ended" },
-];
-
-/** The cases on each pile, most recently worked on first. A case whose tree can't be read is filed as open. */
-function file(
+/** The cases, most recently worked on first. */
+function byLastActive(
   projects: ProjectSummary[],
   facts: Map<string, CaseFacts | null>,
 ) {
   const when = (p: ProjectSummary) =>
     facts.get(p.id)?.lastActive ?? p.created_at;
-  const sorted = [...projects].sort((a, b) => when(b).localeCompare(when(a)));
-  return PILES.map((pile) => ({
-    ...pile,
-    cases: sorted.filter(
-      (p) => (facts.get(p.id)?.status ?? "open") === pile.status,
-    ),
-  }));
+  return [...projects].sort((a, b) => when(b).localeCompare(when(a)));
 }
 
 type BoardProps = { slug: string };
@@ -72,11 +58,9 @@ export function Board({ slug }: BoardProps) {
   }, [filed]);
   // the folder holds its newest FOLDER_CARDS; any other card drops in instead of flying out of it
   const inFolder = new Set(projects.slice(0, FOLDER_CARDS).map((p) => p.id));
-  // the piles, each card numbered in the order it's dealt out of the folder
-  const piles = file(projects, facts ?? new Map());
-  const dealOrder = new Map(
-    piles.flatMap((pile) => pile.cases).map((p, i) => [p.id, i]),
-  );
+  // each card numbered in the order it's dealt out of the folder
+  const cases = byLastActive(projects, facts ?? new Map());
+  const dealOrder = new Map(cases.map((p, i) => [p.id, i]));
   const title = board.workspace?.workspace_name ?? board.activeSlug;
 
   return (
@@ -118,86 +102,36 @@ export function Board({ slug }: BoardProps) {
               </Frame>
             )}
             {ready && (
-              // the piles sit side by side while they fit, and wrap under each other when they don't
-              <Frame direction="row" gap="8" className="board-piles">
-                {piles.map((pile) =>
-                  pile.cases.length === 0 && pile.status !== "open" ? null : (
-                    <Frame
-                      as="section"
-                      gap="4"
-                      key={pile.status}
-                      className="board-pile"
-                      data-pile={pile.status}
-                      aria-labelledby={`pile-${pile.status}`}
+              <Frame
+                as="ol"
+                direction="row"
+                className="board-grid"
+                aria-label="Cases"
+              >
+                {landed &&
+                  cases.map((p) => (
+                    <motion.li
+                      key={p.id}
+                      layout="position"
+                      transition={spring.fly}
                     >
-                      {/* the pile's name on a strip of masking tape stuck to the cork */}
-                      <Frame
-                        direction="row"
-                        gap="3"
-                        align="center"
-                        className="board-pile-head"
-                      >
-                        <Text
-                          as="h2"
-                          id={`pile-${pile.status}`}
-                          face="stamp"
-                          size="xs"
-                          className="board-pile-tape"
-                          content={`${pile.label} · ${pile.cases.length}`}
-                        />
-                        {pile.note && (
-                          <Text
-                            as="span"
-                            size="xs"
-                            hierarchy="tertiary"
-                            content={pile.note}
-                          />
-                        )}
-                      </Frame>
-                      <Frame
-                        as="ol"
-                        direction="row"
-                        className="board-grid"
-                        aria-labelledby={`pile-${pile.status}`}
-                      >
-                        {landed &&
-                          pile.cases.map((p) => (
-                            <motion.li
-                              key={p.id}
-                              layout="position"
-                              transition={spring.fly}
-                            >
-                              <ProjectCard
-                                project={p}
-                                index={dealOrder.get(p.id) ?? 0}
-                                dropIn={!inFolder.has(p.id)}
-                                slug={board.activeSlug}
-                                onRename={(name) =>
-                                  board.renameProject(p.id, name)
-                                }
-                                onDelete={() => board.deleteProject(p.id)}
-                              />
-                            </motion.li>
-                          ))}
-                        {pile.status === "open" && (
-                          <motion.li
-                            key="new"
-                            layout="position"
-                            transition={spring.fly}
-                          >
-                            <NewProjectTile
-                              names={projects.map((p) => p.project_name)}
-                              onCreate={board.createProject}
-                              onCreated={(id) =>
-                                router.push(`/${board.activeSlug}/${id}`)
-                              }
-                            />
-                          </motion.li>
-                        )}
-                      </Frame>
-                    </Frame>
-                  ),
-                )}
+                      <ProjectCard
+                        project={p}
+                        index={dealOrder.get(p.id) ?? 0}
+                        dropIn={!inFolder.has(p.id)}
+                        slug={board.activeSlug}
+                        onRename={(name) => board.renameProject(p.id, name)}
+                        onDelete={() => board.deleteProject(p.id)}
+                      />
+                    </motion.li>
+                  ))}
+                <motion.li key="new" layout="position" transition={spring.fly}>
+                  <NewProjectTile
+                    names={projects.map((p) => p.project_name)}
+                    onCreate={board.createProject}
+                    onCreated={(id) => router.push(`/${board.activeSlug}/${id}`)}
+                  />
+                </motion.li>
               </Frame>
             )}
           </Frame>
