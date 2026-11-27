@@ -394,10 +394,8 @@
 .gent-chat-history .message-user-bubble {
   color: var(--color-text-on-paper);
   --color-text: var(--color-text-on-paper);
-  background:
-    linear-gradient(var(--color-string), var(--color-string)) var(--space-3) 0 / 1px 100% no-repeat,
-    var(--texture-grain),
-    var(--color-slip);
+  /* the slip's red margin is the Panel's own (ruled="margin"); only its paper is named here */
+  background: var(--texture-grain), var(--color-slip);
 }
 
 .gent-chat-history .message-meta,
